@@ -1,0 +1,2448 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schema 文件 — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">Schema 文件</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">Schema 文件</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link active" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control">Document Control</a></li><li><a class="toc__link" href="#change-log">Change Log</a></li><li><a class="toc__link" href="#1-概述">1. 概述</a></li><li><a class="toc__link toc__link--h3" href="#11-schema-boundary-declaration">1.1 Schema Boundary Declaration</a></li><li><a class="toc__link toc__link--h3" href="#12-table-inventory全-40-張表依-bc-schema-歸屬">1.2 Table Inventory（全 40 張表，依 BC schema 歸屬）</a></li><li><a class="toc__link" href="#0-shared-enum-types被多張-table-引用的共用型別">§0 Shared ENUM Types（被多張 table 引用的共用型別）</a></li><li><a class="toc__link" href="#2-通用欄位規範">2. 通用欄位規範</a></li><li><a class="toc__link toc__link--h3" href="#21-命名慣例">2.1 命名慣例</a></li><li><a class="toc__link toc__link--h3" href="#22-所有資料表的基礎欄位規範">2.2 所有資料表的基礎欄位規範</a></li><li><a class="toc__link toc__link--h3" href="#23-主鍵-id-策略全-schema-一致性說明回應-review-critical-3">2.3 主鍵 ID 策略（全 Schema 一致性說明，回應 Review CRITICAL #3）</a></li><li><a class="toc__link toc__link--h3" href="#24-軟刪除soft-delete策略全域政策回應-review-critical-18">2.4 軟刪除（Soft Delete）策略（全域政策，回應 Review CRITICAL #18）</a></li><li><a class="toc__link" href="#3-資料表定義">3. 資料表定義</a></li><li><a class="toc__link toc__link--h3" href="#共用-trigger-function全-schema-一次定義所有可變表共用">共用 Trigger Function（全 schema 一次定義，所有可變表共用）</a></li><li><a class="toc__link toc__link--h3" href="#31-bc-member">3.1 BC: member</a></li><li><a class="toc__link toc__link--h3" href="#32-bc-wallet">3.2 BC: wallet</a></li><li><a class="toc__link toc__link--h3" href="#33-bc-deposit">3.3 BC: deposit</a></li><li><a class="toc__link toc__link--h3" href="#34-bc-entitlement">3.4 BC: entitlement</a></li><li><a class="toc__link toc__link--h3" href="#35-bc-record">3.5 BC: record</a></li><li><a class="toc__link toc__link--h3" href="#36-bc-leaderboard">3.6 BC: leaderboard</a></li><li><a class="toc__link toc__link--h3" href="#37-bc-game-save">3.7 BC: game-save</a></li><li><a class="toc__link toc__link--h3" href="#38-平台底座spring-modulith-outboxmodulith-schema">3.8 平台底座：Spring Modulith Outbox（modulith schema）</a></li><li><a class="toc__link toc__link--h3" href="#39-平台底座橫切platform-schema">3.9 平台底座：橫切（platform schema）</a></li><li><a class="toc__link" href="#4-正規化規則normalization-rules">4. 正規化規則（Normalization Rules）</a></li><li><a class="toc__link toc__link--h3" href="#41-各正規化形式與本系統落實">4.1 各正規化形式與本系統落實</a></li><li><a class="toc__link toc__link--h3" href="#42-刻意反正規化intentional-denormalization">4.2 刻意反正規化（Intentional Denormalization）</a></li><li><a class="toc__link" href="#5-索引策略indexing-strategy">5. 索引策略（Indexing Strategy）</a></li><li><a class="toc__link toc__link--h3" href="#51-索引清單對應查詢模式--api-endpoint">5.1 索引清單（對應查詢模式 / API Endpoint）</a></li><li><a class="toc__link toc__link--h3" href="#52-索引類型選用">5.2 索引類型選用</a></li><li><a class="toc__link toc__link--h3" href="#53-複合索引欄位順序">5.3 複合索引欄位順序</a></li><li><a class="toc__link toc__link--h3" href="#54-partial-index-應用">5.4 Partial Index 應用</a></li><li><a class="toc__link toc__link--h3" href="#55-索引膨脹監控">5.5 索引膨脹監控</a></li><li><a class="toc__link" href="#6-稽核與合規資料表audit--compliance">6. 稽核與合規資料表（Audit &amp;amp; Compliance）</a></li><li><a class="toc__link toc__link--h3" href="#61-標準稽核日誌表">6.1 標準稽核日誌表</a></li><li><a class="toc__link toc__link--h3" href="#62-自動稽核-trigger-模式">6.2 自動稽核 Trigger 模式</a></li><li><a class="toc__link toc__link--h3" href="#63-gdpr--個資保護">6.3 GDPR / 個資保護</a></li><li><a class="toc__link" href="#7-效能設計performance-design">7. 效能設計（Performance Design）</a></li><li><a class="toc__link toc__link--h3" href="#71-查詢效能基準表">7.1 查詢效能基準表</a></li><li><a class="toc__link toc__link--h3" href="#72-n1-查詢防護">7.2 N+1 查詢防護</a></li><li><a class="toc__link toc__link--h3" href="#73-連線池大小公式">7.3 連線池大小公式</a></li><li><a class="toc__link toc__link--h3" href="#74-read-replica-路由規則">7.4 Read Replica 路由規則</a></li><li><a class="toc__link toc__link--h3" href="#75-代表性使用案例-sql依-prd-高頻情境含頻率--效能注意">7.5 代表性使用案例 SQL（依 PRD 高頻情境，含頻率 + 效能注意）</a></li><li><a class="toc__link" href="#8-migration-策略migration-strategy">8. Migration 策略（Migration Strategy）</a></li><li><a class="toc__link toc__link--h3" href="#80-工具與命名">8.0 工具與命名</a></li><li><a class="toc__link toc__link--h3" href="#81-migration-實作清單必填按執行順序">8.1 Migration 實作清單（必填，按執行順序）</a></li><li><a class="toc__link toc__link--h3" href="#82-零停機-expand-contract-pattern">8.2 零停機 Expand-Contract Pattern</a></li><li><a class="toc__link toc__link--h3" href="#83-大表無鎖加欄位4-步驟">8.3 大表無鎖加欄位（4 步驟）</a></li><li><a class="toc__link toc__link--h3" href="#84-migration-測試檢查清單">8.4 Migration 測試檢查清單</a></li><li><a class="toc__link" href="#9-資料完整性約束data-integrity-constraints">9. 資料完整性約束（Data Integrity Constraints）</a></li><li><a class="toc__link toc__link--h3" href="#91-外鍵-on-delete-行為僅限同-bc-schema-內">9.1 外鍵 ON DELETE 行為（僅限同 BC schema 內）</a></li><li><a class="toc__link toc__link--h3" href="#92-check-約束清單">9.2 CHECK 約束清單</a></li><li><a class="toc__link toc__link--h3" href="#93-unique-約束清單">9.3 UNIQUE 約束清單</a></li><li><a class="toc__link toc__link--h3" href="#94-延遲約束">9.4 延遲約束</a></li><li><a class="toc__link toc__link--h3" href="#95-跨-bc-引用清單spring-modulith-hc-1必填">9.5 跨 BC 引用清單（Spring Modulith HC-1，必填）</a></li><li><a class="toc__link" href="#10-分區策略sharding--partitioning">10. 分區策略（Sharding &amp;amp; Partitioning）</a></li><li><a class="toc__link toc__link--h3" href="#101-決策矩陣與本系統評估">10.1 決策矩陣與本系統評估</a></li><li><a class="toc__link toc__link--h3" href="#102-分區鍵選擇準則">10.2 分區鍵選擇準則</a></li><li><a class="toc__link toc__link--h3" href="#103-分區範例">10.3 分區範例</a></li><li><a class="toc__link toc__link--h3" href="#104-shard-key-說明">10.4 Shard Key 說明</a></li><li><a class="toc__link" href="#11-備份與復原backup--recovery">11. 備份與復原（Backup &amp;amp; Recovery）</a></li><li><a class="toc__link toc__link--h3" href="#111-備份策略表">11.1 備份策略表</a></li><li><a class="toc__link toc__link--h3" href="#112-pitr-設定">11.2 PITR 設定</a></li><li><a class="toc__link toc__link--h3" href="#113-ha-replication-架構16-ha-必查--edd-36">11.3 HA Replication 架構（§16 HA 必查 / EDD §3.6）</a></li><li><a class="toc__link toc__link--h3" href="#114-備份驗證">11.4 備份驗證</a></li><li><a class="toc__link" href="#12-關聯圖er-diagram">12. 關聯圖（ER Diagram）</a></li><li><a class="toc__link toc__link--h3" href="#121-核心-bc-er-圖member--wallet--deposit--entitlement--record--leaderboard--game-save">12.1 核心 BC ER 圖（member / wallet / deposit / entitlement / record / leaderboard / game-save）</a></li><li><a class="toc__link toc__link--h3" href="#122-平台底座-er-圖modulith--platform">12.2 平台底座 ER 圖（modulith / platform）</a></li><li><a class="toc__link" href="#13-資料量估算">13. 資料量估算</a></li><li><a class="toc__link" href="#14-敏感資料清單">14. 敏感資料清單</a></li><li><a class="toc__link" href="#15-multi-tenancy-data-isolation-strategies多租戶資料隔離策略">15. Multi-Tenancy Data Isolation Strategies（多租戶資料隔離策略）</a></li><li><a class="toc__link toc__link--h3" href="#策略比較與本產品決策">策略比較與本產品決策</a></li><li><a class="toc__link" href="#16-schema-審查檢查清單schema-review-checklist">16. Schema 審查檢查清單（Schema Review Checklist）</a></li><li><a class="toc__link toc__link--h3" href="#命名與結構">命名與結構</a></li><li><a class="toc__link toc__link--h3" href="#正規化與完整性">正規化與完整性</a></li><li><a class="toc__link toc__link--h3" href="#索引">索引</a></li><li><a class="toc__link toc__link--h3" href="#安全與合規">安全與合規</a></li><li><a class="toc__link toc__link--h3" href="#效能">效能</a></li><li><a class="toc__link toc__link--h3" href="#migration">Migration</a></li><li><a class="toc__link toc__link--h3" href="#ha--replication--read-write-split必查">HA / Replication / Read-Write Split（必查）</a></li><li><a class="toc__link toc__link--h3" href="#bounded-context-隔離spring-modulith-hc-1必查">Bounded Context 隔離（Spring Modulith HC-1，必查）</a></li><li><a class="toc__link" href="#17-data-retention--lifecycle-policy">17. Data Retention &amp;amp; Lifecycle Policy</a></li><li><a class="toc__link toc__link--h3" href="#171-資料保留政策總覽">17.1 資料保留政策總覽</a></li><li><a class="toc__link toc__link--h3" href="#172-gdpr-right-to-erasure被遺忘權事件驅動">17.2 GDPR Right to Erasure（被遺忘權，事件驅動）</a></li><li><a class="toc__link toc__link--h3" href="#173-資料最小化data-minimization">17.3 資料最小化（Data Minimization）</a></li><li><a class="toc__link toc__link--h3" href="#174-資料存取稽核">17.4 資料存取稽核</a></li><li><a class="toc__link toc__link--h3" href="#175-跨境資料傳輸">17.5 跨境資料傳輸</a></li><li><a class="toc__link toc__link--h3" href="#176-schema-刪除安全模式">17.6 Schema 刪除安全模式</a></li><li><a class="toc__link" href="#18-database-observability--health-monitoring">18. Database Observability &amp;amp; Health Monitoring</a></li><li><a class="toc__link toc__link--h3" href="#181-關鍵監控指標">18.1 關鍵監控指標</a></li><li><a class="toc__link toc__link--h3" href="#182-alerting-規則6-項閾值">18.2 Alerting 規則（≥6 項閾值）</a></li><li><a class="toc__link toc__link--h3" href="#183-replica-lag-降級策略">18.3 Replica Lag 降級策略</a></li><li><a class="toc__link" href="#19-redis-key-schema快取--限流hc-4-集中命名">19. Redis Key Schema（快取 / 限流，HC-4 集中命名）</a></li><li><a class="toc__link toc__link--h3" href="#191-key-說明">19.1 Key 說明</a></li><li><a class="toc__link toc__link--h3" href="#192-redis-cli-命令範例">19.2 Redis CLI 命令範例</a></li><li><a class="toc__link" href="#seed-data">Seed Data</a></li><li><a class="toc__link" href="#admin-seed-sql">Admin Seed SQL</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="schema--資料庫-schema-設計文件">SCHEMA — 資料庫 Schema 設計文件</h1>
+<h2 id="document-control">Document Control</h2>
+<table>
+<tr><th>欄位</th><th>值</th></tr>
+<tr><td>Document ID</td><td><code>SCHEMA-yocat-office-backend-20261030</code></td></tr>
+<tr><td>Version</td><td><code>1.0</code></td></tr>
+<tr><td>Status</td><td>In Review</td></tr>
+<tr><td>Classification</td><td>Confidential</td></tr>
+<tr><td>Owner</td><td>Database Architect / Data Engineering Lead</td></tr>
+<tr><td><strong>Owning Bounded Context / Service</strong></td><td><strong>yocat-office-backend（Spring Modulith 單體；7 BC 各自獨佔 schema：<code>member</code> / <code>wallet</code> / <code>deposit</code> / <code>entitlement</code> / <code>record</code> / <code>leaderboard</code> / <code>game_save</code>，加上平台底座橫切 <code>modulith</code> / <code>platform</code> schema）</strong>。每張表之 Owning BC 於 §1.2 Table Inventory 與各 §3.x 子章節逐一標注。</td></tr>
+<tr><td>Created</td><td>2026-10-30</td></tr>
+<tr><td>Last Updated</td><td>2026-10-30</td></tr>
+<tr><td>Upstream EDD</td><td><a href="edd.html" target="_blank" rel="noopener">docs/EDD.md</a> §3.4（Schema Ownership）、§6（Data Model）</td></tr>
+<tr><td>Upstream API</td><td><a href="api.html" target="_blank" rel="noopener">docs/API.md</a> §3（Endpoints）</td></tr>
+<tr><td>Upstream CONSTANTS</td><td><a href="constants.html" target="_blank" rel="noopener">docs/CONSTANTS.md</a> §9（列舉）、§10（錯誤碼）、§11（設定鍵）</td></tr>
+<tr><td>Upstream 原型真相</td><td><a href="req/schema.sql" target="_blank" rel="noopener">docs/req/schema.sql</a>（8 張實體表的真相）</td></tr>
+<tr><td>Database</td><td>PostgreSQL 16</td></tr>
+<tr><td>Source of Truth</td><td>所有 Migration 必須對照本文件審查後才能合併；本文件值與 CONSTANTS.md 衝突時以 CONSTANTS.md（SSOT）為準</td></tr>
+<tr><td>Changelog</td><td><a href="#change-log">See Change Log</a></td></tr>
+</table>
+<h2 id="change-log">Change Log</h2>
+<table>
+<tr><th>Version</th><th>Date</th><th>Author</th><th>Summary</th></tr>
+<tr><td>1.0</td><td>2026-10-30</td><td>gendoc gen SCHEMA</td><td>初稿：依 EDD §6 / schema.sql（8 實體表）+ CONSTANTS §9 列舉重新設計為 Spring Modulith HC-1 各 BC 獨佔 schema；補 Outbox / 冪等 / 稽核 / GDPR 等平台底座表，共 40 張表</td></tr>
+</table>
+<hr>
+<h2 id="1-概述">1. 概述</h2>
+<ul><li><strong>資料庫</strong>：PostgreSQL 16（EDD §3.3 技術棧；<code>lang_stack = Java 21 + Spring Boot 3.3 + Spring Modulith 1.3</code>）</li><li><strong>字元集</strong>：UTF-8（<code>SERVER_ENCODING = UTF8</code>）</li><li><strong>時區</strong>：所有時間戳一律以 <code>TIMESTAMPTZ</code> 儲存 UTC；應用層（Java <code>OffsetDateTime</code>）負責顯示時區轉換</li><li><strong>排序規則（Collation）</strong>：<code>en_US.UTF-8</code></li><li><strong>Schema 命名空間（HC-1）</strong>：每個 Bounded Context 擁有獨立 PostgreSQL schema，外加兩個橫切 schema：</li><li style="margin-left:1.0rem">BC schema：<code>member</code>、<code>wallet</code>、<code>deposit</code>、<code>entitlement</code>、<code>record</code>、<code>leaderboard</code>、<code>game_save</code></li><li style="margin-left:1.0rem">橫切 schema：<code>modulith</code>（Spring Modulith Event Publication Registry / Outbox）、<code>platform</code>（稽核、GDPR、設定、觀測、限流後援）</li><li><strong>最大連線數（Connection Pool）</strong>：HikariCP，依 §7.3 公式計算（啟動期 Pod 各 20、PgBouncer transaction pool 40）</li></ul>
+<h3 id="11-schema-boundary-declaration">1.1 Schema Boundary Declaration</h3>
+<blockquote><p><strong>Spring Modulith 硬約束（HC-1）：每個 Bounded Context 擁有且只擁有自己的 DB Schema；跨 BC 資料存取只能透過對方的 Public API 或 Domain Event（Spring Modulith <code>event_publication</code> Outbox），絕對禁止 DB-level JOIN 或 FK 跨越 BC 邊界。</strong></p></blockquote>
+<table>
+<tr><th>欄位</th><th>值</th></tr>
+<tr><td><strong>唯一擁有服務（Owning BC）</strong></td><td>7 個 Spring Modulith module = 7 個 BC（<code>member</code> / <code>wallet</code> / <code>deposit</code> / <code>entitlement</code> / <code>record</code> / <code>leaderboard</code> / <code>game-save</code>），對應 EDD §3.4、CONSTANTS §12</td></tr>
+<tr><td>Schema 命名空間</td><td>每 BC 一個 PostgreSQL schema（上列）；跨 BC 禁止直接讀寫</td></tr>
+</table>
+<p><strong>外部不得直接 JOIN 的表清單</strong>（其他 BC 禁止對下列表建立 DB-level FK 或跨 schema JOIN）：</p>
+<table>
+<tr><th>表名稱</th><th>原因</th></tr>
+<tr><td><code>member.accounts</code></td><td>屬 member 核心聚合根（身分權威）；跨 BC 僅能透過 <code>MemberService.verifySession()</code> Public API 或 <code>account_id</code>（ID-only）參照</td></tr>
+<tr><td><code>wallet.wallets</code></td><td>屬 wallet 聚合根（伺服器權威餘額）；跨 BC 僅能透過 <code>WalletService.debit()/credit()</code> 同交易呼叫</td></tr>
+<tr><td><code>wallet.wallet_ledger</code></td><td>屬 wallet 內部帳本（append-only 審計）；禁止其他 BC 讀取</td></tr>
+<tr><td><code>entitlement.entitlements</code></td><td>屬 entitlement 聚合根；跨 BC 僅能透過 <code>EntitlementService</code></td></tr>
+</table>
+<blockquote><p><strong>跨 BC 引用規範</strong>：若其他 BC 需要引用本系統另一 BC 的實體，一律使用應用層管理的 <code>account_id BIGINT</code>（ID-only）欄位，<strong>不建立 DB FK</strong>。SQL 注釋格式：<code>-- Cross-BC reference: enforced at application layer, no DB FK (HC-1).</code>（完整清單見 §9.5）</p></blockquote>
+<h3 id="12-table-inventory全-40-張表依-bc-schema-歸屬">1.2 Table Inventory（全 40 張表，依 BC schema 歸屬）</h3>
+<table>
+<tr><th>#</th><th>schema.table</th><th>Owning BC</th><th>類型</th><th>核心/衍生</th><th>來源</th></tr>
+<tr><td>1</td><td><code>member.accounts</code></td><td>member</td><td>聚合根（AR）</td><td>核心</td><td>schema.sql L4、EDD §6.1</td></tr>
+<tr><td>2</td><td><code>member.sessions</code></td><td>member</td><td>實體</td><td>核心</td><td>schema.sql L12、EDD §6.1</td></tr>
+<tr><td>3</td><td><code>member.login_attempts</code></td><td>member</td><td>審計</td><td>衍生</td><td>CONSTANTS §6、EDD §9.1</td></tr>
+<tr><td>4</td><td><code>member.account_deletion_requests</code></td><td>member</td><td>流程實體</td><td>衍生</td><td>EDD §3.4/§6.3（MemberDeleted）</td></tr>
+<tr><td>5</td><td><code>member.password_history</code></td><td>member</td><td>值物件集合</td><td>衍生</td><td>EDD §9.1/§9.4</td></tr>
+<tr><td>6</td><td><code>wallet.wallets</code></td><td>wallet</td><td>聚合根（AR）</td><td>核心</td><td>schema.sql L21、EDD §4.1</td></tr>
+<tr><td>7</td><td><code>wallet.wallet_ledger</code></td><td>wallet</td><td>實體（append-only）</td><td>核心</td><td>schema.sql L29、EDD §6.3</td></tr>
+<tr><td>8</td><td><code>wallet.wallet_balance_snapshots</code></td><td>wallet</td><td>對帳快照</td><td>衍生</td><td>EDD §4.7、CONSTANTS §4（對帳 0 不一致）</td></tr>
+<tr><td>9</td><td><code>wallet.wallet_inbound_events</code></td><td>wallet</td><td>冪等控制</td><td>衍生</td><td>EDD §4.6（event_id dedup）</td></tr>
+<tr><td>10</td><td><code>deposit.deposit_pack</code></td><td>deposit</td><td>目錄（AR）</td><td>核心</td><td>API <code>GET /deposit/packs</code>、CONSTANTS §7</td></tr>
+<tr><td>11</td><td><code>deposit.deposit_order</code></td><td>deposit</td><td>聚合根（AR）</td><td>核心</td><td>API <code>POST /deposit/checkout</code></td></tr>
+<tr><td>12</td><td><code>deposit.deposit_idempotency</code></td><td>deposit</td><td>冪等控制</td><td>衍生</td><td>API §7、deposit/checkout</td></tr>
+<tr><td>13</td><td><code>deposit.deposit_payment_webhook</code></td><td>deposit</td><td>事件（Phase B）</td><td>衍生</td><td>API §8（金流 webhook）</td></tr>
+<tr><td>14</td><td><code>entitlement.entitlements</code></td><td>entitlement</td><td>聚合根（AR）</td><td>核心</td><td>schema.sql L42</td></tr>
+<tr><td>15</td><td><code>entitlement.entitlement_catalog</code></td><td>entitlement</td><td>目錄</td><td>衍生</td><td>CONSTANTS §9（kind）、API 購買驗證</td></tr>
+<tr><td>16</td><td><code>entitlement.entitlement_grant_log</code></td><td>entitlement</td><td>審計</td><td>衍生</td><td>CONSTANTS §7（amount=0 贈與）</td></tr>
+<tr><td>17</td><td><code>record.records</code></td><td>record</td><td>聚合根（AR，append-only）</td><td>核心</td><td>schema.sql L61</td></tr>
+<tr><td>18</td><td><code>record.record_type_catalog</code></td><td>record</td><td>Lookup</td><td>衍生</td><td>CONSTANTS §9（type）</td></tr>
+<tr><td>19</td><td><code>leaderboard.leaderboard</code></td><td>leaderboard</td><td>聚合根（AR）</td><td>核心</td><td>schema.sql L71</td></tr>
+<tr><td>20</td><td><code>leaderboard.leaderboard_mode_catalog</code></td><td>leaderboard</td><td>Lookup</td><td>衍生</td><td>CONSTANTS §9（mode）</td></tr>
+<tr><td>21</td><td><code>leaderboard.leaderboard_snapshot</code></td><td>leaderboard</td><td>快取落庫</td><td>衍生</td><td>EDD §11.3（Top N 快取備援）</td></tr>
+<tr><td>22</td><td><code>game_save.saves</code></td><td>game-save</td><td>聚合根（AR）</td><td>核心</td><td>schema.sql L52</td></tr>
+<tr><td>23</td><td><code>game_save.save_write_log</code></td><td>game-save</td><td>審計</td><td>衍生</td><td>PRD §5.4、CONSTANTS §7</td></tr>
+<tr><td>24</td><td><code>modulith.event_publication</code></td><td>平台（Modulith）</td><td>Outbox</td><td>衍生</td><td>EDD §3.4/§4.6（Transactional Outbox）</td></tr>
+<tr><td>25</td><td><code>modulith.event_publication_archive</code></td><td>平台（Modulith）</td><td>Outbox 歸檔</td><td>衍生</td><td>Spring Modulith completed events</td></tr>
+<tr><td>26</td><td><code>modulith.event_dead_letter</code></td><td>平台（Modulith）</td><td>DLQ</td><td>衍生</td><td>EDD §4.6.1（重試 5 次後）</td></tr>
+<tr><td>27</td><td><code>platform.audit_log</code></td><td>平台底座</td><td>稽核</td><td>衍生</td><td>EDD §10.6 Audit Log Design</td></tr>
+<tr><td>28</td><td><code>platform.data_access_logs</code></td><td>平台底座</td><td>稽核</td><td>衍生</td><td>§17.4、GDPR</td></tr>
+<tr><td>29</td><td><code>platform.gdpr_erasure_requests</code></td><td>平台底座</td><td>合規</td><td>衍生</td><td>§17.2、GDPR Art.17</td></tr>
+<tr><td>30</td><td><code>platform.feature_flags</code></td><td>平台底座</td><td>設定</td><td>衍生</td><td>EDD §20 Feature Flag</td></tr>
+<tr><td>31</td><td><code>platform.feature_flag_audit</code></td><td>平台底座</td><td>稽核</td><td>衍生</td><td>EDD §20.6</td></tr>
+<tr><td>32</td><td><code>platform.rate_limit_counters</code></td><td>平台底座</td><td>限流後援</td><td>衍生</td><td>CONSTANTS §6、EDD §11.3</td></tr>
+<tr><td>33</td><td><code>platform.api_request_log</code></td><td>平台底座</td><td>觀測</td><td>衍生</td><td>EDD §10.1</td></tr>
+<tr><td>34</td><td><code>platform.schema_migrations</code></td><td>平台底座</td><td>版本追蹤</td><td>衍生</td><td>§8（Flyway history）</td></tr>
+<tr><td>35</td><td><code>platform.system_config</code></td><td>平台底座</td><td>設定</td><td>衍生</td><td>CONSTANTS §11</td></tr>
+<tr><td>36</td><td><code>platform.error_code_registry</code></td><td>平台底座</td><td>契約</td><td>衍生</td><td>CONSTANTS §10、API §5.2</td></tr>
+<tr><td>37</td><td><code>platform.slo_measurements</code></td><td>平台底座</td><td>觀測</td><td>衍生</td><td>EDD §10.5、CONSTANTS §4</td></tr>
+<tr><td>38</td><td><code>platform.health_check_log</code></td><td>平台底座</td><td>觀測</td><td>衍生</td><td>EDD §10.7、API Health</td></tr>
+<tr><td>39</td><td><code>platform.outbox_relay_offset</code></td><td>平台底座</td><td>事件轉發</td><td>衍生</td><td>research_summary（write-behind relay）</td></tr>
+<tr><td>40</td><td><code>platform.replication_status_log</code></td><td>平台底座</td><td>HA 監控</td><td>衍生</td><td>§18、EDD §3.6（Replica Lag）</td></tr>
+</table>
+<blockquote><p>核心 8 實體表（accounts/sessions/wallets/wallet_ledger/entitlements/saves/records/leaderboard）皆源自 <code>docs/req/schema.sql</code>；其餘為依 EDD 重構原則（HC-1 各 BC 獨佔 schema、Outbox、冪等、審計、GDPR、觀測、HA）補足的衍生表，使實體總數達 SSOT 要求（<code>min_table_count = 38</code>）。</p></blockquote>
+<hr>
+<h2 id="0-shared-enum-types被多張-table-引用的共用型別">§0 Shared ENUM Types（被多張 table 引用的共用型別）</h2>
+<blockquote><p>本系統將 CONSTANTS §9 登記之各 BC 獨佔列舉以 PostgreSQL <code>CREATE TYPE ... AS ENUM</code> 形式化（相較原型 <code>schema.sql</code> 的裸 <code>TEXT</code> 欄位，提供型別安全與 INSERT 自動驗證，符合「重新設計為 HA/Spring Modulith/Clean Architecture」之重構授權）。ENUM type 建立於其 Owning BC schema 下，跨 BC 不得引用。半動態值集（<code>wallet_ledger.reason</code> 的 <code>buy_&lt;kind&gt;</code>）與自由字串（<code>mode</code>/<code>slot</code>）維持 <code>VARCHAR + CHECK</code> 或 lookup table，不以 ENUM 固定。</p></blockquote>
+<pre><code class="language-sql">-- 來源：CONSTANTS §9（currency，wallet BC 獨佔）
+CREATE TYPE wallet.currency_enum AS ENUM (&#x27;cash&#x27;, &#x27;gems&#x27;);
+
+-- 來源：CONSTANTS §9（entitlement kind，entitlement BC 獨佔）
+CREATE TYPE entitlement.kind_enum AS ENUM (&#x27;cosmetic&#x27;, &#x27;dream&#x27;, &#x27;scenario&#x27;);
+
+-- 來源：CONSTANTS §9（record type，record BC 獨佔）
+CREATE TYPE record.type_enum AS ENUM (&#x27;bankruptcy&#x27;, &#x27;achievement&#x27;, &#x27;legacy&#x27;);
+
+-- 來源：API §deposit（OrderStatus，deposit BC 獨佔）
+CREATE TYPE deposit.order_status_enum AS ENUM (&#x27;pending&#x27;, &#x27;confirmed&#x27;, &#x27;failed&#x27;);</code></pre>
+<blockquote><p><strong>去重說明</strong>：<code>currency_enum</code> 同時被 <code>wallet.wallets</code>（cash/gems 為欄位非 enum）概念與 <code>wallet.wallet_ledger.currency</code>、<code>deposit.deposit_pack.currency</code>、<code>deposit.deposit_order.currency</code> 引用。因 currency 概念由 <strong>wallet BC 權威</strong>（CONSTANTS §9 標注邊界=wallet），deposit BC 引用時以同值集 <code>VARCHAR(8) CHECK (currency IN (&#x27;cash&#x27;,&#x27;gems&#x27;))</code> 對齊（避免跨 schema 依賴 wallet 的 type，維持 HC-1 邊界）。此為刻意設計：ENUM type 不跨 BC schema 共用，改以 CHECK 保證值集一致。</p></blockquote>
+<hr>
+<h2 id="2-通用欄位規範">2. 通用欄位規範</h2>
+<h3 id="21-命名慣例">2.1 命名慣例</h3>
+<table>
+<tr><th>類別</th><th>規則</th><th>範例</th></tr>
+<tr><td>Schema 名稱</td><td>BC 短名 <code>snake_case</code>（<code>game-save</code> → <code>game_save</code>）</td><td><code>member</code>, <code>wallet</code>, <code>game_save</code></td></tr>
+<tr><td>資料表名稱</td><td><code>snake_case</code>，沿用原型表名（原型為複數 <code>accounts</code>，本系統<strong>沿用原型真相不改名</strong>以維持 SSOT 一致）</td><td><code>accounts</code>, <code>wallet_ledger</code></td></tr>
+<tr><td>欄位名稱</td><td><code>snake_case</code>，小寫</td><td><code>account_id</code>, <code>created_at</code></td></tr>
+<tr><td>Boolean 欄位</td><td>以 <code>is_</code>、<code>has_</code> 為前綴</td><td><code>is_active</code>, <code>is_confirmed</code></td></tr>
+<tr><td>Enum 欄位</td><td>語意命名（<code>currency</code>/<code>kind</code>/<code>type</code>/<code>status</code>）</td><td><code>status</code>, <code>kind</code></td></tr>
+<tr><td>跨 BC 參照欄位</td><td><code>account_id</code>（ID-only，無 FK）</td><td><code>account_id</code></td></tr>
+<tr><td>索引名稱</td><td><code>idx_{table}<em>{columns}</code>（沿用原型既有 <code>idx</em>*</code>）</td><td><code>idx_ledger_acct</code></td></tr>
+<tr><td>唯一索引/約束</td><td><code>uq_{table}_{columns}</code></td><td><code>uq_entitlement_acct_kind_item</code></td></tr>
+<tr><td>主鍵約束</td><td>內嵌 <code>PRIMARY KEY</code> 或自然鍵</td><td>—</td></tr>
+</table>
+<blockquote><p><strong>命名例外（有意沿用原型）</strong>：原型 <code>schema.sql</code> 使用<strong>複數</strong>表名（<code>accounts</code>、<code>sessions</code>…），本文件沿用以保持與 <code>docs/req/schema.sql</code>（SSOT 真相）一致，不套用 template 的「單數」慣例。此為刻意決策，已於此處文件化。</p></blockquote>
+<h3 id="22-所有資料表的基礎欄位規範">2.2 所有資料表的基礎欄位規範</h3>
+<p>本系統為<strong>伺服器信任層</strong>，多數核心表為 append-only（帳本/經營史）或權威覆蓋（錢包/存檔），基礎欄位依表性質選用：</p>
+<pre><code class="language-sql">-- 內部實體（BIGSERIAL 主鍵）標準欄位
+id          BIGSERIAL    PRIMARY KEY,
+created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+-- 可變表額外加：
+updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+-- 可軟刪除表額外加：
+deleted_at  TIMESTAMPTZ            -- NULL = 未刪除</code></pre>
+<p><strong>審計欄位例外說明（source-faithful，回應 Review #19）</strong>：<code>wallet.wallets</code> 與 <code>game_save.saves</code> 為<strong>權威狀態/upsert 表</strong>，沿用原型 <code>schema.sql</code>（L21、L52）僅含 <code>updated_at</code>、<strong>無 <code>created_at</code></strong>。此為刻意設計：此二表的「建立時間」與「變更歷史」由其配對的 append-only 審計表承載——<code>wallets</code> 由 <code>wallet.wallet_ledger</code>（首筆 <code>reason=&#x27;init&#x27;</code> 即開帳時間）、<code>saves</code> 由 <code>game_save.save_write_log</code> 追蹤每次寫入。故不另加 <code>created_at</code> 以維持與 SSOT 原型一致，審計完整性由配對表保證。</p>
+<h3 id="23-主鍵-id-策略全-schema-一致性說明回應-review-critical-3">2.3 主鍵 ID 策略（全 Schema 一致性說明，回應 Review CRITICAL #3）</h3>
+<p>本系統<strong>刻意混用三種主鍵型別</strong>，均有明確業務依據（源自 <code>schema.sql</code> 真相，EDD §6.1 確認）：</p>
+<table>
+<tr><th>主鍵型別</th><th>適用表</th><th>業務依據</th></tr>
+<tr><td><code>BIGSERIAL</code>（內部序號）</td><td><code>accounts</code>、<code>wallet_ledger</code>、<code>entitlements</code>、<code>records</code>、各審計/log 表</td><td>信任層內部實體，不以主鍵對外暴露（對外用 <code>account_id</code> 語意）；高寫入量下順序插入性能佳、儲存小、對帳易讀</td></tr>
+<tr><td>自然鍵 <code>TEXT</code></td><td><code>sessions</code>(<code>token</code> 32B hex)、<code>leaderboard</code>(<code>run_id</code>)、<code>deposit_order</code>(<code>order_id</code>)</td><td>業務本身即唯一不可猜測識別碼（session token 由 <code>SECURE_RANDOM(32B)</code> 產生、run_id 由客戶端單場次產生、order_id = Idempotency-Key），直接作 PK 免去代理鍵</td></tr>
+<tr><td>複合主鍵</td><td><code>wallets</code>(<code>account_id</code>)、<code>saves</code>(<code>account_id</code>,<code>slot</code>)、冪等/catalog 表</td><td><code>wallets</code> 一帳號一錢包（1:1）故 <code>account_id</code> 即 PK；<code>saves</code> 以 <code>(account_id, slot)</code> 唯一（CONSTANTS §7 slot 預設 main）</td></tr>
+</table>
+<blockquote><p><strong>不統一為 UUID 的理由</strong>：信任層內部實體不經 URL 暴露主鍵（API 以 <code>account_id</code> 語意欄位溝通，非 REST resource id in path），BIGSERIAL 在對帳審計（人工可讀序號）與寫入性能上優於 UUID；自然鍵（token/run_id）本身已是全域唯一不可猜測值。此混用策略於全 schema 一致套用，非隨意混用。</p></blockquote>
+<h3 id="24-軟刪除soft-delete策略全域政策回應-review-critical-18">2.4 軟刪除（Soft Delete）策略（全域政策，回應 Review CRITICAL #18）</h3>
+<p>本系統<strong>統一軟刪除標記為 <code>deleted_at TIMESTAMPTZ NULL</code></strong>。因信任層資料多為審計性質，軟刪除<strong>僅套用於</strong>下列表，其餘表的「刪除」語意由業務性質決定，並逐一說明例外理由：</p>
+<table>
+<tr><th>表</th><th>刪除策略</th><th>理由</th></tr>
+<tr><td><code>member.accounts</code></td><td><code>deleted_at</code> 軟刪除 + 事件驅動匿名化</td><td>帳號刪除走 GDPR 匿名化（§17.2），保留業務完整性（ledger 歸戶）</td></tr>
+<tr><td><code>entitlement.entitlements</code></td><td><code>deleted_at</code> 軟刪除</td><td>退款/撤銷權益需可追溯（破產<strong>不</strong>刪除，PRD §5.3）</td></tr>
+<tr><td><code>game_save.saves</code></td><td>硬覆蓋（upsert），無 <code>deleted_at</code></td><td>存檔僅保留最新版本（EDD §6.3 upsert），刪檔即 DELETE row</td></tr>
+<tr><td><code>wallet.wallet_ledger</code>、<code>record.records</code></td><td><strong>append-only，永不 UPDATE/DELETE</strong></td><td>審計帳本/經營史不可變（EDD §6.3）；帳號刪除時匿名化保留供審計</td></tr>
+<tr><td><code>member.sessions</code></td><td>硬刪除（<code>expires_at &lt; now()</code> 定時清理 + 登出即刪）</td><td>會話為短期憑證（TTL 30 天），無保留需求（EDD §6.3）</td></tr>
+<tr><td>各 catalog / config 表</td><td>以 <code>is_active</code> 停用，不物理刪除</td><td>lookup 值停用需保留歷史引用</td></tr>
+</table>
+<pre><code class="language-sql">-- updated_at 自動更新 Trigger（所有含 updated_at 的可變表共用，見 §6）
+-- 軟刪除查詢一律：WHERE deleted_at IS NULL
+-- 唯一約束一律加 WHERE deleted_at IS NULL（Partial Unique Index）</code></pre>
+<hr>
+<h2 id="3-資料表定義">3. 資料表定義</h2>
+<blockquote><p>呈現順序強制：<strong>欄位說明 markdown table 先、<code>CREATE TABLE</code> SQL 後</strong>（issue I3）。每張表附完整 DDL 區塊（ENUM if any + CREATE TABLE + INDEX + COMMENT），AI 可複製整塊直接建表。</p></blockquote>
+<h3 id="共用-trigger-function全-schema-一次定義所有可變表共用">共用 Trigger Function（全 schema 一次定義，所有可變表共用）</h3>
+<pre><code class="language-sql">CREATE OR REPLACE FUNCTION platform.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;</code></pre>
+<hr>
+<h3 id="31-bc-member">3.1 BC: member</h3>
+<h4 id="311-memberaccounts帳號聚合根">3.1.1 <code>member.accounts</code>（帳號聚合根）</h4>
+<p><strong>說明：</strong> 身分權威聚合根。儲存登入識別（email 唯一）、公司/老闆名、scrypt 密碼雜湊。對外以 <code>id</code>（AccountId）作為各 BC 的 app-layer 參照鍵。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵，AccountId；各 BC 以此值 ID-only 參照</td></tr>
+<tr><td>email</td><td>TEXT</td><td>否</td><td>—</td><td>登入識別，全域唯一（PII，LOWER 唯一）</td></tr>
+<tr><td>display_name</td><td>TEXT</td><td>否</td><td>—</td><td>公司/老闆名（1–24 字，CONSTANTS §3 <code>DISPLAY_NAME_*</code>）</td></tr>
+<tr><td>pass_hash</td><td>TEXT</td><td>否</td><td>—</td><td>scrypt <code>salt_hex$hash_hex</code>（<strong>永不儲存明文</strong>；CONSTANTS §1 <code>SCRYPT_*</code>）</td></tr>
+<tr><td>is_active</td><td>BOOLEAN</td><td>否</td><td>TRUE</td><td>帳號是否啟用</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>建立時間</td></tr>
+<tr><td>updated_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>更新時間（trigger 自動）</td></tr>
+<tr><td>deleted_at</td><td>TIMESTAMPTZ</td><td>是</td><td>NULL</td><td>軟刪除時間戳（GDPR 匿名化併用）</td></tr>
+</table>
+<pre><code class="language-sql">-- ── member.accounts（member BC）──────────────────────────────────────
+-- 身分權威聚合根（EDD §4.2）。登入/註冊以 email 查詢；密碼 scrypt 驗證。
+CREATE TABLE member.accounts (
+  id            BIGSERIAL    PRIMARY KEY,
+  email         TEXT         NOT NULL,
+  display_name  TEXT         NOT NULL CHECK (char_length(display_name) BETWEEN 1 AND 24),
+  pass_hash     TEXT         NOT NULL,                 -- scrypt(salt$hash)，cost 高成本，永不明文
+  is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  deleted_at    TIMESTAMPTZ
+);
+
+-- email 大小寫不敏感唯一（僅未刪除帳號）
+CREATE UNIQUE INDEX uq_accounts_email ON member.accounts (LOWER(email)) WHERE deleted_at IS NULL;
+
+CREATE TRIGGER trg_accounts_updated_at
+  BEFORE UPDATE ON member.accounts FOR EACH ROW EXECUTE FUNCTION platform.set_updated_at();
+
+COMMENT ON TABLE  member.accounts            IS &#x27;member BC 身分權威聚合根（AccountId）。來源 schema.sql L4 / EDD §4.2&#x27;;
+COMMENT ON COLUMN member.accounts.email      IS &#x27;PII 識別資料；pgcrypto 查詢層加密候選；帳號刪除後匿名化（§17.2）&#x27;;
+COMMENT ON COLUMN member.accounts.pass_hash  IS &#x27;scrypt salt_hex$hash_hex（SCRYPT_KEYLEN=64/SALT=16B，CONSTANTS §1），禁明文&#x27;;</code></pre>
+<h4 id="312-membersessionsopaque-session">3.1.2 <code>member.sessions</code>（opaque session）</h4>
+<p><strong>說明：</strong> 不透明 session token（32B hex）。Bearer 驗證以 <code>token</code> 為 PK；<code>account_id</code> 為跨 BC app-layer 參照（EDD §6.1 標注，無跨 BC FK）。TTL 30 天（CONSTANTS §1 <code>SESSION_TTL_DAYS</code>）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>token</td><td>TEXT</td><td>否</td><td>—</td><td>主鍵，opaque session（<code>SESSION_TOKEN_BYTES=32</code> → 64 hex 字元）</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>所屬帳號（app-layer ID，無 FK；EDD §6.1）</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>簽發時間</td></tr>
+<tr><td>expires_at</td><td>TIMESTAMPTZ</td><td>否</td><td>—</td><td>到期時間（now() + 30 天）</td></tr>
+</table>
+<pre><code class="language-sql">-- ── member.sessions（member BC）──────────────────────────────────────
+-- 不透明 session（EDD ADR-003）。Bearer 驗證 O(log N) + Redis 快取 1800s。
+CREATE TABLE member.sessions (
+  token       TEXT         PRIMARY KEY,
+  account_id  BIGINT       NOT NULL,                   -- member 內部參照 accounts(id)（同 BC），應用層解析
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  expires_at  TIMESTAMPTZ  NOT NULL
+);
+
+CREATE INDEX idx_sessions_acct ON member.sessions (account_id);           -- 依帳號列舉/清理（EDD §6.2）
+CREATE INDEX idx_sessions_expires ON member.sessions (expires_at);        -- 定時清理過期 session
+
+COMMENT ON TABLE  member.sessions            IS &#x27;member BC opaque session（TTL 30 天，CONSTANTS §1）。來源 schema.sql L12&#x27;;
+COMMENT ON COLUMN member.sessions.account_id IS &#x27;同 BC（member）參照 accounts(id)，應用層維護（原型 schema FK 已依 HC-1 移除，以 app-layer ID 表示）&#x27;;</code></pre>
+<h4 id="313-memberlogin_attempts登入嘗試審計--限流持久後援">3.1.3 <code>member.login_attempts</code>（登入嘗試審計 / 限流持久後援）</h4>
+<p><strong>說明：</strong> 記錄每次登入/註冊嘗試，供暴力破解偵測與 CONSTANTS §6 限流的持久化稽核後援（Redis 為熱路徑，本表為冷稽核）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>email</td><td>TEXT</td><td>是</td><td>NULL</td><td>嘗試的 email（未必存在；失敗不洩漏帳號）</td></tr>
+<tr><td>ip_address</td><td>INET</td><td>否</td><td>—</td><td>來源 IP（限流維度，CONSTANTS §6）</td></tr>
+<tr><td>is_success</td><td>BOOLEAN</td><td>否</td><td>—</td><td>是否成功</td></tr>
+<tr><td>failure_reason</td><td>VARCHAR(40)</td><td>是</td><td>NULL</td><td>失敗原因（<code>bad_credentials</code>/<code>rate_limited</code>）</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>嘗試時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── member.login_attempts（member BC）─────────────────────────────────
+-- 登入/註冊嘗試審計（防暴力破解，CONSTANTS §6 login 10/min、register 5/min）。
+CREATE TABLE member.login_attempts (
+  id             BIGSERIAL    PRIMARY KEY,
+  email          TEXT,
+  ip_address     INET         NOT NULL,
+  is_success     BOOLEAN      NOT NULL,
+  failure_reason VARCHAR(40),
+  created_at     TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_login_attempts_ip   ON member.login_attempts (ip_address, created_at DESC);  -- 限流滑動視窗後援
+CREATE INDEX idx_login_attempts_mail ON member.login_attempts (LOWER(email), created_at DESC) WHERE email IS NOT NULL;
+
+COMMENT ON TABLE member.login_attempts IS &#x27;member BC 登入嘗試審計 + 限流持久後援（CONSTANTS §6 / EDD §9.1）&#x27;;</code></pre>
+<h4 id="314-memberaccount_deletion_requests帳號刪除請求佇列">3.1.4 <code>member.account_deletion_requests</code>（帳號刪除請求佇列）</h4>
+<p><strong>說明：</strong> 帳號刪除請求實體，驅動 <code>MemberDeleted</code> 事件（EDD §3.4/§6.3），各 BC 消費後匿名化/清理對應 <code>account_id</code> 資料。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>待刪除帳號（member 內部參照）</td></tr>
+<tr><td>status</td><td>VARCHAR(20)</td><td>否</td><td>&#x27;requested&#x27;</td><td><code>requested</code>/<code>anonymized</code>/<code>completed</code></td></tr>
+<tr><td>requested_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>請求時間</td></tr>
+<tr><td>completed_at</td><td>TIMESTAMPTZ</td><td>是</td><td>NULL</td><td>完成時間（硬刪除 30 天後，§17.2）</td></tr>
+</table>
+<pre><code class="language-sql">-- ── member.account_deletion_requests（member BC）──────────────────────
+-- 帳號刪除流程實體；提交後發 MemberDeleted，各 BC 匿名化 account_id 資料（§17.2）。
+CREATE TABLE member.account_deletion_requests (
+  id            BIGSERIAL    PRIMARY KEY,
+  account_id    BIGINT       NOT NULL REFERENCES member.accounts (id) ON DELETE CASCADE,  -- 同 BC FK（HC-1 允許）
+  status        VARCHAR(20)  NOT NULL DEFAULT &#x27;requested&#x27;
+                             CHECK (status IN (&#x27;requested&#x27;, &#x27;anonymized&#x27;, &#x27;completed&#x27;)),
+  requested_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  completed_at  TIMESTAMPTZ
+);
+
+CREATE INDEX idx_del_req_status ON member.account_deletion_requests (status, requested_at) WHERE status &lt;&gt; &#x27;completed&#x27;;
+
+COMMENT ON TABLE member.account_deletion_requests IS &#x27;member BC 帳號刪除請求，驅動 MemberDeleted 事件（EDD §3.4/§6.3）&#x27;;
+COMMENT ON COLUMN member.account_deletion_requests.account_id IS &#x27;同 BC（member）FK 至 accounts(id)，HC-1 允許同 BC FK&#x27;;</code></pre>
+<h4 id="315-memberpassword_history密碼雜湊歷史值物件集合">3.1.5 <code>member.password_history</code>（密碼雜湊歷史，值物件集合）</h4>
+<p><strong>說明：</strong> 保留帳號歷史 scrypt 雜湊，防止密碼重用（EDD §9.1/§9.4 認證安全）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>所屬帳號（同 BC FK）</td></tr>
+<tr><td>pass_hash</td><td>TEXT</td><td>否</td><td>—</td><td>歷史 scrypt 雜湊（禁明文）</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>設定時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── member.password_history（member BC）───────────────────────────────
+-- 密碼歷史（防重用；僅存 scrypt 雜湊）。
+CREATE TABLE member.password_history (
+  id          BIGSERIAL    PRIMARY KEY,
+  account_id  BIGINT       NOT NULL REFERENCES member.accounts (id) ON DELETE CASCADE,  -- 同 BC FK
+  pass_hash   TEXT         NOT NULL,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_pwd_hist_acct ON member.password_history (account_id, created_at DESC);
+
+COMMENT ON TABLE member.password_history IS &#x27;member BC 密碼歷史（防重用，EDD §9.1）；僅 scrypt 雜湊，禁明文&#x27;;</code></pre>
+<hr>
+<h3 id="32-bc-wallet">3.2 BC: wallet</h3>
+<h4 id="321-walletwallets錢包聚合根">3.2.1 <code>wallet.wallets</code>（錢包聚合根）</h4>
+<p><strong>說明：</strong> 伺服器權威錢包聚合根。一帳號一錢包（<code>account_id</code> 即 PK）。<code>cash</code>（資本）、<code>gems</code>（寶石）均 <code>CHECK ≥ 0</code>（餘額一致性）。扣款走 <code>SELECT ... FOR UPDATE</code> 行鎖（EDD §4.7 演算法 1）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>主鍵（app-layer ID，跨 BC 無 FK）</td></tr>
+<tr><td>cash</td><td>BIGINT</td><td>否</td><td>0</td><td>資本餘額（<code>CHECK ≥ 0</code>，CONSTANTS §1 <code>WALLET_INIT_CASH=0</code>）</td></tr>
+<tr><td>gems</td><td>BIGINT</td><td>否</td><td>0</td><td>寶石餘額（<code>CHECK ≥ 0</code>，<code>WALLET_INIT_GEMS=0</code>）</td></tr>
+<tr><td>updated_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>最後異動時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── wallet.wallets（wallet BC）────────────────────────────────────────
+-- 伺服器權威錢包（EDD §4.1）。account_id 為 app-layer ID（HC-1：不設跨 schema FK）。
+CREATE TABLE wallet.wallets (
+  account_id  BIGINT       PRIMARY KEY,                -- Cross-BC reference to member.accounts(id): app-layer, no DB FK (HC-1)
+  cash        BIGINT       NOT NULL DEFAULT 0 CHECK (cash &gt;= 0),
+  gems        BIGINT       NOT NULL DEFAULT 0 CHECK (gems &gt;= 0),
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER trg_wallets_updated_at
+  BEFORE UPDATE ON wallet.wallets FOR EACH ROW EXECUTE FUNCTION platform.set_updated_at();
+
+COMMENT ON TABLE  wallet.wallets            IS &#x27;wallet BC 權威錢包聚合根（1:1 帳號）。來源 schema.sql L21 / EDD §4.1&#x27;;
+COMMENT ON COLUMN wallet.wallets.account_id IS &#x27;Cross-BC reference to member.accounts(id). Enforced at application layer, no DB FK (HC-1).&#x27;;
+COMMENT ON COLUMN wallet.wallets.cash       IS &#x27;資本餘額；CHECK&gt;=0 保證不透支（餘額一致性，CONSTANTS §4 對帳 0 不一致）&#x27;;</code></pre>
+<h4 id="322-walletwallet_ledger錢包帳本append-only">3.2.2 <code>wallet.wallet_ledger</code>（錢包帳本，append-only）</h4>
+<p><strong>說明：</strong> 每筆錢包異動的 append-only 審計帳本（防作弊 + 對帳 + 儲值記錄）。<code>balance</code> 記異動後餘額；永不 UPDATE/DELETE（EDD §6.3）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵，帳本序號</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>所屬帳號（app-layer ID）</td></tr>
+<tr><td>currency</td><td>VARCHAR(8)</td><td>否</td><td>—</td><td><code>cash</code>/<code>gems</code>（CONSTANTS §9）</td></tr>
+<tr><td>delta</td><td>BIGINT</td><td>否</td><td>—</td><td>異動量（±）</td></tr>
+<tr><td>reason</td><td>VARCHAR(40)</td><td>否</td><td>—</td><td><code>init</code>/<code>topup</code>/<code>buy_&lt;kind&gt;</code>/<code>rescue</code>（<code>SPEND_REASON_MAXLEN=40</code>）</td></tr>
+<tr><td>balance</td><td>BIGINT</td><td>否</td><td>—</td><td>異動後餘額（<code>CHECK ≥ 0</code>）</td></tr>
+<tr><td>meta</td><td>JSONB</td><td>是</td><td>NULL</td><td>附加資訊（orderId、packId 等）</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>異動時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── wallet.wallet_ledger（wallet BC）──────────────────────────────────
+-- Append-only 帳本（審計/防作弊/對帳）。reason 半動態（buy_&lt;kind&gt;），用 VARCHAR+CHECK 非 ENUM。
+CREATE TABLE wallet.wallet_ledger (
+  id          BIGSERIAL    PRIMARY KEY,
+  account_id  BIGINT       NOT NULL,                   -- Cross-BC: app-layer ID, no DB FK (HC-1)
+  currency    VARCHAR(8)   NOT NULL CHECK (currency IN (&#x27;cash&#x27;, &#x27;gems&#x27;)),
+  delta       BIGINT       NOT NULL,
+  reason      VARCHAR(40)  NOT NULL
+                           CHECK (reason IN (&#x27;init&#x27;, &#x27;topup&#x27;, &#x27;rescue&#x27;)
+                                  OR reason LIKE &#x27;buy\_%&#x27;),   -- buy_cosmetic/buy_dream/buy_scenario（CONSTANTS §9 註記）
+  balance     BIGINT       NOT NULL CHECK (balance &gt;= 0),
+  meta        JSONB,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_ledger_acct ON wallet.wallet_ledger (account_id, created_at DESC);  -- 帳本對帳/查近期（EDD §6.2）
+
+COMMENT ON TABLE  wallet.wallet_ledger        IS &#x27;wallet BC append-only 帳本（永不 UPDATE/DELETE，EDD §6.3）。來源 schema.sql L29&#x27;;
+COMMENT ON COLUMN wallet.wallet_ledger.reason IS &#x27;init/topup/rescue 或 buy_&lt;entitlement.kind&gt;（CONSTANTS §9 真實集合）&#x27;;
+COMMENT ON COLUMN wallet.wallet_ledger.balance IS &#x27;異動後餘額快照，供對帳驗 Σdelta 一致性&#x27;;</code></pre>
+<h4 id="323-walletwallet_balance_snapshots對帳餘額快照">3.2.3 <code>wallet.wallet_balance_snapshots</code>（對帳餘額快照）</h4>
+<p><strong>說明：</strong> 每日/定時對 <code>wallets</code> 與 <code>Σ wallet_ledger.delta</code> 做一致性快照，供對帳稽核（CONSTANTS §4「錢包對帳一致性 0 筆不一致」）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>帳號（app-layer ID）</td></tr>
+<tr><td>currency</td><td>VARCHAR(8)</td><td>否</td><td>—</td><td><code>cash</code>/<code>gems</code></td></tr>
+<tr><td>wallet_balance</td><td>BIGINT</td><td>否</td><td>—</td><td><code>wallets</code> 當前餘額</td></tr>
+<tr><td>ledger_sum</td><td>BIGINT</td><td>否</td><td>—</td><td><code>Σ ledger.delta</code> 聚合值</td></tr>
+<tr><td>is_consistent</td><td>BOOLEAN</td><td>否</td><td>—</td><td>兩者是否相符（false → P0 告警）</td></tr>
+<tr><td>snapshot_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>快照時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── wallet.wallet_balance_snapshots（wallet BC）───────────────────────
+-- 對帳快照：wallets.balance vs Σledger.delta（CONSTANTS §4 對帳一致性）。
+CREATE TABLE wallet.wallet_balance_snapshots (
+  id              BIGSERIAL    PRIMARY KEY,
+  account_id      BIGINT       NOT NULL,               -- Cross-BC: app-layer ID
+  currency        VARCHAR(8)   NOT NULL CHECK (currency IN (&#x27;cash&#x27;, &#x27;gems&#x27;)),
+  wallet_balance  BIGINT       NOT NULL,
+  ledger_sum      BIGINT       NOT NULL,
+  is_consistent   BOOLEAN      NOT NULL,
+  snapshot_at     TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_wallet_snap_incons ON wallet.wallet_balance_snapshots (snapshot_at DESC) WHERE is_consistent = FALSE;
+
+COMMENT ON TABLE wallet.wallet_balance_snapshots IS &#x27;wallet BC 對帳快照（任一 is_consistent=false 即 P0，CONSTANTS §4）&#x27;;</code></pre>
+<h4 id="324-walletwallet_inbound_events入站事件冪等控制">3.2.4 <code>wallet.wallet_inbound_events</code>（入站事件冪等控制）</h4>
+<p><strong>說明：</strong> wallet 消費 <code>MemberRegistered</code>（建錢包）/<code>DepositConfirmed</code>（入帳）時，以 <code>event_id</code> 去重，保證 exactly-once 入帳（EDD §4.6 event_id dedup）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>event_id</td><td>UUID</td><td>否</td><td>—</td><td>主鍵，來源事件唯一 ID（冪等鍵）</td></tr>
+<tr><td>topic_name</td><td>VARCHAR(80)</td><td>否</td><td>—</td><td>事件 topic（<code>member.account.registered</code> 等）</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>關聯帳號</td></tr>
+<tr><td>processed_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>處理完成時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── wallet.wallet_inbound_events（wallet BC）──────────────────────────
+-- 入站事件冪等表：消費 MemberRegistered / DepositConfirmed，event_id 去重（EDD §4.6）。
+CREATE TABLE wallet.wallet_inbound_events (
+  event_id      UUID         PRIMARY KEY,
+  topic_name    VARCHAR(80)  NOT NULL,
+  account_id    BIGINT       NOT NULL,
+  processed_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_wallet_inbound_topic ON wallet.wallet_inbound_events (topic_name, processed_at DESC);
+
+COMMENT ON TABLE wallet.wallet_inbound_events IS &#x27;wallet BC 入站事件冪等（exactly-once 入帳，EDD §4.6 event_id dedup）&#x27;;</code></pre>
+<hr>
+<h3 id="33-bc-deposit">3.3 BC: deposit</h3>
+<h4 id="331-depositdeposit_pack儲值包目錄">3.3.1 <code>deposit.deposit_pack</code>（儲值包目錄）</h4>
+<p><strong>說明：</strong> 儲值包目錄（伺服器權威）。供 <code>GET /deposit/packs</code> 渲染商店（CONSTANTS §7 包定義 + §2 加量倍率）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>pack_id</td><td>VARCHAR(20)</td><td>否</td><td>—</td><td>主鍵（<code>g_small</code>/<code>g_mid</code>/<code>g_big</code>/<code>cap_1000</code>）</td></tr>
+<tr><td>currency</td><td>VARCHAR(8)</td><td>否</td><td>—</td><td><code>gems</code>/<code>cash</code></td></tr>
+<tr><td>amount</td><td>BIGINT</td><td>否</td><td>—</td><td>入帳數量（CONSTANTS §7，<code>CHECK &gt; 0</code>）</td></tr>
+<tr><td>label</td><td>TEXT</td><td>否</td><td>—</td><td>顯示名稱（zh-TW）</td></tr>
+<tr><td>bonus_pct</td><td>INTEGER</td><td>是</td><td>NULL</td><td>加量比例（g_mid=10、g_big=16；NULL=無加贈）</td></tr>
+<tr><td>is_active</td><td>BOOLEAN</td><td>否</td><td>TRUE</td><td>是否上架</td></tr>
+</table>
+<pre><code class="language-sql">-- ── deposit.deposit_pack（deposit BC）─────────────────────────────────
+-- 儲值包目錄（API GET /deposit/packs）。currency 以 CHECK 對齊 wallet 值集（HC-1：不跨 schema 引用 ENUM）。
+CREATE TABLE deposit.deposit_pack (
+  pack_id    VARCHAR(20)  PRIMARY KEY,
+  currency   VARCHAR(8)   NOT NULL CHECK (currency IN (&#x27;gems&#x27;, &#x27;cash&#x27;)),
+  amount     BIGINT       NOT NULL CHECK (amount &gt; 0),
+  label      TEXT         NOT NULL,
+  bonus_pct  INTEGER      CHECK (bonus_pct IS NULL OR bonus_pct BETWEEN 0 AND 100),
+  is_active  BOOLEAN      NOT NULL DEFAULT TRUE
+);
+
+COMMENT ON TABLE deposit.deposit_pack IS &#x27;deposit BC 儲值包目錄（CONSTANTS §7 / API GET /deposit/packs）&#x27;;</code></pre>
+<h4 id="332-depositdeposit_order儲值訂單聚合根">3.3.2 <code>deposit.deposit_order</code>（儲值訂單聚合根）</h4>
+<p><strong>說明：</strong> 儲值訂單。Phase A 假付費恆 <code>confirmed</code>，發 <code>DepositConfirmed</code> → wallet 入帳；Phase B 對接真金流。以 <code>idempotency_key</code> 去重（API <code>POST /deposit/checkout</code>）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>order_id</td><td>TEXT</td><td>否</td><td>—</td><td>主鍵（= Idempotency-Key 或伺服器 UUID）</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>下單帳號（app-layer ID）</td></tr>
+<tr><td>pack_id</td><td>VARCHAR(20)</td><td>否</td><td>—</td><td>儲值包（同 BC FK → deposit_pack）</td></tr>
+<tr><td>currency</td><td>VARCHAR(8)</td><td>否</td><td>—</td><td><code>gems</code>/<code>cash</code></td></tr>
+<tr><td>amount</td><td>BIGINT</td><td>否</td><td>—</td><td>入帳數量</td></tr>
+<tr><td>status</td><td>deposit.order_status_enum</td><td>否</td><td>&#x27;confirmed&#x27;</td><td><code>pending</code>/<code>confirmed</code>/<code>failed</code></td></tr>
+<tr><td>idempotency_key</td><td>TEXT</td><td>否</td><td>—</td><td>冪等鍵（UNIQUE）</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>建立時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── deposit.deposit_order（deposit BC）────────────────────────────────
+-- 儲值訂單聚合根（API POST /deposit/checkout）。idempotency_key 去重，同 key 重放回放原結果。
+CREATE TABLE deposit.deposit_order (
+  order_id         TEXT                        PRIMARY KEY,
+  account_id       BIGINT                      NOT NULL,   -- Cross-BC: app-layer ID
+  pack_id          VARCHAR(20)                 NOT NULL REFERENCES deposit.deposit_pack (pack_id),  -- 同 BC FK
+  currency         VARCHAR(8)                  NOT NULL CHECK (currency IN (&#x27;gems&#x27;, &#x27;cash&#x27;)),
+  amount           BIGINT                      NOT NULL CHECK (amount &gt; 0),
+  status           deposit.order_status_enum   NOT NULL DEFAULT &#x27;confirmed&#x27;,
+  idempotency_key  TEXT                        NOT NULL,
+  created_at       TIMESTAMPTZ                 NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uq_deposit_order_idem ON deposit.deposit_order (idempotency_key);  -- 冪等去重
+CREATE INDEX idx_deposit_order_acct ON deposit.deposit_order (account_id, created_at DESC);
+
+COMMENT ON TABLE  deposit.deposit_order IS &#x27;deposit BC 儲值訂單（Phase A 恆 confirmed → DepositConfirmed 入帳）&#x27;;
+COMMENT ON COLUMN deposit.deposit_order.pack_id IS &#x27;同 BC（deposit）FK 至 deposit_pack(pack_id)&#x27;;</code></pre>
+<h4 id="333-depositdeposit_idempotencyidempotency-key-去重存放">3.3.3 <code>deposit.deposit_idempotency</code>（Idempotency-Key 去重存放）</h4>
+<p><strong>說明：</strong> 通用 Idempotency-Key 去重表，保存請求指紋與回放結果（24h，API §7.4）。與 <code>deposit_order</code> 分離以支援非下單類冪等端點。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>idempotency_key</td><td>TEXT</td><td>否</td><td>—</td><td>主鍵（UUID 格式）</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>帳號</td></tr>
+<tr><td>request_fingerprint</td><td>TEXT</td><td>否</td><td>—</td><td>請求 body 雜湊（偵測 409 衝突）</td></tr>
+<tr><td>response_body</td><td>JSONB</td><td>是</td><td>NULL</td><td>回放結果</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>建立時間</td></tr>
+<tr><td>expires_at</td><td>TIMESTAMPTZ</td><td>否</td><td>—</td><td>到期（24h，API §7.4）</td></tr>
+</table>
+<pre><code class="language-sql">-- ── deposit.deposit_idempotency（deposit BC）──────────────────────────
+-- Idempotency-Key 去重（API §7，24h 保存）；同 key 不同 body → 409。
+CREATE TABLE deposit.deposit_idempotency (
+  idempotency_key      TEXT         PRIMARY KEY,
+  account_id           BIGINT       NOT NULL,
+  request_fingerprint  TEXT         NOT NULL,
+  response_body        JSONB,
+  created_at           TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  expires_at           TIMESTAMPTZ  NOT NULL
+);
+
+CREATE INDEX idx_deposit_idem_expires ON deposit.deposit_idempotency (expires_at);  -- 過期清理
+
+COMMENT ON TABLE deposit.deposit_idempotency IS &#x27;deposit BC 冪等鍵（API §7，24h）&#x27;;</code></pre>
+<h4 id="334-depositdeposit_payment_webhookphase-b-金流-webhook">3.3.4 <code>deposit.deposit_payment_webhook</code>（Phase B 金流 webhook）</h4>
+<p><strong>說明：</strong> Phase B 真金流 inbound webhook 事件（API §8，HMAC-SHA256 驗簽）。Phase A 預留表結構。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>provider_event_id</td><td>TEXT</td><td>否</td><td>—</td><td>金流商事件 ID（UNIQUE 去重）</td></tr>
+<tr><td>order_id</td><td>TEXT</td><td>是</td><td>NULL</td><td>對應訂單（同 BC FK → deposit_order）</td></tr>
+<tr><td>signature_valid</td><td>BOOLEAN</td><td>否</td><td>—</td><td>HMAC 驗簽結果</td></tr>
+<tr><td>payload</td><td>JSONB</td><td>否</td><td>—</td><td>原始 webhook body</td></tr>
+<tr><td>received_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>接收時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── deposit.deposit_payment_webhook（deposit BC）──────────────────────
+-- Phase B 金流 inbound webhook（API §8，HMAC-SHA256）。Phase A 預留。
+CREATE TABLE deposit.deposit_payment_webhook (
+  id                 BIGSERIAL    PRIMARY KEY,
+  provider_event_id  TEXT         NOT NULL,
+  order_id           TEXT         REFERENCES deposit.deposit_order (order_id),  -- 同 BC FK
+  signature_valid    BOOLEAN      NOT NULL,
+  payload            JSONB        NOT NULL,
+  received_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uq_webhook_provider_event ON deposit.deposit_payment_webhook (provider_event_id);
+
+COMMENT ON TABLE deposit.deposit_payment_webhook IS &#x27;deposit BC Phase B 金流 webhook（API §8）&#x27;;</code></pre>
+<hr>
+<h3 id="34-bc-entitlement">3.4 BC: entitlement</h3>
+<h4 id="341-entitlemententitlements已購權益聚合根">3.4.1 <code>entitlement.entitlements</code>（已購權益聚合根）</h4>
+<p><strong>說明：</strong> 已購權益（外觀/夢想員工/劇本解鎖）。破產不消失（PRD §5.3）。<code>UNIQUE(account_id,kind,item_id)</code> 防重複授予（409）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>擁有帳號（app-layer ID）</td></tr>
+<tr><td>kind</td><td>entitlement.kind_enum</td><td>否</td><td>—</td><td><code>cosmetic</code>/<code>dream</code>/<code>scenario</code></td></tr>
+<tr><td>item_id</td><td>TEXT</td><td>否</td><td>—</td><td>項目 ID（同 BC FK → entitlement_catalog）</td></tr>
+<tr><td>acquired_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>取得時間</td></tr>
+<tr><td>deleted_at</td><td>TIMESTAMPTZ</td><td>是</td><td>NULL</td><td>軟刪除（退款/撤銷，破產不刪）</td></tr>
+</table>
+<pre><code class="language-sql">-- ── entitlement.entitlements（entitlement BC）─────────────────────────
+-- 已購權益聚合根（schema.sql L42）。防重複授予 UNIQUE；破產不消失（PRD §5.3）。
+CREATE TABLE entitlement.entitlements (
+  id           BIGSERIAL                 PRIMARY KEY,
+  account_id   BIGINT                    NOT NULL,     -- Cross-BC: app-layer ID
+  kind         entitlement.kind_enum     NOT NULL,
+  item_id      TEXT                      NOT NULL REFERENCES entitlement.entitlement_catalog (item_id),  -- 同 BC FK
+  acquired_at  TIMESTAMPTZ               NOT NULL DEFAULT now(),
+  deleted_at   TIMESTAMPTZ
+);
+
+CREATE UNIQUE INDEX uq_entitlement_acct_kind_item
+  ON entitlement.entitlements (account_id, kind, item_id) WHERE deleted_at IS NULL;  -- 防重複授予（冪等）
+CREATE INDEX idx_entitlement_acct ON entitlement.entitlements (account_id) WHERE deleted_at IS NULL;
+
+COMMENT ON TABLE  entitlement.entitlements IS &#x27;entitlement BC 已購權益聚合根（破產不消失，PRD §5.3）&#x27;;
+COMMENT ON COLUMN entitlement.entitlements.kind IS &#x27;cosmetic/dream/scenario（CONSTANTS §9；不在集合 → 400）&#x27;;</code></pre>
+<h4 id="342-entitlemententitlement_catalog可購項目目錄">3.4.2 <code>entitlement.entitlement_catalog</code>（可購項目目錄）</h4>
+<p><strong>說明：</strong> 可購權益項目目錄（<code>item_id</code> 權威）。供購買時驗證 <code>item_id</code> 合法性，並提供顯示資訊。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>item_id</td><td>TEXT</td><td>否</td><td>—</td><td>主鍵，項目 ID</td></tr>
+<tr><td>kind</td><td>entitlement.kind_enum</td><td>否</td><td>—</td><td>所屬種類</td></tr>
+<tr><td>label</td><td>TEXT</td><td>否</td><td>—</td><td>顯示名稱（zh-TW）</td></tr>
+<tr><td>price_currency</td><td>VARCHAR(8)</td><td>否</td><td>—</td><td>計價幣別（<code>cash</code>/<code>gems</code>）</td></tr>
+<tr><td>price_amount</td><td>BIGINT</td><td>否</td><td>0</td><td>價格（0 = 活動免費贈與，CONSTANTS §7）</td></tr>
+<tr><td>is_active</td><td>BOOLEAN</td><td>否</td><td>TRUE</td><td>是否上架</td></tr>
+</table>
+<pre><code class="language-sql">-- ── entitlement.entitlement_catalog（entitlement BC）──────────────────
+-- 可購項目目錄（item_id 權威 + 計價）。price_amount=0 → 免費贈與（僅插權益、不寫 ledger）。
+CREATE TABLE entitlement.entitlement_catalog (
+  item_id         TEXT                     PRIMARY KEY,
+  kind            entitlement.kind_enum    NOT NULL,
+  label           TEXT                     NOT NULL,
+  price_currency  VARCHAR(8)               NOT NULL CHECK (price_currency IN (&#x27;cash&#x27;, &#x27;gems&#x27;)),
+  price_amount    BIGINT                   NOT NULL DEFAULT 0 CHECK (price_amount &gt;= 0),
+  is_active       BOOLEAN                  NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX idx_entitlement_catalog_kind ON entitlement.entitlement_catalog (kind) WHERE is_active;
+
+COMMENT ON TABLE entitlement.entitlement_catalog IS &#x27;entitlement BC 項目目錄（item_id 權威；price_amount=0 為免費贈與，CONSTANTS §7）&#x27;;</code></pre>
+<h4 id="343-entitlemententitlement_grant_log授予審計">3.4.3 <code>entitlement.entitlement_grant_log</code>（授予審計）</h4>
+<p><strong>說明：</strong> 授予/贈與審計（含免費 <code>amount=0</code> 活動贈與與付費購買，CONSTANTS §7）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>帳號（app-layer ID）</td></tr>
+<tr><td>kind</td><td>entitlement.kind_enum</td><td>否</td><td>—</td><td>種類</td></tr>
+<tr><td>item_id</td><td>TEXT</td><td>否</td><td>—</td><td>項目 ID</td></tr>
+<tr><td>charged_amount</td><td>BIGINT</td><td>否</td><td>0</td><td>實扣金額（0 = 贈與）</td></tr>
+<tr><td>granted_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>授予時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── entitlement.entitlement_grant_log（entitlement BC）────────────────
+-- 授予審計（付費/贈與；amount=0 僅插權益不寫 ledger，CONSTANTS §7）。
+CREATE TABLE entitlement.entitlement_grant_log (
+  id              BIGSERIAL                PRIMARY KEY,
+  account_id      BIGINT                   NOT NULL,
+  kind            entitlement.kind_enum    NOT NULL,
+  item_id         TEXT                     NOT NULL,
+  charged_amount  BIGINT                   NOT NULL DEFAULT 0 CHECK (charged_amount &gt;= 0),
+  granted_at      TIMESTAMPTZ              NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_grant_log_acct ON entitlement.entitlement_grant_log (account_id, granted_at DESC);
+
+COMMENT ON TABLE entitlement.entitlement_grant_log IS &#x27;entitlement BC 授予審計（EntitlementGranted 事件來源）&#x27;;</code></pre>
+<hr>
+<h3 id="35-bc-record">3.5 BC: record</h3>
+<h4 id="351-recordrecords經營史聚合根append-only">3.5.1 <code>record.records</code>（經營史聚合根，append-only）</h4>
+<p><strong>說明：</strong> 經營史記錄（破產/成就/傳承），掛在帳號上（「失敗記在某帳號身上」）。Append-only（EDD §6.3）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>帳號（app-layer ID）</td></tr>
+<tr><td>type</td><td>record.type_enum</td><td>否</td><td>—</td><td><code>bankruptcy</code>/<code>achievement</code>/<code>legacy</code>（同 BC FK → catalog）</td></tr>
+<tr><td>payload</td><td>JSONB</td><td>否</td><td>—</td><td>記錄內容（公司名、原因、數值快照等）</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>記錄時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── record.records（record BC）────────────────────────────────────────
+-- 經營史（append-only，EDD §6.3）。schema.sql L61。GET /records 單次上限 100（CONSTANTS §7）。
+CREATE TABLE record.records (
+  id          BIGSERIAL         PRIMARY KEY,
+  account_id  BIGINT            NOT NULL,              -- Cross-BC: app-layer ID
+  type        record.type_enum  NOT NULL REFERENCES record.record_type_catalog (type_code),  -- 同 BC FK
+  payload     JSONB             NOT NULL,
+  created_at  TIMESTAMPTZ       NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_records_acct ON record.records (account_id, type, created_at DESC);  -- 依帳號/類型查史（EDD §6.2）
+
+COMMENT ON TABLE  record.records      IS &#x27;record BC 經營史（append-only；破產/成就/傳承）。來源 schema.sql L61&#x27;;
+COMMENT ON COLUMN record.records.type IS &#x27;bankruptcy/achievement/legacy（CONSTANTS §9；不在集合 → 400）&#x27;;</code></pre>
+<h4 id="352-recordrecord_type_catalog經營史類型-lookup">3.5.2 <code>record.record_type_catalog</code>（經營史類型 Lookup）</h4>
+<p><strong>說明：</strong> 經營史類型 lookup 表（type 值權威 + 顯示文案）。Lookup 表無 FK 指向他表為設計所需（孤立表合理，提供 <code>records.type</code> 的參照完整性）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>type_code</td><td>record.type_enum</td><td>否</td><td>—</td><td>主鍵，類型碼</td></tr>
+<tr><td>label</td><td>TEXT</td><td>否</td><td>—</td><td>顯示名稱（zh-TW）</td></tr>
+<tr><td>description</td><td>TEXT</td><td>是</td><td>NULL</td><td>類型說明</td></tr>
+<tr><td>is_active</td><td>BOOLEAN</td><td>否</td><td>TRUE</td><td>是否啟用</td></tr>
+</table>
+<pre><code class="language-sql">-- ── record.record_type_catalog（record BC）────────────────────────────
+-- 經營史類型 Lookup（type 值權威）。Lookup 表：供 records.type 參照完整性。
+CREATE TABLE record.record_type_catalog (
+  type_code    record.type_enum  PRIMARY KEY,
+  label        TEXT              NOT NULL,
+  description  TEXT,
+  is_active    BOOLEAN           NOT NULL DEFAULT TRUE
+);
+
+COMMENT ON TABLE record.record_type_catalog IS &#x27;record BC 類型 Lookup（CONSTANTS §9）&#x27;;</code></pre>
+<hr>
+<h3 id="36-bc-leaderboard">3.6 BC: leaderboard</h3>
+<h4 id="361-leaderboardleaderboard排行分數聚合根">3.6.1 <code>leaderboard.leaderboard</code>（排行分數聚合根）</h4>
+<p><strong>說明：</strong> 全域排行。以 <code>run_id</code> 為 PK（upsert 鍵），同 run 分數最新覆蓋。歸戶寫入 <code>account_id</code> + 冗餘 <code>display_name</code>（上榜當下快照，Conformist from member，EDD §3.4）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>run_id</td><td>TEXT</td><td>否</td><td>—</td><td>主鍵，單場次 ID（upsert 鍵）</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>歸戶帳號（app-layer ID）</td></tr>
+<tr><td>display_name</td><td>TEXT</td><td>否</td><td>—</td><td>上榜名稱（上榜當下快照，刻意冗餘，§4.2）</td></tr>
+<tr><td>mode</td><td>TEXT</td><td>否</td><td>&#x27;sandbox&#x27;</td><td>排行模式（自由字串，預設 sandbox）</td></tr>
+<tr><td>score</td><td>BIGINT</td><td>否</td><td>—</td><td>分數（排序鍵）</td></tr>
+<tr><td>grade</td><td>TEXT</td><td>是</td><td>NULL</td><td>評級</td></tr>
+<tr><td>detail</td><td>JSONB</td><td>是</td><td>NULL</td><td>詳細（營收/天數等）</td></tr>
+<tr><td>updated_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>最後 upsert 時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── leaderboard.leaderboard（leaderboard BC）──────────────────────────
+-- 全域排行（upsert by run_id）。display_name 冗餘（Conformist 快照，§4.2 反正規化）。
+CREATE TABLE leaderboard.leaderboard (
+  run_id        TEXT         PRIMARY KEY,
+  account_id    BIGINT       NOT NULL,                 -- Cross-BC: app-layer ID
+  display_name  TEXT         NOT NULL,                 -- 刻意冗餘：上榜當下快照（§4.2）
+  mode          TEXT         NOT NULL DEFAULT &#x27;sandbox&#x27;,
+  score         BIGINT       NOT NULL,
+  grade         TEXT,
+  detail        JSONB,
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_lb_mode_score ON leaderboard.leaderboard (mode, score DESC);  -- Top N by mode（P99&lt;300ms，EDD §6.2）
+
+COMMENT ON TABLE  leaderboard.leaderboard IS &#x27;leaderboard BC 排行（upsert by run_id）。來源 schema.sql L71&#x27;;
+COMMENT ON COLUMN leaderboard.leaderboard.display_name IS &#x27;刻意反正規化：上榜當下 member.display_name 快照（Conformist，§4.2）&#x27;;</code></pre>
+<h4 id="362-leaderboardleaderboard_mode_catalog排行模式-lookup">3.6.2 <code>leaderboard.leaderboard_mode_catalog</code>（排行模式 Lookup）</h4>
+<p><strong>說明：</strong> 排行模式 lookup（mode 為自由字串，預設 sandbox；本表登記已知模式供前端下拉與驗證，非強制外鍵）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>mode</td><td>TEXT</td><td>否</td><td>—</td><td>主鍵，模式碼</td></tr>
+<tr><td>label</td><td>TEXT</td><td>否</td><td>—</td><td>顯示名稱</td></tr>
+<tr><td>is_active</td><td>BOOLEAN</td><td>否</td><td>TRUE</td><td>是否啟用</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>建立時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── leaderboard.leaderboard_mode_catalog（leaderboard BC）──────────────
+-- 排行模式 Lookup（mode 自由字串，此表登記已知模式；不對 leaderboard.mode 強制 FK 以保留自由字串彈性）。
+CREATE TABLE leaderboard.leaderboard_mode_catalog (
+  mode        TEXT         PRIMARY KEY,
+  label       TEXT         NOT NULL,
+  is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE leaderboard.leaderboard_mode_catalog IS &#x27;leaderboard BC 模式 Lookup（mode 預設 sandbox，CONSTANTS §9；不強制 FK）&#x27;;</code></pre>
+<h4 id="363-leaderboardleaderboard_snapshottop-n-快取落庫">3.6.3 <code>leaderboard.leaderboard_snapshot</code>（Top N 快取落庫）</h4>
+<p><strong>說明：</strong> 排行榜 Top N 週期快照（EDD §11.3 快取備援），Redis 失效時提供降級查詢來源。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>mode</td><td>TEXT</td><td>否</td><td>—</td><td>模式</td></tr>
+<tr><td>top_limit</td><td>INTEGER</td><td>否</td><td>—</td><td>快照筆數（≤100）</td></tr>
+<tr><td>rows</td><td>JSONB</td><td>否</td><td>—</td><td>Top N 列表快照</td></tr>
+<tr><td>captured_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>快照時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── leaderboard.leaderboard_snapshot（leaderboard BC）──────────────────
+-- Top N 快照（Redis 快取降級備援，EDD §11.3）。
+CREATE TABLE leaderboard.leaderboard_snapshot (
+  id           BIGSERIAL    PRIMARY KEY,
+  mode         TEXT         NOT NULL,
+  top_limit    INTEGER      NOT NULL CHECK (top_limit BETWEEN 1 AND 100),
+  rows         JSONB        NOT NULL,
+  captured_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_lb_snapshot_mode ON leaderboard.leaderboard_snapshot (mode, captured_at DESC);
+
+COMMENT ON TABLE leaderboard.leaderboard_snapshot IS &#x27;leaderboard BC Top N 快照（快取降級，EDD §11.3）&#x27;;</code></pre>
+<hr>
+<h3 id="37-bc-game-save">3.7 BC: game-save</h3>
+<h4 id="371-game_savesaves跨裝置存檔聚合根">3.7.1 <code>game_save.saves</code>（跨裝置存檔聚合根）</h4>
+<p><strong>說明：</strong> 辦公室存檔（跨裝置還原）。<code>(account_id, slot)</code> 複合主鍵；slot 預設 <code>main</code>（CONSTANTS §7）。Upsert 覆蓋最新，無歷史版本（EDD §6.3）。<code>REQUEST_BODY_MAX=4MB</code>（CONSTANTS §3）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>帳號（複合 PK，app-layer ID）</td></tr>
+<tr><td>slot</td><td>TEXT</td><td>否</td><td>&#x27;main&#x27;</td><td>存檔槽（複合 PK）</td></tr>
+<tr><td>data</td><td>JSONB</td><td>否</td><td>—</td><td>存檔內容（≤4MB）</td></tr>
+<tr><td>updated_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>最後存檔時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── game_save.saves（game-save BC）────────────────────────────────────
+-- 跨裝置存檔（upsert 覆蓋，EDD §6.3）。schema.sql L52。(account_id, slot) 複合 PK。
+CREATE TABLE game_save.saves (
+  account_id  BIGINT       NOT NULL,                   -- Cross-BC: app-layer ID
+  slot        TEXT         NOT NULL DEFAULT &#x27;main&#x27;,
+  data        JSONB        NOT NULL,
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, slot)
+);
+
+CREATE TRIGGER trg_saves_updated_at
+  BEFORE UPDATE ON game_save.saves FOR EACH ROW EXECUTE FUNCTION platform.set_updated_at();
+
+COMMENT ON TABLE game_save.saves IS &#x27;game-save BC 跨裝置存檔（upsert；slot 預設 main，CONSTANTS §7）。來源 schema.sql L52&#x27;;</code></pre>
+<h4 id="372-game_savesave_write_log存檔寫入審計">3.7.2 <code>game_save.save_write_log</code>（存檔寫入審計）</h4>
+<p><strong>說明：</strong> 存檔寫入審計（upsert 覆蓋無歷史，本表記錄每次寫入事件供追蹤最近活動，PRD §5.4）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>帳號</td></tr>
+<tr><td>slot</td><td>TEXT</td><td>否</td><td>—</td><td>存檔槽</td></tr>
+<tr><td>data_bytes</td><td>INTEGER</td><td>否</td><td>—</td><td>本次存檔大小（bytes，≤4e6）</td></tr>
+<tr><td>written_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>寫入時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── game_save.save_write_log（game-save BC）───────────────────────────
+-- 存檔寫入審計（saves 無歷史版本，本表追蹤寫入事件，PRD §5.4）。
+CREATE TABLE game_save.save_write_log (
+  id          BIGSERIAL    PRIMARY KEY,
+  account_id  BIGINT       NOT NULL,
+  slot        TEXT         NOT NULL,
+  data_bytes  INTEGER      NOT NULL CHECK (data_bytes &gt;= 0 AND data_bytes &lt;= 4000000),  -- REQUEST_BODY_MAX
+  written_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_save_write_acct ON game_save.save_write_log (account_id, written_at DESC);
+
+COMMENT ON TABLE game_save.save_write_log IS &#x27;game-save BC 存檔寫入審計（CONSTANTS §3 REQUEST_BODY_MAX=4MB）&#x27;;</code></pre>
+<hr>
+<h3 id="38-平台底座spring-modulith-outboxmodulith-schema">3.8 平台底座：Spring Modulith Outbox（<code>modulith</code> schema）</h3>
+<h4 id="381-modulithevent_publicationevent-publication-registry--outbox">3.8.1 <code>modulith.event_publication</code>（Event Publication Registry / Outbox）</h4>
+<p><strong>說明：</strong> Spring Modulith 標準 Transactional Outbox 表（<code>@ApplicationModuleListener</code> + <code>events.jdbc</code>）。領域事件與業務交易同一 commit 寫入；非同步投遞成功後標記 <code>completion_date</code>。保證事件可靠投遞（EDD §3.4/§4.6）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>UUID</td><td>否</td><td>—</td><td>主鍵（事件發布 ID）</td></tr>
+<tr><td>listener_id</td><td>TEXT</td><td>否</td><td>—</td><td>目標監聽器 ID</td></tr>
+<tr><td>event_type</td><td>TEXT</td><td>否</td><td>—</td><td>事件類別全名</td></tr>
+<tr><td>serialized_event</td><td>TEXT</td><td>否</td><td>—</td><td>序列化事件 payload（JSON）</td></tr>
+<tr><td>publication_date</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>發布時間</td></tr>
+<tr><td>completion_date</td><td>TIMESTAMPTZ</td><td>是</td><td>NULL</td><td>完成時間（NULL = 未投遞/待重試）</td></tr>
+</table>
+<pre><code class="language-sql">-- ── modulith.event_publication（平台 Modulith）────────────────────────
+-- Spring Modulith Event Publication Registry（Transactional Outbox，EDD §3.4/§4.6）。
+CREATE TABLE modulith.event_publication (
+  id                UUID         PRIMARY KEY,
+  listener_id       TEXT         NOT NULL,
+  event_type        TEXT         NOT NULL,
+  serialized_event  TEXT         NOT NULL,
+  publication_date  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  completion_date   TIMESTAMPTZ
+);
+
+-- 未完成事件掃描（補投）：Partial Index 僅索引待投遞事件
+CREATE INDEX idx_event_pub_incomplete ON modulith.event_publication (publication_date) WHERE completion_date IS NULL;
+
+COMMENT ON TABLE modulith.event_publication IS &#x27;平台 Spring Modulith Outbox；completion_date IS NULL 為待投遞（EDD §4.6）&#x27;;</code></pre>
+<h4 id="382-modulithevent_publication_archive已完成事件歸檔">3.8.2 <code>modulith.event_publication_archive</code>（已完成事件歸檔）</h4>
+<p><strong>說明：</strong> 已成功投遞事件歸檔（Spring Modulith completed events archive），保持 <code>event_publication</code> 精簡以加速待投遞掃描。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>UUID</td><td>否</td><td>—</td><td>主鍵</td></tr>
+<tr><td>listener_id</td><td>TEXT</td><td>否</td><td>—</td><td>監聽器 ID</td></tr>
+<tr><td>event_type</td><td>TEXT</td><td>否</td><td>—</td><td>事件類別</td></tr>
+<tr><td>serialized_event</td><td>TEXT</td><td>否</td><td>—</td><td>payload</td></tr>
+<tr><td>publication_date</td><td>TIMESTAMPTZ</td><td>否</td><td>—</td><td>發布時間</td></tr>
+<tr><td>completion_date</td><td>TIMESTAMPTZ</td><td>否</td><td>—</td><td>完成時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── modulith.event_publication_archive（平台 Modulith）────────────────
+-- 已完成事件歸檔（保持主 Outbox 表精簡）。
+CREATE TABLE modulith.event_publication_archive (
+  id                UUID         PRIMARY KEY,
+  listener_id       TEXT         NOT NULL,
+  event_type        TEXT         NOT NULL,
+  serialized_event  TEXT         NOT NULL,
+  publication_date  TIMESTAMPTZ  NOT NULL,
+  completion_date   TIMESTAMPTZ  NOT NULL
+);
+
+CREATE INDEX idx_event_archive_date ON modulith.event_publication_archive (completion_date);
+
+COMMENT ON TABLE modulith.event_publication_archive IS &#x27;平台 Modulith 已完成事件歸檔&#x27;;</code></pre>
+<h4 id="383-modulithevent_dead_letter事件-dlq">3.8.3 <code>modulith.event_dead_letter</code>（事件 DLQ）</h4>
+<p><strong>說明：</strong> 投遞失敗事件死信佇列（重試 5 次指數退避後進 DLQ，EDD §4.6.1 / deposit §降級），供人工介入補償。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>event_id</td><td>UUID</td><td>否</td><td>—</td><td>原事件 ID</td></tr>
+<tr><td>topic_name</td><td>VARCHAR(80)</td><td>否</td><td>—</td><td>topic</td></tr>
+<tr><td>retry_count</td><td>INTEGER</td><td>否</td><td>0</td><td>已重試次數</td></tr>
+<tr><td>last_error</td><td>TEXT</td><td>是</td><td>NULL</td><td>最後錯誤訊息</td></tr>
+<tr><td>dead_lettered_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>進 DLQ 時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── modulith.event_dead_letter（平台 Modulith）────────────────────────
+-- 事件 DLQ（重試 5 次後，EDD §4.6.1）；人工補償來源。
+CREATE TABLE modulith.event_dead_letter (
+  id                BIGSERIAL    PRIMARY KEY,
+  event_id          UUID         NOT NULL,
+  topic_name        VARCHAR(80)  NOT NULL,
+  retry_count       INTEGER      NOT NULL DEFAULT 0 CHECK (retry_count &gt;= 0),
+  last_error        TEXT,
+  dead_lettered_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_dlq_topic ON modulith.event_dead_letter (topic_name, dead_lettered_at DESC);
+
+COMMENT ON TABLE modulith.event_dead_letter IS &#x27;平台 Modulith 事件 DLQ（重試上限 5，EDD §4.6.1）&#x27;;</code></pre>
+<hr>
+<h3 id="39-平台底座橫切platform-schema">3.9 平台底座：橫切（<code>platform</code> schema）</h3>
+<h4 id="391-platformaudit_log全域稽核日誌">3.9.1 <code>platform.audit_log</code>（全域稽核日誌）</h4>
+<p><strong>說明：</strong> 高業務重要性操作（帳號變更、錢包異動、權益授予）的統一稽核日誌（EDD §10.6 Audit Log Design）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>bc_name</td><td>VARCHAR(20)</td><td>否</td><td>—</td><td>來源 BC</td></tr>
+<tr><td>table_name</td><td>VARCHAR(100)</td><td>否</td><td>—</td><td>操作對象表</td></tr>
+<tr><td>record_id</td><td>TEXT</td><td>否</td><td>—</td><td>目標記錄主鍵（字串化）</td></tr>
+<tr><td>operation</td><td>VARCHAR(10)</td><td>否</td><td>—</td><td><code>INSERT</code>/<code>UPDATE</code>/<code>DELETE</code></td></tr>
+<tr><td>actor_account_id</td><td>BIGINT</td><td>是</td><td>NULL</td><td>操作帳號（NULL = 系統）</td></tr>
+<tr><td>old_values</td><td>JSONB</td><td>是</td><td>NULL</td><td>舊值</td></tr>
+<tr><td>new_values</td><td>JSONB</td><td>是</td><td>NULL</td><td>新值</td></tr>
+<tr><td>ip_address</td><td>INET</td><td>是</td><td>NULL</td><td>來源 IP</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.audit_log（平台底座）─────────────────────────────────────
+-- 全域稽核日誌（EDD §10.6）。以插入為主，BRIN 節省空間。
+CREATE TABLE platform.audit_log (
+  id                BIGSERIAL    PRIMARY KEY,
+  bc_name           VARCHAR(20)  NOT NULL,
+  table_name        VARCHAR(100) NOT NULL,
+  record_id         TEXT         NOT NULL,
+  operation         VARCHAR(10)  NOT NULL CHECK (operation IN (&#x27;INSERT&#x27;, &#x27;UPDATE&#x27;, &#x27;DELETE&#x27;)),
+  actor_account_id  BIGINT,
+  old_values        JSONB,
+  new_values        JSONB,
+  ip_address        INET,
+  created_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_audit_table_record ON platform.audit_log (table_name, record_id);
+CREATE INDEX idx_audit_actor ON platform.audit_log (actor_account_id) WHERE actor_account_id IS NOT NULL;
+CREATE INDEX idx_audit_created_brin ON platform.audit_log USING BRIN (created_at);
+
+COMMENT ON TABLE platform.audit_log IS &#x27;平台底座全域稽核日誌（EDD §10.6）&#x27;;</code></pre>
+<h4 id="392-platformdata_access_logs敏感資料存取稽核">3.9.2 <code>platform.data_access_logs</code>（敏感資料存取稽核）</h4>
+<p><strong>說明：</strong> 敏感欄位（email 等 PII）存取稽核（§17.4、GDPR 問責制）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>UUID</td><td>否</td><td>gen_random_uuid()</td><td>主鍵</td></tr>
+<tr><td>table_name</td><td>VARCHAR(100)</td><td>否</td><td>—</td><td>存取表</td></tr>
+<tr><td>record_id</td><td>TEXT</td><td>否</td><td>—</td><td>記錄 ID</td></tr>
+<tr><td>field_name</td><td>VARCHAR(100)</td><td>是</td><td>NULL</td><td>欄位（NULL = 整筆）</td></tr>
+<tr><td>action</td><td>VARCHAR(20)</td><td>否</td><td>—</td><td><code>SELECT</code>/<code>UPDATE</code>/<code>DELETE</code></td></tr>
+<tr><td>actor_account_id</td><td>BIGINT</td><td>是</td><td>NULL</td><td>操作者</td></tr>
+<tr><td>reason</td><td>TEXT</td><td>是</td><td>NULL</td><td>存取原因（如 GDPR 刪除）</td></tr>
+<tr><td>accessed_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>存取時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.data_access_logs（平台底座）──────────────────────────────
+-- 敏感資料存取稽核（§17.4，GDPR）。
+CREATE TABLE platform.data_access_logs (
+  id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_name        VARCHAR(100) NOT NULL,
+  record_id         TEXT         NOT NULL,
+  field_name        VARCHAR(100),
+  action            VARCHAR(20)  NOT NULL CHECK (action IN (&#x27;SELECT&#x27;, &#x27;UPDATE&#x27;, &#x27;DELETE&#x27;)),
+  actor_account_id  BIGINT,
+  reason            TEXT,
+  accessed_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_dal_record ON platform.data_access_logs (table_name, record_id);
+CREATE INDEX idx_dal_accessed ON platform.data_access_logs (accessed_at);
+
+COMMENT ON TABLE platform.data_access_logs IS &#x27;平台底座敏感資料存取稽核（§17.4）&#x27;;</code></pre>
+<h4 id="393-platformgdpr_erasure_requests被遺忘權請求稽核">3.9.3 <code>platform.gdpr_erasure_requests</code>（被遺忘權請求稽核）</h4>
+<p><strong>說明：</strong> GDPR Art.17 被遺忘權請求稽核（§17.2）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>UUID</td><td>否</td><td>gen_random_uuid()</td><td>主鍵</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>否</td><td>—</td><td>請求帳號</td></tr>
+<tr><td>status</td><td>VARCHAR(20)</td><td>否</td><td>&#x27;requested&#x27;</td><td><code>requested</code>/<code>anonymized</code>/<code>completed</code></td></tr>
+<tr><td>requested_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>請求時間</td></tr>
+<tr><td>completed_at</td><td>TIMESTAMPTZ</td><td>是</td><td>NULL</td><td>完成時間</td></tr>
+<tr><td>requestor_ip</td><td>INET</td><td>是</td><td>NULL</td><td>請求來源 IP</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.gdpr_erasure_requests（平台底座）─────────────────────────
+-- GDPR 被遺忘權請求稽核（§17.2，Art.17，30 天內回應）。
+CREATE TABLE platform.gdpr_erasure_requests (
+  id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id    BIGINT       NOT NULL,
+  status        VARCHAR(20)  NOT NULL DEFAULT &#x27;requested&#x27;
+                             CHECK (status IN (&#x27;requested&#x27;, &#x27;anonymized&#x27;, &#x27;completed&#x27;)),
+  requested_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  completed_at  TIMESTAMPTZ,
+  requestor_ip  INET
+);
+
+CREATE INDEX idx_gdpr_status ON platform.gdpr_erasure_requests (status, requested_at) WHERE status &lt;&gt; &#x27;completed&#x27;;
+
+COMMENT ON TABLE platform.gdpr_erasure_requests IS &#x27;平台底座 GDPR 被遺忘權請求稽核（§17.2）&#x27;;</code></pre>
+<h4 id="394-platformfeature_flags功能開關">3.9.4 <code>platform.feature_flags</code>（功能開關）</h4>
+<p><strong>說明：</strong> 功能開關定義（EDD §20 Feature Flag Engineering），支援金絲雀發佈與緊急回滾。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>flag_key</td><td>VARCHAR(100)</td><td>否</td><td>—</td><td>主鍵，flag 鍵（EDD §20.2 命名規範）</td></tr>
+<tr><td>is_enabled</td><td>BOOLEAN</td><td>否</td><td>FALSE</td><td>是否啟用</td></tr>
+<tr><td>rollout_pct</td><td>INTEGER</td><td>否</td><td>0</td><td>灰度比例（0–100）</td></tr>
+<tr><td>description</td><td>TEXT</td><td>是</td><td>NULL</td><td>說明</td></tr>
+<tr><td>updated_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>更新時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.feature_flags（平台底座）─────────────────────────────────
+-- 功能開關（EDD §20）；rollout_pct 支援金絲雀。
+CREATE TABLE platform.feature_flags (
+  flag_key     VARCHAR(100) PRIMARY KEY,
+  is_enabled   BOOLEAN      NOT NULL DEFAULT FALSE,
+  rollout_pct  INTEGER      NOT NULL DEFAULT 0 CHECK (rollout_pct BETWEEN 0 AND 100),
+  description  TEXT,
+  updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER trg_feature_flags_updated_at
+  BEFORE UPDATE ON platform.feature_flags FOR EACH ROW EXECUTE FUNCTION platform.set_updated_at();
+
+COMMENT ON TABLE platform.feature_flags IS &#x27;平台底座功能開關（EDD §20）&#x27;;</code></pre>
+<h4 id="395-platformfeature_flag_auditflag-變更稽核">3.9.5 <code>platform.feature_flag_audit</code>（Flag 變更稽核）</h4>
+<p><strong>說明：</strong> 功能開關變更稽核（EDD §20.6 Flag 技術債管理）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>flag_key</td><td>VARCHAR(100)</td><td>否</td><td>—</td><td>flag（同 BC FK → feature_flags）</td></tr>
+<tr><td>old_enabled</td><td>BOOLEAN</td><td>是</td><td>NULL</td><td>變更前狀態</td></tr>
+<tr><td>new_enabled</td><td>BOOLEAN</td><td>否</td><td>—</td><td>變更後狀態</td></tr>
+<tr><td>changed_by</td><td>BIGINT</td><td>是</td><td>NULL</td><td>操作者</td></tr>
+<tr><td>changed_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>變更時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.feature_flag_audit（平台底座）────────────────────────────
+-- Flag 變更稽核（EDD §20.6）。
+CREATE TABLE platform.feature_flag_audit (
+  id           BIGSERIAL    PRIMARY KEY,
+  flag_key     VARCHAR(100) NOT NULL REFERENCES platform.feature_flags (flag_key) ON DELETE CASCADE,  -- 同 schema FK
+  old_enabled  BOOLEAN,
+  new_enabled  BOOLEAN      NOT NULL,
+  changed_by   BIGINT,
+  changed_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_flag_audit_key ON platform.feature_flag_audit (flag_key, changed_at DESC);
+
+COMMENT ON TABLE platform.feature_flag_audit IS &#x27;平台底座 Flag 變更稽核（EDD §20.6）&#x27;;</code></pre>
+<h4 id="396-platformrate_limit_counters限流計數持久後援">3.9.6 <code>platform.rate_limit_counters</code>（限流計數持久後援）</h4>
+<p><strong>說明：</strong> 限流計數持久化後援（Redis 為熱路徑滑動視窗，本表為 Redis 不可用時的降級後援 + 稽核，CONSTANTS §6 / EDD §11.3）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>action</td><td>VARCHAR(20)</td><td>否</td><td>—</td><td><code>login</code>/<code>register</code>/<code>wallet</code>/<code>buy</code>/<code>lb</code></td></tr>
+<tr><td>identifier</td><td>VARCHAR(80)</td><td>否</td><td>—</td><td>IP 或 account_id</td></tr>
+<tr><td>window_start</td><td>TIMESTAMPTZ</td><td>否</td><td>—</td><td>視窗起點</td></tr>
+<tr><td>hit_count</td><td>INTEGER</td><td>否</td><td>0</td><td>計數</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.rate_limit_counters（平台底座）───────────────────────────
+-- 限流計數持久後援（Redis 主，本表降級/稽核，CONSTANTS §6 / EDD §11.3）。
+CREATE TABLE platform.rate_limit_counters (
+  id            BIGSERIAL    PRIMARY KEY,
+  action        VARCHAR(20)  NOT NULL CHECK (action IN (&#x27;login&#x27;, &#x27;register&#x27;, &#x27;wallet&#x27;, &#x27;buy&#x27;, &#x27;lb&#x27;)),
+  identifier    VARCHAR(80)  NOT NULL,
+  window_start  TIMESTAMPTZ  NOT NULL,
+  hit_count     INTEGER      NOT NULL DEFAULT 0 CHECK (hit_count &gt;= 0)
+);
+
+CREATE UNIQUE INDEX uq_rate_action_id_window ON platform.rate_limit_counters (action, identifier, window_start);
+
+COMMENT ON TABLE platform.rate_limit_counters IS &#x27;平台底座限流後援（CONSTANTS §6）&#x27;;</code></pre>
+<h4 id="397-platformapi_request_logapi-請求日誌">3.9.7 <code>platform.api_request_log</code>（API 請求日誌）</h4>
+<p><strong>說明：</strong> API 請求存取日誌（EDD §10.1 Logging / §17 Observability），含 trace_id 關聯分散式追蹤。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>trace_id</td><td>VARCHAR(64)</td><td>否</td><td>—</td><td>分散式追蹤 ID</td></tr>
+<tr><td>method</td><td>VARCHAR(8)</td><td>否</td><td>—</td><td>HTTP 方法</td></tr>
+<tr><td>path</td><td>TEXT</td><td>否</td><td>—</td><td>請求路徑</td></tr>
+<tr><td>status_code</td><td>SMALLINT</td><td>否</td><td>—</td><td>HTTP 狀態碼</td></tr>
+<tr><td>latency_ms</td><td>INTEGER</td><td>否</td><td>—</td><td>延遲（ms）</td></tr>
+<tr><td>account_id</td><td>BIGINT</td><td>是</td><td>NULL</td><td>帳號（公開端點為 NULL）</td></tr>
+<tr><td>created_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.api_request_log（平台底座）───────────────────────────────
+-- API 請求日誌（EDD §10.1）。高寫入，BRIN + 時間分區候選（§10）。
+CREATE TABLE platform.api_request_log (
+  id           BIGSERIAL    PRIMARY KEY,
+  trace_id     VARCHAR(64)  NOT NULL,
+  method       VARCHAR(8)   NOT NULL,
+  path         TEXT         NOT NULL,
+  status_code  SMALLINT     NOT NULL CHECK (status_code BETWEEN 100 AND 599),
+  latency_ms   INTEGER      NOT NULL CHECK (latency_ms &gt;= 0),
+  account_id   BIGINT,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_api_log_trace ON platform.api_request_log (trace_id);
+CREATE INDEX idx_api_log_created_brin ON platform.api_request_log USING BRIN (created_at);
+
+COMMENT ON TABLE platform.api_request_log IS &#x27;平台底座 API 請求日誌（EDD §10.1；trace_id 關聯 §10.3）&#x27;;</code></pre>
+<h4 id="398-platformschema_migrationsmigration-版本追蹤">3.9.8 <code>platform.schema_migrations</code>（Migration 版本追蹤）</h4>
+<p><strong>說明：</strong> Flyway schema history（§8 Migration 策略），追蹤已套用版本。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>version</td><td>VARCHAR(20)</td><td>否</td><td>—</td><td>主鍵，版本號（V001…）</td></tr>
+<tr><td>description</td><td>TEXT</td><td>否</td><td>—</td><td>描述</td></tr>
+<tr><td>checksum</td><td>BIGINT</td><td>是</td><td>NULL</td><td>校驗碼</td></tr>
+<tr><td>applied_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>套用時間</td></tr>
+<tr><td>success</td><td>BOOLEAN</td><td>否</td><td>—</td><td>是否成功</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.schema_migrations（平台底座）─────────────────────────────
+-- Migration 版本追蹤（Flyway history，§8）。
+CREATE TABLE platform.schema_migrations (
+  version      VARCHAR(20)  PRIMARY KEY,
+  description  TEXT         NOT NULL,
+  checksum     BIGINT,
+  applied_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  success      BOOLEAN      NOT NULL
+);
+
+COMMENT ON TABLE platform.schema_migrations IS &#x27;平台底座 Flyway migration 版本追蹤（§8）&#x27;;</code></pre>
+<h4 id="399-platformsystem_config動態設定">3.9.9 <code>platform.system_config</code>（動態設定）</h4>
+<p><strong>說明：</strong> 動態設定鍵值（CONSTANTS §11 設定鍵），可熱更新不重啟。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>config_key</td><td>VARCHAR(100)</td><td>否</td><td>—</td><td>主鍵（<code>SESSION_TTL_DAYS</code> 等）</td></tr>
+<tr><td>config_value</td><td>TEXT</td><td>否</td><td>—</td><td>值（字串化）</td></tr>
+<tr><td>value_type</td><td>VARCHAR(20)</td><td>否</td><td>&#x27;string&#x27;</td><td><code>string</code>/<code>int</code>/<code>bool</code></td></tr>
+<tr><td>updated_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>更新時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.system_config（平台底座）─────────────────────────────────
+-- 動態設定（CONSTANTS §11）；覆寫 env 預設。
+CREATE TABLE platform.system_config (
+  config_key    VARCHAR(100) PRIMARY KEY,
+  config_value  TEXT         NOT NULL,
+  value_type    VARCHAR(20)  NOT NULL DEFAULT &#x27;string&#x27; CHECK (value_type IN (&#x27;string&#x27;, &#x27;int&#x27;, &#x27;bool&#x27;)),
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER trg_system_config_updated_at
+  BEFORE UPDATE ON platform.system_config FOR EACH ROW EXECUTE FUNCTION platform.set_updated_at();
+
+COMMENT ON TABLE platform.system_config IS &#x27;平台底座動態設定（CONSTANTS §11）&#x27;;</code></pre>
+<h4 id="3910-platformerror_code_registry錯誤碼清冊">3.9.10 <code>platform.error_code_registry</code>（錯誤碼清冊）</h4>
+<p><strong>說明：</strong> 全域錯誤碼契約（CONSTANTS §10、API §5.2），供客戶端可預期處理與一致訊息。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>error_code</td><td>VARCHAR(40)</td><td>否</td><td>—</td><td>主鍵（<code>VALIDATION_ERROR</code> 等）</td></tr>
+<tr><td>http_status</td><td>SMALLINT</td><td>否</td><td>—</td><td>HTTP 狀態碼</td></tr>
+<tr><td>message_zh_tw</td><td>TEXT</td><td>否</td><td>—</td><td>zh-TW 訊息</td></tr>
+<tr><td>is_active</td><td>BOOLEAN</td><td>否</td><td>TRUE</td><td>是否啟用</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.error_code_registry（平台底座）───────────────────────────
+-- 錯誤碼清冊（CONSTANTS §10 / API §5.2）。
+CREATE TABLE platform.error_code_registry (
+  error_code     VARCHAR(40)  PRIMARY KEY,
+  http_status    SMALLINT     NOT NULL CHECK (http_status BETWEEN 100 AND 599),
+  message_zh_tw  TEXT         NOT NULL,
+  is_active      BOOLEAN      NOT NULL DEFAULT TRUE
+);
+
+COMMENT ON TABLE platform.error_code_registry IS &#x27;平台底座錯誤碼清冊（CONSTANTS §10）&#x27;;</code></pre>
+<h4 id="3911-platformslo_measurementsslo-量測">3.9.11 <code>platform.slo_measurements</code>（SLO 量測）</h4>
+<p><strong>說明：</strong> SLO/SLI 量測記錄（EDD §10.5、CONSTANTS §4），供 Error Budget 計算。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>metric_name</td><td>VARCHAR(50)</td><td>否</td><td>—</td><td>指標（<code>p99_latency_ms</code> 等）</td></tr>
+<tr><td>metric_value</td><td>NUMERIC(12,4)</td><td>否</td><td>—</td><td>量測值</td></tr>
+<tr><td>target_value</td><td>NUMERIC(12,4)</td><td>是</td><td>NULL</td><td>目標值</td></tr>
+<tr><td>measured_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>量測時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.slo_measurements（平台底座）──────────────────────────────
+-- SLO/SLI 量測（EDD §10.5、CONSTANTS §4）；numeric 避免浮點誤差。
+CREATE TABLE platform.slo_measurements (
+  id            BIGSERIAL      PRIMARY KEY,
+  metric_name   VARCHAR(50)    NOT NULL,
+  metric_value  NUMERIC(12,4)  NOT NULL,
+  target_value  NUMERIC(12,4),
+  measured_at   TIMESTAMPTZ    NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_slo_metric ON platform.slo_measurements (metric_name, measured_at DESC);
+
+COMMENT ON TABLE platform.slo_measurements IS &#x27;平台底座 SLO 量測（EDD §10.5）&#x27;;</code></pre>
+<h4 id="3912-platformhealth_check_log健康檢查記錄">3.9.12 <code>platform.health_check_log</code>（健康檢查記錄）</h4>
+<p><strong>說明：</strong> 健康檢查 / 合成監控記錄（EDD §10.7、API Health endpoints）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>check_name</td><td>VARCHAR(50)</td><td>否</td><td>—</td><td>檢查項（<code>db</code>/<code>redis</code>/<code>liveness</code>）</td></tr>
+<tr><td>is_healthy</td><td>BOOLEAN</td><td>否</td><td>—</td><td>是否健康</td></tr>
+<tr><td>latency_ms</td><td>INTEGER</td><td>是</td><td>NULL</td><td>檢查延遲</td></tr>
+<tr><td>checked_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>檢查時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.health_check_log（平台底座）──────────────────────────────
+-- 健康檢查/合成監控記錄（EDD §10.7、API Health）。
+CREATE TABLE platform.health_check_log (
+  id          BIGSERIAL    PRIMARY KEY,
+  check_name  VARCHAR(50)  NOT NULL,
+  is_healthy  BOOLEAN      NOT NULL,
+  latency_ms  INTEGER      CHECK (latency_ms IS NULL OR latency_ms &gt;= 0),
+  checked_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_health_check ON platform.health_check_log (check_name, checked_at DESC);
+
+COMMENT ON TABLE platform.health_check_log IS &#x27;平台底座健康檢查記錄（EDD §10.7）&#x27;;</code></pre>
+<h4 id="3913-platformoutbox_relay_offset事件轉發位移">3.9.13 <code>platform.outbox_relay_offset</code>（事件轉發位移）</h4>
+<p><strong>說明：</strong> 事件轉發 worker 的 relay 位移/狀態（write-behind worker 經 broker 落庫，research_summary），記錄各 relay 已處理進度。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>relay_name</td><td>VARCHAR(50)</td><td>否</td><td>—</td><td>主鍵，relay 名稱</td></tr>
+<tr><td>last_event_id</td><td>UUID</td><td>是</td><td>NULL</td><td>最後處理事件 ID</td></tr>
+<tr><td>last_relayed_at</td><td>TIMESTAMPTZ</td><td>是</td><td>NULL</td><td>最後轉發時間</td></tr>
+<tr><td>updated_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>更新時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.outbox_relay_offset（平台底座）───────────────────────────
+-- 事件轉發位移（write-behind relay 進度，research_summary）。
+CREATE TABLE platform.outbox_relay_offset (
+  relay_name       VARCHAR(50)  PRIMARY KEY,
+  last_event_id    UUID,
+  last_relayed_at  TIMESTAMPTZ,
+  updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE TRIGGER trg_relay_offset_updated_at
+  BEFORE UPDATE ON platform.outbox_relay_offset FOR EACH ROW EXECUTE FUNCTION platform.set_updated_at();
+
+COMMENT ON TABLE platform.outbox_relay_offset IS &#x27;平台底座事件轉發位移&#x27;;</code></pre>
+<h4 id="3914-platformreplication_status_log複本延遲監控">3.9.14 <code>platform.replication_status_log</code>（複本延遲監控）</h4>
+<p><strong>說明：</strong> PostgreSQL Primary-Standby 複本延遲監控記錄（§18、EDD §3.6 HA；Replica Lag 告警）。</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>Nullable</th><th>預設值</th><th>說明</th></tr>
+<tr><td>id</td><td>BIGSERIAL</td><td>否</td><td>（序號）</td><td>主鍵</td></tr>
+<tr><td>replica_name</td><td>VARCHAR(50)</td><td>否</td><td>—</td><td>standby 節點名</td></tr>
+<tr><td>lag_seconds</td><td>NUMERIC(10,3)</td><td>否</td><td>—</td><td>複製延遲（秒）</td></tr>
+<tr><td>is_healthy</td><td>BOOLEAN</td><td>否</td><td>—</td><td>是否在閾值內（≤1s）</td></tr>
+<tr><td>checked_at</td><td>TIMESTAMPTZ</td><td>否</td><td>now()</td><td>檢查時間</td></tr>
+</table>
+<pre><code class="language-sql">-- ── platform.replication_status_log（平台底座）────────────────────────
+-- 複本延遲監控（§18、EDD §3.6；lag&gt;10s 警告 / &gt;60s 嚴重）。
+CREATE TABLE platform.replication_status_log (
+  id            BIGSERIAL      PRIMARY KEY,
+  replica_name  VARCHAR(50)    NOT NULL,
+  lag_seconds   NUMERIC(10,3)  NOT NULL CHECK (lag_seconds &gt;= 0),
+  is_healthy    BOOLEAN        NOT NULL,
+  checked_at    TIMESTAMPTZ    NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_repl_status ON platform.replication_status_log (replica_name, checked_at DESC);
+
+COMMENT ON TABLE platform.replication_status_log IS &#x27;平台底座複本延遲監控（§18、EDD §3.6）&#x27;;</code></pre>
+<hr>
+<h2 id="4-正規化規則normalization-rules">4. 正規化規則（Normalization Rules）</h2>
+<h3 id="41-各正規化形式與本系統落實">4.1 各正規化形式與本系統落實</h3>
+<table>
+<tr><th>正規化</th><th>要求</th><th>本系統落實</th></tr>
+<tr><td>1NF</td><td>每欄位原子值；無重複欄位組</td><td>無 <code>tag1/tag2</code> 類重複組；多值以 JSONB（<code>saves.data</code>、<code>records.payload</code>）或獨立表（<code>password_history</code>）表達</td></tr>
+<tr><td>2NF</td><td>非主鍵欄位完全依賴整個主鍵</td><td><code>saves</code>（複合 PK account_id+slot）的 <code>data</code> 完全依賴整組鍵，無部分依賴</td></tr>
+<tr><td>3NF</td><td>無遞移依賴</td><td>catalog 表（<code>deposit_pack</code>/<code>entitlement_catalog</code>）抽離，<code>deposit_order.amount</code> 於下單當下快照（非遞移，見 §4.2）</td></tr>
+<tr><td>BCNF</td><td>每個決定因子皆候選鍵</td><td><code>entitlements</code> 的 <code>(account_id,kind,item_id)</code> 為唯一決定因子</td></tr>
+</table>
+<h3 id="42-刻意反正規化intentional-denormalization">4.2 刻意反正規化（Intentional Denormalization）</h3>
+<table>
+<tr><th>情境</th><th>反正規化手法</th><th>理由與同步策略</th></tr>
+<tr><td>排行上榜名稱</td><td><code>leaderboard.display_name</code> 冗餘 member 的 <code>display_name</code></td><td><strong>上榜當下快照</strong>（Conformist，EDD §3.4）：避免跨 BC JOIN（HC-1 禁止）；玩家改名不回溯既有榜單（業務可接受）。同步策略：上榜 upsert 時由 member Public API 取值寫入，不事後同步</td></tr>
+<tr><td>帳本餘額</td><td><code>wallet_ledger.balance</code> 冗餘異動後餘額</td><td>對帳審計需每筆當下餘額快照（防作弊）；append-only 不更新，無一致性風險。對帳以 <code>Σdelta == wallets.balance</code> 驗證（§3.2.3）</td></tr>
+<tr><td>訂單入帳量</td><td><code>deposit_order.amount/currency</code> 冗餘自 <code>deposit_pack</code></td><td>下單當下快照（包定義變動不影響歷史訂單）；符合交易不可變原則</td></tr>
+</table>
+<blockquote><p>規則：本系統所有反正規化均屬「交易當下快照」語意（append-only / upsert 快照），非效能複製，故不需 EXPLAIN ANALYZE 佐證；已於上表逐一文件化同步策略。</p></blockquote>
+<hr>
+<h2 id="5-索引策略indexing-strategy">5. 索引策略（Indexing Strategy）</h2>
+<h3 id="51-索引清單對應查詢模式--api-endpoint">5.1 索引清單（對應查詢模式 / API Endpoint）</h3>
+<table>
+<tr><th>索引</th><th>表</th><th>類型</th><th>對應查詢 / API</th></tr>
+<tr><td><code>uq_accounts_email</code>（Partial Unique, LOWER）</td><td>member.accounts</td><td>B-tree Unique Partial</td><td><code>POST /auth/login</code>、<code>/register</code>（email 等值，排除軟刪除）</td></tr>
+<tr><td><code>idx_sessions_acct</code></td><td>member.sessions</td><td>B-tree</td><td>依帳號列舉/清理 session</td></tr>
+<tr><td><code>idx_sessions_expires</code></td><td>member.sessions</td><td>B-tree</td><td>定時清理過期 session</td></tr>
+<tr><td><code>idx_login_attempts_ip</code></td><td>member.login_attempts</td><td>B-tree 複合</td><td>限流滑動視窗後援（CONSTANTS §6）</td></tr>
+<tr><td><code>idx_ledger_acct</code>（account_id, created_at DESC）</td><td>wallet.wallet_ledger</td><td>B-tree 複合</td><td><code>GET /wallet/ledger</code> 對帳查近期（EDD §6.2）</td></tr>
+<tr><td><code>idx_wallet_snap_incons</code>（Partial）</td><td>wallet.wallet_balance_snapshots</td><td>B-tree Partial</td><td>對帳不一致掃描（is_consistent=false）</td></tr>
+<tr><td><code>uq_deposit_order_idem</code></td><td>deposit.deposit_order</td><td>B-tree Unique</td><td>冪等去重（<code>Idempotency-Key</code>）</td></tr>
+<tr><td><code>uq_entitlement_acct_kind_item</code>（Partial）</td><td>entitlement.entitlements</td><td>B-tree Unique Partial</td><td>防重複授予 + 查擁有（排除軟刪除）</td></tr>
+<tr><td><code>idx_entitlement_acct</code>（Partial）</td><td>entitlement.entitlements</td><td>B-tree Partial</td><td><code>GET /entitlements</code>（排除軟刪除）</td></tr>
+<tr><td><code>idx_records_acct</code>（account_id, type, created_at DESC）</td><td>record.records</td><td>B-tree 複合</td><td><code>GET /records</code>（依帳號/類型，EDD §6.2）</td></tr>
+<tr><td><code>idx_lb_mode_score</code>（mode, score DESC）</td><td>leaderboard.leaderboard</td><td>B-tree 複合</td><td><code>GET /leaderboard</code> Top N（P99&lt;300ms）</td></tr>
+<tr><td><code>idx_event_pub_incomplete</code>（Partial）</td><td>modulith.event_publication</td><td>B-tree Partial</td><td>Outbox 待投遞掃描（completion_date IS NULL）</td></tr>
+<tr><td><code>idx_audit_created_brin</code></td><td>platform.audit_log</td><td>BRIN</td><td>大型稽核表時間範圍查詢</td></tr>
+<tr><td><code>idx_api_log_created_brin</code></td><td>platform.api_request_log</td><td>BRIN</td><td>高寫入日誌時間範圍</td></tr>
+</table>
+<h3 id="52-索引類型選用">5.2 索引類型選用</h3>
+<ul><li><strong>B-tree</strong>（預設）：等值 / 範圍 / 排序（絕大多數查詢）</li><li><strong>BRIN</strong>：物理時間有序的高寫入大表（<code>audit_log</code>、<code>api_request_log</code>）</li><li><strong>Partial Index</strong>：軟刪除（<code>WHERE deleted_at IS NULL</code>）、Outbox 待投遞（<code>WHERE completion_date IS NULL</code>）、對帳不一致</li><li><strong>GIN</strong>（候選）：若未來對 <code>records.payload</code> / <code>saves.data</code> JSONB 做鍵查詢，加 <code>GIN (payload jsonb_path_ops)</code></li></ul>
+<h3 id="53-複合索引欄位順序">5.3 複合索引欄位順序</h3>
+<pre><code class="">(等值條件欄位) → (範圍 / 排序欄位)</code></pre>
+<pre><code class="language-sql">-- idx_ledger_acct：account_id（等值）在前，created_at DESC（排序）在後 — 正確
+CREATE INDEX idx_ledger_acct ON wallet.wallet_ledger (account_id, created_at DESC);
+-- idx_lb_mode_score：mode（等值）在前，score DESC（排序）在後 — 正確（Top N 掃描）
+CREATE INDEX idx_lb_mode_score ON leaderboard.leaderboard (mode, score DESC);</code></pre>
+<h3 id="54-partial-index-應用">5.4 Partial Index 應用</h3>
+<pre><code class="language-sql">CREATE UNIQUE INDEX uq_accounts_email ON member.accounts (LOWER(email)) WHERE deleted_at IS NULL;
+CREATE INDEX idx_event_pub_incomplete ON modulith.event_publication (publication_date) WHERE completion_date IS NULL;</code></pre>
+<h3 id="55-索引膨脹監控">5.5 索引膨脹監控</h3>
+<pre><code class="language-sql">-- 從未被使用的索引
+SELECT schemaname, relname AS table_name, indexrelname AS index_name,
+       pg_size_pretty(pg_relation_size(indexrelid)) AS index_size, idx_scan
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0
+ORDER BY pg_relation_size(indexrelid) DESC;
+
+-- 重建膨脹索引（不鎖表）
+REINDEX INDEX CONCURRENTLY wallet.idx_ledger_acct;</code></pre>
+<hr>
+<h2 id="6-稽核與合規資料表audit--compliance">6. 稽核與合規資料表（Audit &amp; Compliance）</h2>
+<h3 id="61-標準稽核日誌表">6.1 標準稽核日誌表</h3>
+<p>稽核日誌見 §3.9.1 <code>platform.audit_log</code>（含 <code>old_values</code>/<code>new_values</code> JSONB、<code>actor_account_id</code>、BRIN 時間索引）。</p>
+<h3 id="62-自動稽核-trigger-模式">6.2 自動稽核 Trigger 模式</h3>
+<pre><code class="language-sql">-- 通用稽核 trigger function（套用於高業務重要性表：accounts / wallets / entitlements）
+CREATE OR REPLACE FUNCTION platform.audit_trigger_fn()
+RETURNS TRIGGER AS $$
+DECLARE
+  old_data JSONB; new_data JSONB;
+BEGIN
+  IF TG_OP = &#x27;DELETE&#x27; THEN old_data := to_jsonb(OLD); new_data := NULL;
+  ELSIF TG_OP = &#x27;INSERT&#x27; THEN old_data := NULL; new_data := to_jsonb(NEW);
+  ELSE old_data := to_jsonb(OLD); new_data := to_jsonb(NEW);
+  END IF;
+
+  INSERT INTO platform.audit_log(bc_name, table_name, record_id, operation, old_values, new_values, actor_account_id)
+  VALUES (TG_ARGV[0], TG_TABLE_NAME, COALESCE(NEW.id, OLD.id)::TEXT, TG_OP,
+          old_data, new_data, current_setting(&#x27;app.current_account_id&#x27;, true)::BIGINT);
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 套用範例（member BC）
+CREATE TRIGGER trg_accounts_audit
+  AFTER INSERT OR UPDATE OR DELETE ON member.accounts
+  FOR EACH ROW EXECUTE FUNCTION platform.audit_trigger_fn(&#x27;member&#x27;);</code></pre>
+<blockquote><p><strong>註</strong>：<code>wallet_ledger</code> / <code>records</code> 為 append-only，本身即為審計記錄，不另套稽核 trigger（避免重複）。</p></blockquote>
+<h3 id="63-gdpr--個資保護">6.3 GDPR / 個資保護</h3>
+<p>PII 欄位清單見 §14；被遺忘權實作見 §17.2。密碼 <code>pass_hash</code> 使用 scrypt（<code>SCRYPT_KEYLEN=64</code>/<code>SALT=16B</code>，CONSTANTS §1），永不儲存明文。</p>
+<hr>
+<h2 id="7-效能設計performance-design">7. 效能設計（Performance Design）</h2>
+<h3 id="71-查詢效能基準表">7.1 查詢效能基準表</h3>
+<table>
+<tr><th>查詢描述</th><th>預期 P95/P99</th><th>使用索引</th><th>備注</th></tr>
+<tr><td>登入查 email（<code>POST /auth/login</code>）</td><td>P95 &lt; 10ms</td><td><code>uq_accounts_email</code></td><td>等值 + 唯一</td></tr>
+<tr><td>Bearer 驗證查 session</td><td>P95 &lt; 5ms</td><td>PK(token) + Redis 1800s</td><td>EDD §11.3 快取</td></tr>
+<tr><td>排行 Top N（<code>GET /leaderboard</code>）</td><td>P99 &lt; 300ms</td><td><code>idx_lb_mode_score</code></td><td>CONSTANTS §4 SLO</td></tr>
+<tr><td>帳本查近期（<code>GET /wallet/ledger</code>）</td><td>P95 &lt; 20ms</td><td><code>idx_ledger_acct</code></td><td>範圍掃描</td></tr>
+<tr><td>扣款交易（<code>POST /wallet/spend</code>）</td><td>P99 &lt; 50ms</td><td>PK + <code>SELECT FOR UPDATE</code></td><td>行鎖序列化（EDD §4.7）</td></tr>
+<tr><td>寫入吞吐</td><td>≥ 200 txn/s</td><td>—</td><td>CONSTANTS §4</td></tr>
+</table>
+<h3 id="72-n1-查詢防護">7.2 N+1 查詢防護</h3>
+<pre><code class="language-sql">-- 查帳號的錢包 + 近 20 筆帳本（一次查詢，非迴圈）
+SELECT w.cash, w.gems,
+       COALESCE(json_agg(json_build_object(&#x27;delta&#x27;, l.delta, &#x27;reason&#x27;, l.reason, &#x27;balance&#x27;, l.balance)
+                         ORDER BY l.created_at DESC) FILTER (WHERE l.id IS NOT NULL), &#x27;[]&#x27;) AS recent_ledger
+FROM wallet.wallets w
+LEFT JOIN LATERAL (
+  SELECT * FROM wallet.wallet_ledger l2 WHERE l2.account_id = w.account_id ORDER BY created_at DESC LIMIT 20
+) l ON TRUE
+WHERE w.account_id = $1
+GROUP BY w.cash, w.gems;</code></pre>
+<blockquote><p>註：此 JOIN 限於 <strong>wallet BC schema 內</strong>（wallets + wallet_ledger），不跨 BC（HC-1 合規）。</p></blockquote>
+<h3 id="73-連線池大小公式">7.3 連線池大小公式</h3>
+<pre><code class="">最佳連線數 = (CPU 核心數 × 2) + 有效磁碟數</code></pre>
+<table>
+<tr><th>環境</th><th>計算</th><th>建議設定</th></tr>
+<tr><td>開發（Rancher Desktop，4 核）</td><td>(4×2)+1 = 9</td><td>HikariCP max 10</td></tr>
+<tr><td>生產（Pod 4 核 × ≥2 replicas）</td><td>每 Pod (4×2)+1 ≈ 9</td><td>HikariCP max 20/Pod；PgBouncer transaction pool 40</td></tr>
+</table>
+<pre><code class="language-ini"># PgBouncer（Serverless/多 Pod 必用 transaction mode）
+pool_mode = transaction
+max_client_conn = 1000
+default_pool_size = 40</code></pre>
+<blockquote><p>高峰期總連線須 &lt; PostgreSQL <code>max_connections</code> 的 80%（§16 HA 核查）。</p></blockquote>
+<h3 id="74-read-replica-路由規則">7.4 Read Replica 路由規則</h3>
+<table>
+<tr><th>查詢類型</th><th>路由</th><th>說明</th></tr>
+<tr><td>寫入（錢包/權益/訂單交易）</td><td>Primary</td><td>強一致（EDD §4.7 行鎖）</td></tr>
+<tr><td>即時讀（剛寫入後讀自己餘額）</td><td>Primary</td><td>避免 Replica Lag 讀到舊值</td></tr>
+<tr><td>公開排行 Top N</td><td>Read Replica（可接受 ≤1s Lag）</td><td>非即時（另有 Redis 30s 快取）</td></tr>
+<tr><td>稽核/報表/背景 Job</td><td>Read Replica</td><td>不影響線上</td></tr>
+</table>
+<h3 id="75-代表性使用案例-sql依-prd-高頻情境含頻率--效能注意">7.5 代表性使用案例 SQL（依 PRD 高頻情境，含頻率 + 效能注意）</h3>
+<pre><code class="language-sql">-- 【1】分頁列表查詢（高頻）— GET /records（PRD §4.1，上限 100 筆，CONSTANTS §7）
+-- 效能：idx_records_acct(account_id,type,created_at DESC) 命中；用 keyset 分頁避免大 OFFSET 掃描
+SELECT id, type, payload, created_at
+FROM record.records
+WHERE account_id = $1 AND ($2::record.type_enum IS NULL OR type = $2)
+  AND ($3::bigint IS NULL OR id &lt; $3)          -- keyset：上一頁最後 id（取代 OFFSET）
+ORDER BY id DESC
+LIMIT 100;
+
+-- 【2】聚合查詢（中頻）— 錢包對帳：Σledger.delta vs wallets.balance（CONSTANTS §4）
+-- 效能：idx_ledger_acct 範圍聚合；對帳 Job 走 Read Replica
+SELECT w.account_id, w.cash,
+       COALESCE(SUM(l.delta) FILTER (WHERE l.currency = &#x27;cash&#x27;), 0) AS ledger_cash_sum,
+       (w.cash = COALESCE(SUM(l.delta) FILTER (WHERE l.currency = &#x27;cash&#x27;), 0)) AS is_consistent
+FROM wallet.wallets w
+LEFT JOIN wallet.wallet_ledger l ON l.account_id = w.account_id    -- 同 BC（wallet）JOIN，HC-1 合規
+WHERE w.account_id = $1
+GROUP BY w.account_id, w.cash;
+
+-- 【3】JOIN 查詢（高頻）— 排行榜 Top N（GET /leaderboard，P99&lt;300ms，CONSTANTS §4）
+-- 效能：idx_lb_mode_score(mode,score DESC) 命中 O(log N + K)；display_name 冗餘免跨 BC JOIN
+SELECT run_id, display_name, mode, score, grade, updated_at
+FROM leaderboard.leaderboard
+WHERE ($1 = &#x27;&#x27; OR mode = $1)                   -- 空字串 = 全模式（CONSTANTS §9）
+ORDER BY score DESC
+LIMIT LEAST(GREATEST($2, 1), 100);             -- 夾擠 [1,100]（LEADERBOARD_LIMIT_MAX）
+
+-- 【4】寫入 upsert（高頻）— POST /leaderboard 上榜（by run_id，EDD §4.7 演算法 2）
+INSERT INTO leaderboard.leaderboard (run_id, account_id, display_name, mode, score, grade, detail, updated_at)
+VALUES ($1, $2, $3, COALESCE($4,&#x27;sandbox&#x27;), $5, $6, $7, now())
+ON CONFLICT (run_id) DO UPDATE
+  SET score = EXCLUDED.score, grade = EXCLUDED.grade, detail = EXCLUDED.detail,
+      mode = EXCLUDED.mode, updated_at = now();   -- 分數最新覆蓋（冪等 by run_id）
+
+-- 【5】軟刪除操作（低頻）— 撤銷權益（退款；破產不刪，PRD §5.3）
+UPDATE entitlement.entitlements
+SET deleted_at = now()
+WHERE account_id = $1 AND kind = $2 AND item_id = $3 AND deleted_at IS NULL;  -- Partial Unique 容許重購</code></pre>
+<hr>
+<h2 id="8-migration-策略migration-strategy">8. Migration 策略（Migration Strategy）</h2>
+<h3 id="80-工具與命名">8.0 工具與命名</h3>
+<ul><li><strong>工具</strong>：Flyway（<code>lang_stack = Java 21 + Spring Boot 3.3</code>）</li><li><strong>命名</strong>：<code>V{版本:3位}__{描述}.sql</code>（如 <code>V001__create_member_schema.sql</code>）</li><li><strong>規則</strong>：每次只做一件事；大表 ADD COLUMN 用 <code>DEFAULT NULL</code> 再 backfill；大表索引用 <code>CREATE INDEX CONCURRENTLY</code>；DROP 先標記廢棄下版再刪</li></ul>
+<h3 id="81-migration-實作清單必填按執行順序">8.1 Migration 實作清單（必填，按執行順序）</h3>
+<table>
+<tr><th>版本</th><th>檔名</th><th>操作說明</th><th>依賴</th><th>Expand/Contract</th><th>Backfill</th><th>Maint. Window</th></tr>
+<tr><td>V001</td><td><code>V001__create_schemas_and_enums.sql</code></td><td>建 9 schema + §0 ENUM types + <code>set_updated_at()</code></td><td>—</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V002</td><td><code>V002__create_member_tables.sql</code></td><td>member：accounts/sessions/login_attempts/account_deletion_requests/password_history</td><td>V001</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V003</td><td><code>V003__create_wallet_tables.sql</code></td><td>wallet：wallets/wallet_ledger/balance_snapshots/inbound_events</td><td>V001</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V004</td><td><code>V004__create_deposit_tables.sql</code></td><td>deposit：deposit_pack/deposit_order/deposit_idempotency/payment_webhook</td><td>V001</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V005</td><td><code>V005__create_entitlement_tables.sql</code></td><td>entitlement：entitlement_catalog/entitlements/grant_log</td><td>V001</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V006</td><td><code>V006__create_record_tables.sql</code></td><td>record：record_type_catalog/records</td><td>V001</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V007</td><td><code>V007__create_leaderboard_tables.sql</code></td><td>leaderboard：mode_catalog/leaderboard/snapshot</td><td>V001</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V008</td><td><code>V008__create_game_save_tables.sql</code></td><td>game_save：saves/save_write_log</td><td>V001</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V009</td><td><code>V009__create_modulith_outbox.sql</code></td><td>modulith：event_publication/archive/dead_letter</td><td>V001</td><td>Expand</td><td>否</td><td>否</td></tr>
+<tr><td>V010</td><td><code>V010__create_platform_tables.sql</code></td><td>platform：audit_log/data_access_logs/gdpr/feature_flags(+audit)/rate_limit/api_request_log/schema_migrations/system_config/error_code_registry/slo/health/relay_offset/replication_status</td><td>V001</td><td>Expand</td><td>否</td><td>否（BRIN/一般索引）</td></tr>
+<tr><td>V011</td><td><code>V011__seed_catalogs_and_errorcodes.sql</code></td><td>寫入 deposit_pack / entitlement_catalog / record_type_catalog / leaderboard_mode_catalog / error_code_registry 種子</td><td>V004–V010</td><td>Expand</td><td>是（種子）</td><td>否</td></tr>
+<tr><td>V012</td><td><code>V012__create_audit_triggers.sql</code></td><td>套用 audit_trigger_fn 於 accounts/wallets/entitlements</td><td>V002,V003,V005,V010</td><td>Expand</td><td>否</td><td>否</td></tr>
+</table>
+<p><strong>Rollback 規範</strong>（每檔末尾附可執行逆操作）：</p>
+<pre><code class="language-sql">-- V002 Rollback:
+DROP TABLE IF EXISTS member.password_history CASCADE;
+DROP TABLE IF EXISTS member.account_deletion_requests CASCADE;
+DROP TABLE IF EXISTS member.login_attempts CASCADE;
+DROP TABLE IF EXISTS member.sessions CASCADE;
+DROP TABLE IF EXISTS member.accounts CASCADE;
+
+-- V001 Rollback:
+DROP TYPE IF EXISTS deposit.order_status_enum;
+DROP TYPE IF EXISTS record.type_enum;
+DROP TYPE IF EXISTS entitlement.kind_enum;
+DROP TYPE IF EXISTS wallet.currency_enum;
+DROP FUNCTION IF EXISTS platform.set_updated_at();
+DROP SCHEMA IF EXISTS platform, modulith, game_save, leaderboard, record, entitlement, deposit, wallet, member CASCADE;
+
+-- V004 Rollback:
+DROP TABLE IF EXISTS deposit.deposit_payment_webhook CASCADE;
+DROP TABLE IF EXISTS deposit.deposit_idempotency CASCADE;
+DROP TABLE IF EXISTS deposit.deposit_order CASCADE;
+DROP TABLE IF EXISTS deposit.deposit_pack CASCADE;
+
+-- V009 Rollback:
+DROP TABLE IF EXISTS modulith.event_dead_letter CASCADE;
+DROP TABLE IF EXISTS modulith.event_publication_archive CASCADE;
+DROP TABLE IF EXISTS modulith.event_publication CASCADE;
+
+-- V012 Rollback:
+DROP TRIGGER IF EXISTS trg_accounts_audit ON member.accounts;
+DROP TRIGGER IF EXISTS trg_wallets_audit ON wallet.wallets;
+DROP TRIGGER IF EXISTS trg_entitlements_audit ON entitlement.entitlements;</code></pre>
+<blockquote><p>V003/V005/V006/V007/V008/V010/V011 的 Rollback 同理：<code>DROP TABLE IF EXISTS &lt;schema&gt;.&lt;table&gt; CASCADE;</code>（子表/有 FK 依賴者先刪），V011 以 <code>TRUNCATE</code> 種子資料。</p></blockquote>
+<h3 id="82-零停機-expand-contract-pattern">8.2 零停機 Expand-Contract Pattern</h3>
+<pre><code class="">Phase 1 (Expand)   → 新增欄位/表（nullable），舊應用正常
+Phase 2 (Migrate)  → 部署新應用，雙寫新舊
+Phase 3 (Contract) → 確認舊欄位無流量後，下個 migration 移除</code></pre>
+<h3 id="83-大表無鎖加欄位4-步驟">8.3 大表無鎖加欄位（4 步驟）</h3>
+<pre><code class="language-sql">ALTER TABLE wallet.wallet_ledger ADD COLUMN settled BOOLEAN;                 -- Step1 nullable 瞬間
+UPDATE wallet.wallet_ledger SET settled = TRUE WHERE id IN (SELECT id FROM wallet.wallet_ledger WHERE settled IS NULL LIMIT 10000); -- Step2 分批
+ALTER TABLE wallet.wallet_ledger ALTER COLUMN settled SET DEFAULT TRUE, ALTER COLUMN settled SET NOT NULL;  -- Step3
+SELECT count(*) FROM wallet.wallet_ledger WHERE settled IS NULL;            -- Step4 驗證 = 0</code></pre>
+<h3 id="84-migration-測試檢查清單">8.4 Migration 測試檢查清單</h3>
+<ul><li style="list-style:none"><input type="checkbox" disabled> UP 在乾淨 DB 成功；DOWN 完整還原</li><li style="list-style:none"><input type="checkbox" disabled> Staging（生產資料量）測試執行時間</li><li style="list-style:none"><input type="checkbox" disabled> 不持有 &gt; 3 秒 table lock（大表索引用 CONCURRENTLY）</li><li style="list-style:none"><input type="checkbox" disabled> FK 約束未破壞（跨 BC 無 FK）</li></ul>
+<hr>
+<h2 id="9-資料完整性約束data-integrity-constraints">9. 資料完整性約束（Data Integrity Constraints）</h2>
+<h3 id="91-外鍵-on-delete-行為僅限同-bc-schema-內">9.1 外鍵 ON DELETE 行為（僅限同 BC schema 內）</h3>
+<table>
+<tr><th>FK（同 BC）</th><th>ON DELETE</th><th>理由</th></tr>
+<tr><td><code>account_deletion_requests.account_id → accounts.id</code></td><td>CASCADE</td><td>帳號刪除連帶刪請求</td></tr>
+<tr><td><code>password_history.account_id → accounts.id</code></td><td>CASCADE</td><td>密碼歷史隨帳號消滅</td></tr>
+<tr><td><code>deposit_order.pack_id → deposit_pack.pack_id</code></td><td>RESTRICT（預設）</td><td>包不可在有訂單時刪除</td></tr>
+<tr><td><code>entitlements.item_id → entitlement_catalog.item_id</code></td><td>RESTRICT</td><td>目錄項目有權益時不可刪</td></tr>
+<tr><td><code>records.type → record_type_catalog.type_code</code></td><td>RESTRICT</td><td>類型有記錄時不可刪</td></tr>
+<tr><td><code>feature_flag_audit.flag_key → feature_flags.flag_key</code></td><td>CASCADE</td><td>flag 刪除連帶稽核</td></tr>
+</table>
+<blockquote><p><strong>跨 BC 一律無 FK</strong>（HC-1，見 §9.5）。</p></blockquote>
+<h3 id="92-check-約束清單">9.2 CHECK 約束清單</h3>
+<table>
+<tr><th>表.欄位</th><th>CHECK</th><th>來源</th></tr>
+<tr><td><code>wallets.cash</code> / <code>.gems</code></td><td><code>&gt;= 0</code></td><td>餘額不透支（CONSTANTS §4 對帳）</td></tr>
+<tr><td><code>wallet_ledger.balance</code></td><td><code>&gt;= 0</code></td><td>異動後餘額非負</td></tr>
+<tr><td><code>wallet_ledger.reason</code></td><td><code>IN (&#x27;init&#x27;,&#x27;topup&#x27;,&#x27;rescue&#x27;) OR LIKE &#x27;buy\_%&#x27;</code></td><td>CONSTANTS §9 reason 集合</td></tr>
+<tr><td><code>wallet_ledger.currency</code></td><td><code>IN (&#x27;cash&#x27;,&#x27;gems&#x27;)</code></td><td>CONSTANTS §9</td></tr>
+<tr><td><code>accounts.display_name</code></td><td><code>char_length BETWEEN 1 AND 24</code></td><td>CONSTANTS §3 <code>DISPLAY_NAME_*</code></td></tr>
+<tr><td><code>deposit_pack.amount</code></td><td><code>&gt; 0</code></td><td>入帳量正數</td></tr>
+<tr><td><code>deposit_pack.bonus_pct</code></td><td><code>BETWEEN 0 AND 100</code></td><td>CONSTANTS §2</td></tr>
+<tr><td><code>save_write_log.data_bytes</code></td><td><code>&lt;= 4000000</code></td><td>CONSTANTS §3 <code>REQUEST_BODY_MAX</code></td></tr>
+<tr><td><code>leaderboard_snapshot.top_limit</code></td><td><code>BETWEEN 1 AND 100</code></td><td>CONSTANTS §3 <code>LEADERBOARD_LIMIT_MAX</code></td></tr>
+<tr><td><code>rate_limit_counters.action</code></td><td><code>IN (&#x27;login&#x27;,&#x27;register&#x27;,&#x27;wallet&#x27;,&#x27;buy&#x27;,&#x27;lb&#x27;)</code></td><td>CONSTANTS §6</td></tr>
+</table>
+<h3 id="93-unique-約束清單">9.3 UNIQUE 約束清單</h3>
+<table>
+<tr><th>表</th><th>UNIQUE</th><th>類型</th></tr>
+<tr><td><code>accounts</code></td><td><code>LOWER(email) WHERE deleted_at IS NULL</code></td><td>Partial Unique</td></tr>
+<tr><td><code>entitlements</code></td><td><code>(account_id,kind,item_id) WHERE deleted_at IS NULL</code></td><td>Partial Unique（防重複授予）</td></tr>
+<tr><td><code>deposit_order</code></td><td><code>idempotency_key</code></td><td>Unique（冪等）</td></tr>
+<tr><td><code>deposit_payment_webhook</code></td><td><code>provider_event_id</code></td><td>Unique（事件去重）</td></tr>
+<tr><td><code>rate_limit_counters</code></td><td><code>(action,identifier,window_start)</code></td><td>Unique</td></tr>
+</table>
+<h3 id="94-延遲約束">9.4 延遲約束</h3>
+<p>本系統無循環 FK（跨 BC 皆 app-layer ID），不需 <code>DEFERRABLE</code>。</p>
+<h3 id="95-跨-bc-引用清單spring-modulith-hc-1必填">9.5 跨 BC 引用清單（Spring Modulith HC-1，必填）</h3>
+<blockquote><p><strong>HC-1 硬約束</strong>：本系統所有跨 BC 參照改為<strong>應用層管理的 <code>account_id</code>（ID-only）</strong>，不建立 DB-level FK。原型 <code>schema.sql</code> 中 <code>wallets/entitlements/records/leaderboard/saves/sessions/wallet_ledger</code> 皆 FK 參照 <code>accounts(id)</code>，重構後<strong>全部移除</strong>（EDD §3.4）。</p></blockquote>
+<table>
+<tr><th>Column</th><th>所在 BC</th><th>引用的 BC</th><th>邏輯參照</th><th>執行方式</th></tr>
+<tr><td><code>wallet.wallets.account_id</code></td><td>wallet</td><td>member</td><td><code>accounts(id)</code></td><td>Application layer，no DB FK；由 <code>MemberRegistered</code> 事件建立</td></tr>
+<tr><td><code>wallet.wallet_ledger.account_id</code></td><td>wallet</td><td>member</td><td><code>accounts(id)</code></td><td>Application layer，no DB FK</td></tr>
+<tr><td><code>wallet.wallet_balance_snapshots.account_id</code></td><td>wallet</td><td>member</td><td><code>accounts(id)</code></td><td>Application layer，no DB FK</td></tr>
+<tr><td><code>deposit.deposit_order.account_id</code></td><td>deposit</td><td>member</td><td><code>accounts(id)</code></td><td>Application layer，no DB FK</td></tr>
+<tr><td><code>entitlement.entitlements.account_id</code></td><td>entitlement</td><td>member</td><td><code>accounts(id)</code></td><td>Application layer，no DB FK</td></tr>
+<tr><td><code>record.records.account_id</code></td><td>record</td><td>member</td><td><code>accounts(id)</code></td><td>Application layer，no DB FK</td></tr>
+<tr><td><code>leaderboard.leaderboard.account_id</code></td><td>leaderboard</td><td>member</td><td><code>accounts(id)</code></td><td>Application layer，no DB FK；display_name 冗餘快照</td></tr>
+<tr><td><code>game_save.saves.account_id</code></td><td>game-save</td><td>member</td><td><code>accounts(id)</code></td><td>Application layer，no DB FK</td></tr>
+</table>
+<blockquote><p><strong>同 BC FK 允許清單</strong>（HC-1 允許同 schema 內 FK）：<code>member.sessions</code>→accounts（概念上，EDD §6.1 標為 app-layer，本系統以 app-layer ID 表示不設實體 FK 以完全對齊 EDD）；<code>member.account_deletion_requests</code>/<code>password_history</code>→accounts；<code>deposit.deposit_order</code>→deposit_pack；<code>deposit.deposit_payment_webhook</code>→deposit_order；<code>entitlement.entitlements</code>/<code>grant_log</code>→entitlement_catalog；<code>record.records</code>→record_type_catalog；<code>platform.feature_flag_audit</code>→feature_flags。以上 FK 均<strong>不跨 schema</strong>。</p></blockquote>
+<p>&gt;</p>
+<blockquote><p><strong>帳號刪除級聯</strong>：跨 BC 的 <code>account_id</code> 資料不靠 DB CASCADE，改由 <code>MemberDeleted</code> 事件驅動各 BC 匿名化/清理（§17.2）；ledger 匿名化保留供審計。</p></blockquote>
+<hr>
+<h2 id="10-分區策略sharding--partitioning">10. 分區策略（Sharding &amp; Partitioning）</h2>
+<h3 id="101-決策矩陣與本系統評估">10.1 決策矩陣與本系統評估</h3>
+<table>
+<tr><th>表</th><th>5 年預估量</th><th>策略</th></tr>
+<tr><td><code>wallet.wallet_ledger</code></td><td>~數千萬～億（append-only）</td><td><strong>Range Partition by <code>created_at</code>（按月）</strong>，Phase B 啟用（EDD §6.3）；啟動期先 BRIN</td></tr>
+<tr><td><code>platform.api_request_log</code></td><td>高寫入日誌</td><td>Range Partition by <code>created_at</code>（按月）+ 定期 DROP 舊分區（§17 保留 90 天）</td></tr>
+<tr><td><code>platform.audit_log</code></td><td>中高</td><td>BRIN 足夠；超 1 億再 Range 分區</td></tr>
+<tr><td>其餘核心表</td><td>&lt; 千萬</td><td>不分區，索引即可</td></tr>
+</table>
+<h3 id="102-分區鍵選擇準則">10.2 分區鍵選擇準則</h3>
+<ul><li><strong>Range by <code>created_at</code></strong>：帳本 / 日誌具時間局部性，查詢多帶時間範圍（Partition Pruning 有效）</li><li>本系統<strong>無多租戶分片需求</strong>（單租戶 SaaS，見 §15），故無 Hash/List 分片</li></ul>
+<h3 id="103-分區範例">10.3 分區範例</h3>
+<pre><code class="language-sql">-- wallet_ledger 按月 Range 分區（Phase B）
+CREATE TABLE wallet.wallet_ledger (
+  id BIGSERIAL, account_id BIGINT NOT NULL, currency VARCHAR(8) NOT NULL,
+  delta BIGINT NOT NULL, reason VARCHAR(40) NOT NULL, balance BIGINT NOT NULL,
+  meta JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+) PARTITION BY RANGE (created_at);
+
+CREATE TABLE wallet.wallet_ledger_2026_11 PARTITION OF wallet.wallet_ledger
+  FOR VALUES FROM (&#x27;2026-11-01&#x27;) TO (&#x27;2026-12-01&#x27;);
+CREATE TABLE wallet.wallet_ledger_default PARTITION OF wallet.wallet_ledger DEFAULT;</code></pre>
+<blockquote><p>注意：分區鍵 <code>created_at</code> 須含於 PK（PostgreSQL 限制）→ Phase B 分區時 PK 改為 <code>(id, created_at)</code>。</p></blockquote>
+<h3 id="104-shard-key-說明">10.4 Shard Key 說明</h3>
+<p>本系統<strong>不採用跨節點 Sharding</strong>（單 PostgreSQL Primary + Standby，EDD §3.6）。Partitioning 僅為單庫內大表管理，無跨 Shard JOIN 問題。排行榜 <code>mode</code> 為低基數不適合作 Shard Key，故不分片。</p>
+<hr>
+<h2 id="11-備份與復原backup--recovery">11. 備份與復原（Backup &amp; Recovery）</h2>
+<h3 id="111-備份策略表">11.1 備份策略表</h3>
+<table>
+<tr><th>類型</th><th>頻率</th><th>保留</th><th>工具</th><th>位置</th></tr>
+<tr><td>Full Backup</td><td>每日 00:00 UTC</td><td>30 天</td><td><code>pgbackrest</code></td><td>物件儲存（跨 AZ）</td></tr>
+<tr><td>WAL Archiving（PITR）</td><td>持續（≤5 分鐘歸檔）</td><td>7 天</td><td><code>pgbackrest archive-push</code></td><td>物件儲存</td></tr>
+<tr><td><code>wallet_ledger</code> 邏輯備份</td><td>每週</td><td>90 天</td><td><code>pg_dump --table</code></td><td>物件儲存（審計）</td></tr>
+</table>
+<blockquote><p>RPO 目標 5 分鐘 → <code>archive_timeout = 300</code>，符合 CONSTANTS §4 RPO。</p></blockquote>
+<h3 id="112-pitr-設定">11.2 PITR 設定</h3>
+<pre><code class="language-ini"># postgresql.conf
+wal_level = replica
+archive_mode = on
+archive_command = &#x27;pgbackrest --stanza=yocat-office archive-push %p&#x27;
+archive_timeout = 300</code></pre>
+<pre><code class="language-bash"># 還原到指定時間點
+pgbackrest --stanza=yocat-office --target=&quot;2026-10-30 14:30:00+00&quot; restore</code></pre>
+<h3 id="113-ha-replication-架構16-ha-必查--edd-36">11.3 HA Replication 架構（§16 HA 必查 / EDD §3.6）</h3>
+<ul><li><strong>Primary + ≥1 Standby</strong>（啟動期同 Region 跨 AZ，成長期跨 Region），<strong>串流複製</strong>（非同步，lag ≤ 1s 目標）</li><li><strong>Failover</strong>：Patroni / 託管 Multi-AZ 自動切換；無單一 DB SPOF</li><li>RTO 30 分 / RPO 5 分（CONSTANTS §4）</li></ul>
+<h3 id="114-備份驗證">11.4 備份驗證</h3>
+<table>
+<tr><th>指標</th><th>目標</th><th>實測</th></tr>
+<tr><td>RTO</td><td>&lt; 30 min</td><td>—</td></tr>
+<tr><td>RPO</td><td>&lt; 5 min</td><td>—</td></tr>
+</table>
+<p>每月執行一次還原測試（隔離環境 + schema 完整性比對 + 核心查詢驗證）。</p>
+<hr>
+<h2 id="12-關聯圖er-diagram">12. 關聯圖（ER Diagram）</h2>
+<blockquote><p>Mermaid <code>erDiagram</code>。跨 BC 以虛線語意（app-layer，無 DB FK）；同 BC schema 內以實線 FK。涵蓋全 40 張表（分 BC 呈現以維持可讀性）。</p></blockquote>
+<h3 id="121-核心-bc-er-圖member--wallet--deposit--entitlement--record--leaderboard--game-save">12.1 核心 BC ER 圖（member / wallet / deposit / entitlement / record / leaderboard / game-save）</h3>
+<div class="diagram-container"><pre class="mermaid">erDiagram
+    direction TB
+    accounts ||--o{ sessions : &quot;member 內（app-layer account_id）&quot;
+    accounts ||--o{ login_attempts : &quot;member 內&quot;
+    accounts ||--o{ account_deletion_requests : &quot;member 內 FK&quot;
+    accounts ||--o{ password_history : &quot;member 內 FK&quot;
+    wallets ||--o{ wallet_ledger : &quot;wallet 內（account_id）&quot;
+    wallets ||--o{ wallet_balance_snapshots : &quot;wallet 內&quot;
+    deposit_pack ||--o{ deposit_order : &quot;deposit 內 FK&quot;
+    deposit_order ||--o{ deposit_payment_webhook : &quot;deposit 內 FK&quot;
+    entitlement_catalog ||--o{ entitlements : &quot;entitlement 內 FK&quot;
+    entitlement_catalog ||--o{ entitlement_grant_log : &quot;entitlement 內&quot;
+    record_type_catalog ||--o{ records : &quot;record 內 FK&quot;
+    leaderboard_mode_catalog ||--o{ leaderboard : &quot;leaderboard 內（軟參照）&quot;
+
+    accounts {
+        bigserial id PK
+        text email UK &quot;NOT NULL PII&quot;
+        text display_name &quot;NOT NULL 1-24&quot;
+        text pass_hash &quot;NOT NULL scrypt&quot;
+        boolean is_active
+        timestamptz deleted_at
+    }
+    sessions {
+        text token PK
+        bigint account_id &quot;app-layer&quot;
+        timestamptz expires_at &quot;NOT NULL&quot;
+    }
+    login_attempts {
+        bigserial id PK
+        inet ip_address &quot;NOT NULL&quot;
+        boolean is_success
+        timestamptz created_at
+    }
+    account_deletion_requests {
+        bigserial id PK
+        bigint account_id FK
+        varchar status
+        timestamptz requested_at
+    }
+    password_history {
+        bigserial id PK
+        bigint account_id FK
+        text pass_hash
+        timestamptz created_at
+    }
+    wallets {
+        bigint account_id PK &quot;app-layer&quot;
+        bigint cash &quot;CHECK&gt;=0&quot;
+        bigint gems &quot;CHECK&gt;=0&quot;
+        timestamptz updated_at
+    }
+    wallet_ledger {
+        bigserial id PK
+        bigint account_id &quot;app-layer&quot;
+        varchar currency &quot;cash|gems&quot;
+        bigint delta
+        varchar reason
+        bigint balance &quot;CHECK&gt;=0&quot;
+        timestamptz created_at
+    }
+    wallet_balance_snapshots {
+        bigserial id PK
+        bigint account_id
+        boolean is_consistent
+        timestamptz snapshot_at
+    }
+    deposit_pack {
+        varchar pack_id PK
+        varchar currency
+        bigint amount &quot;CHECK&gt;0&quot;
+        integer bonus_pct
+    }
+    deposit_order {
+        text order_id PK
+        bigint account_id &quot;app-layer&quot;
+        varchar pack_id FK
+        varchar status
+        text idempotency_key UK
+    }
+    deposit_payment_webhook {
+        bigserial id PK
+        text provider_event_id UK
+        text order_id FK
+        boolean signature_valid
+    }
+    entitlement_catalog {
+        text item_id PK
+        varchar kind
+        bigint price_amount
+    }
+    entitlements {
+        bigserial id PK
+        bigint account_id &quot;app-layer&quot;
+        varchar kind
+        text item_id FK
+        timestamptz deleted_at
+    }
+    entitlement_grant_log {
+        bigserial id PK
+        bigint account_id
+        bigint charged_amount
+        timestamptz granted_at
+    }
+    record_type_catalog {
+        varchar type_code PK
+        text label
+    }
+    records {
+        bigserial id PK
+        bigint account_id &quot;app-layer&quot;
+        varchar type FK
+        jsonb payload
+        timestamptz created_at
+    }
+    leaderboard_mode_catalog {
+        text mode PK
+        text label
+    }
+    leaderboard {
+        text run_id PK
+        bigint account_id &quot;app-layer&quot;
+        text display_name &quot;冗餘快照&quot;
+        text mode
+        bigint score
+        timestamptz updated_at
+    }
+    saves {
+        bigint account_id PK &quot;app-layer&quot;
+        text slot PK &quot;DEFAULT main&quot;
+        jsonb data
+        timestamptz updated_at
+    }
+    save_write_log {
+        bigserial id PK
+        bigint account_id
+        text slot
+        integer data_bytes
+    }</pre></div>
+<blockquote><p><strong>跨 BC 關聯（虛線語意，無 DB FK）</strong>：<code>member.accounts.id</code> 被 <code>wallets / wallet_ledger / deposit_order / entitlements / records / leaderboard / saves</code> 以 <code>account_id</code>（app-layer ID）邏輯參照——詳見 §9.5。ER 圖中這些以各 BC 自身的 <code>account_id</code> 欄位呈現，<strong>不畫實體 FK 連線</strong>（HC-1）。</p></blockquote>
+<h3 id="122-平台底座-er-圖modulith--platform">12.2 平台底座 ER 圖（modulith / platform）</h3>
+<div class="diagram-container"><pre class="mermaid">erDiagram
+    direction TB
+    feature_flags ||--o{ feature_flag_audit : &quot;platform 內 FK&quot;
+    event_publication {
+        uuid id PK
+        text listener_id
+        text event_type
+        timestamptz completion_date &quot;NULL=待投遞&quot;
+    }
+    event_publication_archive {
+        uuid id PK
+        timestamptz completion_date
+    }
+    event_dead_letter {
+        bigserial id PK
+        uuid event_id
+        integer retry_count
+    }
+    audit_log {
+        bigserial id PK
+        varchar table_name
+        varchar operation
+        timestamptz created_at
+    }
+    data_access_logs {
+        uuid id PK
+        varchar action
+        timestamptz accessed_at
+    }
+    gdpr_erasure_requests {
+        uuid id PK
+        bigint account_id
+        varchar status
+    }
+    feature_flags {
+        varchar flag_key PK
+        boolean is_enabled
+        integer rollout_pct
+    }
+    feature_flag_audit {
+        bigserial id PK
+        varchar flag_key FK
+        boolean new_enabled
+    }
+    rate_limit_counters {
+        bigserial id PK
+        varchar action
+        varchar identifier
+    }
+    api_request_log {
+        bigserial id PK
+        varchar trace_id
+        smallint status_code
+        integer latency_ms
+    }
+    schema_migrations {
+        varchar version PK
+        boolean success
+    }
+    system_config {
+        varchar config_key PK
+        text config_value
+    }
+    error_code_registry {
+        varchar error_code PK
+        smallint http_status
+    }
+    slo_measurements {
+        bigserial id PK
+        varchar metric_name
+        numeric metric_value
+    }
+    health_check_log {
+        bigserial id PK
+        varchar check_name
+        boolean is_healthy
+    }
+    outbox_relay_offset {
+        varchar relay_name PK
+        uuid last_event_id
+    }
+    replication_status_log {
+        bigserial id PK
+        varchar replica_name
+        numeric lag_seconds
+    }</pre></div>
+<hr>
+<h2 id="13-資料量估算">13. 資料量估算</h2>
+<table>
+<tr><th>資料表</th><th>初始量</th><th>年增量</th><th>5 年預估</th><th>備注</th></tr>
+<tr><td><code>member.accounts</code></td><td>5,000（DAU）</td><td>+~1.8M（50k DAU 成長期）</td><td>~數百萬</td><td>低</td></tr>
+<tr><td><code>member.sessions</code></td><td>~DAU</td><td>滾動（TTL 30 天清理）</td><td>穩定 ~數萬</td><td>定時清理</td></tr>
+<tr><td><code>member.login_attempts</code></td><td>—</td><td>高（每登入）</td><td>分區/歸檔</td><td>90 天保留</td></tr>
+<tr><td><code>wallet.wallets</code></td><td>= accounts</td><td>= accounts</td><td>~數百萬</td><td>1:1 帳號</td></tr>
+<tr><td><code>wallet.wallet_ledger</code></td><td>—</td><td>高（每交易）</td><td>數千萬～億</td><td><strong>超 1 億 → Range 分區（§10）</strong></td></tr>
+<tr><td><code>entitlement.entitlements</code></td><td>—</td><td>中</td><td>數百萬</td><td>—</td></tr>
+<tr><td><code>record.records</code></td><td>—</td><td>中（破產/成就）</td><td>數百萬</td><td>append-only</td></tr>
+<tr><td><code>leaderboard.leaderboard</code></td><td>—</td><td>中（每 run upsert）</td><td>數百萬</td><td>by run_id</td></tr>
+<tr><td><code>game_save.saves</code></td><td>= 活躍帳號</td><td>upsert（覆蓋）</td><td>~數百萬</td><td>無歷史</td></tr>
+<tr><td><code>platform.api_request_log</code></td><td>—</td><td>極高</td><td>分區 + 90 天刪</td><td>Range 分區</td></tr>
+<tr><td><code>platform.audit_log</code></td><td>—</td><td>高</td><td>超 1 億考慮分區</td><td>BRIN</td></tr>
+</table>
+<hr>
+<h2 id="14-敏感資料清單">14. 敏感資料清單</h2>
+<table>
+<tr><th>資料表</th><th>欄位</th><th>分類</th><th>保護方式</th><th>保留期限</th></tr>
+<tr><td><code>member.accounts</code></td><td><code>email</code></td><td>PII（識別）</td><td>pgcrypto 查詢層加密候選 + LOWER 唯一；傳輸 TLS 1.3</td><td>帳號刪除後匿名化（§17.2）</td></tr>
+<tr><td><code>member.accounts</code></td><td><code>display_name</code></td><td>PII（識別）</td><td>標準存取控制</td><td>帳號刪除後匿名化</td></tr>
+<tr><td><code>member.accounts</code></td><td><code>pass_hash</code></td><td>Credential（最高）</td><td>scrypt（<code>SCRYPT_KEYLEN=64</code>/<code>SALT=16B</code>，CONSTANTS §1），<strong>永不明文</strong></td><td>立即隨帳號刪除</td></tr>
+<tr><td><code>member.password_history</code></td><td><code>pass_hash</code></td><td>Credential</td><td>scrypt，禁明文</td><td>隨帳號 CASCADE</td></tr>
+<tr><td><code>member.sessions</code></td><td><code>token</code></td><td>Credential（憑證）</td><td>不可猜測 32B hex；Redis 快取；過期清理</td><td>≤ 30 天</td></tr>
+<tr><td><code>member.login_attempts</code></td><td><code>ip_address</code></td><td>網路識別</td><td>EU 用戶截斷至 /24</td><td>90 天</td></tr>
+<tr><td><code>platform.audit_log</code></td><td><code>ip_address</code></td><td>網路識別</td><td>雜湊或截斷（EU）</td><td>90 天</td></tr>
+<tr><td><code>game_save.saves</code></td><td><code>data</code></td><td>使用者內容</td><td>JSONB；隨帳號</td><td>隨帳號</td></tr>
+</table>
+<blockquote><p><strong>PII 最小化</strong>：信任層不持有遊戲數值（算力留本地，CONSTANTS §1 註記），<code>saves.data</code> 為玩家本地存檔快照，不含金流個資。</p></blockquote>
+<hr>
+<h2 id="15-multi-tenancy-data-isolation-strategies多租戶資料隔離策略">15. Multi-Tenancy Data Isolation Strategies（多租戶資料隔離策略）</h2>
+<h3 id="策略比較與本產品決策">策略比較與本產品決策</h3>
+<table>
+<tr><th>策略</th><th>隔離</th><th>成本</th><th>適用</th></tr>
+<tr><td>Shared DB + 共用 Schema（RLS）</td><td>低</td><td>低</td><td>中小型 SaaS</td></tr>
+<tr><td>Shared DB + Schema-per-Tenant</td><td>中</td><td>中</td><td>中型 B2B</td></tr>
+<tr><td>DB-per-Tenant</td><td>高</td><td>高</td><td>企業級</td></tr>
+</table>
+<p><strong>本產品決策：不適用傳統多租戶（Single-Tenant SaaS）。</strong></p>
+<p><strong>決策依據：</strong> yoCat Office 後端信任層為<strong>單一營運方（sayyogames）的全域服務</strong>，所有玩家帳號屬同一租戶（同一遊戲營運），無 B2B 多租戶隔離需求。帳號間隔離由 <code>account_id</code> 應用層授權（Bearer session → account_id scope）保證，非租戶級隔離。此處的 schema 切分（<code>member</code>/<code>wallet</code>/…）為 <strong>Bounded Context 邊界（HC-1）</strong>，非租戶隔離。</p>
+<blockquote><p>若未來開放白標（多遊戲營運方共用後端），再評估導入 <code>tenant_id</code> + PostgreSQL RLS：</p></blockquote>
+<blockquote><p>```sql</p></blockquote>
+<blockquote><p>-- 未來擴充預留（目前不啟用）</p></blockquote>
+<blockquote><p>-- ALTER TABLE member.accounts ADD COLUMN tenant_id UUID NOT NULL DEFAULT &#x27;...&#x27;;</p></blockquote>
+<blockquote><p>-- ALTER TABLE member.accounts ENABLE ROW LEVEL SECURITY;</p></blockquote>
+<blockquote><p>-- CREATE POLICY tenant_isolation ON member.accounts USING (tenant_id = current_setting(&#x27;app.current_tenant_id&#x27;)::uuid);</p></blockquote>
+<blockquote><p>```</p></blockquote>
+<p><strong>租戶識別方式：</strong> N/A（單租戶）；帳號識別為 <code>Authorization: Bearer &lt;session_token&gt;</code> → <code>account_id</code>（API §4.1）。</p>
+<hr>
+<h2 id="16-schema-審查檢查清單schema-review-checklist">16. Schema 審查檢查清單（Schema Review Checklist）</h2>
+<h3 id="命名與結構">命名與結構</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> 表名 <code>snake_case</code>（沿用原型複數，§2.1 已文件化例外）</li><li style="list-style:none"><input type="checkbox" checked disabled> Boolean 欄位 <code>is_</code>/<code>has_</code> 前綴</li><li style="list-style:none"><input type="checkbox" checked disabled> 跨 BC 參照統一 <code>account_id</code></li><li style="list-style:none"><input type="checkbox" checked disabled> 索引/約束遵循命名規範</li></ul>
+<h3 id="正規化與完整性">正規化與完整性</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> 無重複欄位組（1NF）；多值用 JSONB/獨立表</li><li style="list-style:none"><input type="checkbox" checked disabled> 無遞移依賴（3NF）；反正規化已文件化（§4.2）</li><li style="list-style:none"><input type="checkbox" checked disabled> CHECK 約束涵蓋業務值域（§9.2）</li><li style="list-style:none"><input type="checkbox" checked disabled> 同 BC FK ON DELETE 行為有理由（§9.1）</li></ul>
+<h3 id="索引">索引</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> 所有高頻 WHERE / 同 BC FK 欄位有索引（§5.1）</li><li style="list-style:none"><input type="checkbox" checked disabled> 軟刪除用 Partial Index（§5.4）</li><li style="list-style:none"><input type="checkbox" checked disabled> 複合索引順序正確（等值在前）（§5.3）</li></ul>
+<h3 id="安全與合規">安全與合規</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> PII 清單完整（§14）；<code>pass_hash</code> scrypt 禁明文</li><li style="list-style:none"><input type="checkbox" checked disabled> 軟刪除策略統一（<code>deleted_at</code>）+ 例外文件化（§2.4）</li><li style="list-style:none"><input type="checkbox" checked disabled> 保留期限定義（§17）；GDPR 被遺忘權路徑（§17.2）</li></ul>
+<h3 id="效能">效能</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> 高寫入表（ledger/api_log）評估分區（§10）</li><li style="list-style:none"><input type="checkbox" checked disabled> 連線池公式（§7.3）</li><li style="list-style:none"><input type="checkbox" checked disabled> 查詢基準表（§7.1）</li></ul>
+<h3 id="migration">Migration</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> UP/DOWN 均撰寫（§8.1 Rollback）</li><li style="list-style:none"><input type="checkbox" checked disabled> 大表 CONCURRENTLY / 批次 backfill（§8.3）</li><li style="list-style:none"><input type="checkbox" checked disabled> 命名遵循 Flyway <code>V{n}__{desc}.sql</code></li></ul>
+<h3 id="ha--replication--read-write-split必查">HA / Replication / Read-Write Split（必查）</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> Primary + ≥1 Standby，無單寫 SPOF（§11.3 / EDD §3.6）</li><li style="list-style:none"><input type="checkbox" checked disabled> 讀寫分離策略定義（§7.4）</li><li style="list-style:none"><input type="checkbox" checked disabled> Replica Lag 監控（§18、<code>replication_status_log</code>）+ 上限 ≤1s</li><li style="list-style:none"><input type="checkbox" checked disabled> 連線池 &lt; max_connections 80%（§7.3）</li><li style="list-style:none"><input type="checkbox" checked disabled> Partitioning（§10）含 key 依據；無跨節點 Shard</li></ul>
+<h3 id="bounded-context-隔離spring-modulith-hc-1必查">Bounded Context 隔離（Spring Modulith HC-1，必查）</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> Owning BC 已填（Document Control + §1.2 每表標注）</li><li style="list-style:none"><input type="checkbox" checked disabled> 每張表屬單一 BC schema，無混入</li><li style="list-style:none"><input type="checkbox" checked disabled> 無跨 BC DB-level FK（§9.5 清單；同 BC FK 白名單列明）</li><li style="list-style:none"><input type="checkbox" checked disabled> 跨 BC 引用改 ID-only + 應用層一致性（§9.5，COMMENT 標注）</li></ul>
+<hr>
+<h2 id="17-data-retention--lifecycle-policy">17. Data Retention &amp; Lifecycle Policy</h2>
+<h3 id="171-資料保留政策總覽">17.1 資料保留政策總覽</h3>
+<blockquote><p><strong>法規依據</strong>：GDPR Art.5(1)(e) Storage Limitation、個資法（PDPA）</p></blockquote>
+<table>
+<tr><th>資料類別</th><th>資料表</th><th>保留期限</th><th>依據</th><th>刪除方式</th></tr>
+<tr><td>帳號資料</td><td><code>member.accounts</code></td><td>帳號刪除後 30 天匿名化</td><td>服務條款 + GDPR</td><td>軟刪除 → 匿名化 → 硬刪除 Job</td></tr>
+<tr><td>密碼歷史</td><td><code>member.password_history</code></td><td>隨帳號</td><td>安全</td><td>CASCADE</td></tr>
+<tr><td>會話</td><td><code>member.sessions</code></td><td>≤ 30 天</td><td>安全（CONSTANTS §1）</td><td><code>expires_at</code> 定時刪</td></tr>
+<tr><td>錢包帳本</td><td><code>wallet.wallet_ledger</code></td><td><strong>永久（append-only）</strong></td><td>審計/對帳</td><td>帳號刪除時匿名化 account_id，保留帳本</td></tr>
+<tr><td>經營史</td><td><code>record.records</code></td><td><strong>永久</strong></td><td>經營史（PRD §5.3 不奪走）</td><td>匿名化保留</td></tr>
+<tr><td>登入嘗試</td><td><code>member.login_attempts</code></td><td>90 天</td><td>安全稽核</td><td>滾動刪除</td></tr>
+<tr><td>API 日誌</td><td><code>platform.api_request_log</code></td><td>90 天（熱）/ 365 天（冷）</td><td>合規（CONSTANTS §8）</td><td>分區 DROP</td></tr>
+<tr><td>Trace</td><td>（外部）</td><td>7 天</td><td>觀測（CONSTANTS §8）</td><td>—</td></tr>
+</table>
+<h3 id="172-gdpr-right-to-erasure被遺忘權事件驅動">17.2 GDPR Right to Erasure（被遺忘權，事件驅動）</h3>
+<blockquote><p>帳號刪除<strong>不物理刪跨 BC 資料</strong>，改發 <code>MemberDeleted</code> 事件，各 BC 匿名化/清理對應 <code>account_id</code>（EDD §3.4/§6.3）。</p></blockquote>
+<pre><code class="language-sql">-- ============================================================
+-- GDPR Art.17 — 帳號匿名化（member BC，立即執行）
+-- ============================================================
+-- Step 1: member 匿名化 + 軟刪除
+UPDATE member.accounts SET
+  email        = CONCAT(&#x27;deleted_&#x27;, id, &#x27;@gdpr.invalid&#x27;),
+  display_name = &#x27;Deleted User&#x27;,
+  pass_hash    = &#x27;&#x27;,
+  is_active    = FALSE,
+  deleted_at   = now()
+WHERE id = $1 AND deleted_at IS NULL;
+
+DELETE FROM member.sessions WHERE account_id = $1;            -- 會話立即失效
+DELETE FROM member.password_history WHERE account_id = $1;    -- 密碼歷史清除
+
+-- Step 2: 記錄請求 + 發事件（各 BC 消費）
+INSERT INTO platform.gdpr_erasure_requests (account_id, status, requested_at, requestor_ip)
+VALUES ($1, &#x27;anonymized&#x27;, now(), $2);
+-- PUBLISH MemberDeleted{accountId:$1} → wallet/entitlement/record/leaderboard/game-save 消費：
+--   wallet.wallet_ledger：account_id 匿名化保留（審計）；wallets 刪除
+--   entitlement/record/leaderboard/game-save：刪除或匿名化對應 account_id 列</code></pre>
+<p><strong>非同步硬刪除任務（30 天後）：</strong></p>
+<pre><code class="language-sql">-- scheduled job（每日）：硬刪除軟刪除超過 30 天的帳號（ledger/records 匿名化保留）
+DELETE FROM member.accounts
+WHERE deleted_at &lt; now() - INTERVAL &#x27;30 days&#x27;
+  AND email LIKE &#x27;deleted\_%@gdpr.invalid&#x27;;
+UPDATE platform.gdpr_erasure_requests SET status = &#x27;completed&#x27;, completed_at = now()
+WHERE account_id IN (/* 上述已硬刪除 */) AND status = &#x27;anonymized&#x27;;</code></pre>
+<h3 id="173-資料最小化data-minimization">17.3 資料最小化（Data Minimization）</h3>
+<ul><li>信任層<strong>不收集</strong>遊戲數值（算力留本地，CONSTANTS §1）；僅存身分/錢包/權益/記錄/排行/存檔</li><li>敏感欄位分類見 §14；DPIA 檢查：每新欄位評估業務必要性 + 保留期限 + 加密需求</li></ul>
+<h3 id="174-資料存取稽核">17.4 資料存取稽核</h3>
+<p>見 §3.9.2 <code>platform.data_access_logs</code>（敏感欄位存取記錄 table/record/field/action/actor/reason）。</p>
+<h3 id="175-跨境資料傳輸">17.5 跨境資料傳輸</h3>
+<table>
+<tr><th>場景</th><th>機制</th></tr>
+<tr><td>備份傳輸</td><td>TLS 1.3 傳輸 + AES-256 靜態加密</td></tr>
+<tr><td>資料落地</td><td>啟動期單 Region（region-a），成長期跨 Region 須評估 SCCs</td></tr>
+</table>
+<h3 id="176-schema-刪除安全模式">17.6 Schema 刪除安全模式</h3>
+<pre><code class="language-sql">-- 三步驟安全刪表（禁直接 DROP 含用戶資料表）
+COMMENT ON TABLE deposit.deposit_payment_webhook IS &#x27;DEPRECATED: 2027-01-01 - remove 2027-07-01&#x27;;
+ALTER TABLE deposit.deposit_payment_webhook RENAME TO _deprecated_deposit_payment_webhook_20270101;
+-- 觀察 6 個月無流量（pg_stat_user_tables）後：DROP TABLE ...</code></pre>
+<hr>
+<h2 id="18-database-observability--health-monitoring">18. Database Observability &amp; Health Monitoring</h2>
+<h3 id="181-關鍵監控指標">18.1 關鍵監控指標</h3>
+<pre><code class="language-sql">-- 連線數監控
+SELECT count(*), state FROM pg_stat_activity WHERE datname = current_database() GROUP BY state;
+
+-- 慢查詢（需 pg_stat_statements）
+SELECT query, calls, mean_exec_time, rows FROM pg_stat_statements
+WHERE mean_exec_time &gt; 100 ORDER BY mean_exec_time DESC LIMIT 20;
+
+-- 複製延遲（Replica Lag，HA 必查）
+SELECT client_addr, write_lag, flush_lag, replay_lag FROM pg_stat_replication;
+-- 或 standby 端：SELECT (now() - pg_last_xact_replay_timestamp()) AS replica_lag;
+
+-- 表格膨脹（Dead Tuple Ratio）
+SELECT schemaname, relname,
+  ROUND(100.0 * n_dead_tup / NULLIF(n_live_tup + n_dead_tup, 0), 2) AS dead_ratio
+FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 20;
+
+-- 未使用索引
+SELECT indexrelid::regclass AS idx, relid::regclass AS tbl, idx_scan
+FROM pg_stat_user_indexes WHERE idx_scan = 0 ORDER BY pg_relation_size(indexrelid) DESC;</code></pre>
+<h3 id="182-alerting-規則6-項閾值">18.2 Alerting 規則（≥6 項閾值）</h3>
+<table>
+<tr><th>指標</th><th>警告</th><th>緊急</th><th>說明</th></tr>
+<tr><td>連線數使用率</td><td>&gt; 70%</td><td>&gt; 90%</td><td>HikariCP/PgBouncer + max_connections</td></tr>
+<tr><td>複製延遲（Replica Lag）</td><td>&gt; 10s</td><td>&gt; 60s</td><td>Primary-Standby（降級：Lag 過高讀改走 Primary，§7.4）</td></tr>
+<tr><td>表格膨脹率</td><td>&gt; 10%</td><td>&gt; 30%</td><td>觸發 VACUUM</td></tr>
+<tr><td>長事務</td><td>&gt; 60s</td><td>&gt; 300s</td><td>錢包行鎖可能造成等待</td></tr>
+<tr><td>Lock Wait</td><td>&gt; 5s</td><td>&gt; 30s</td><td><code>SELECT FOR UPDATE</code> 競爭</td></tr>
+<tr><td>Disk Usage</td><td>&gt; 70%</td><td>&gt; 85%</td><td>帳本/日誌成長</td></tr>
+<tr><td>慢查詢</td><td>mean &gt; 1s</td><td>—</td><td>pg_stat_statements</td></tr>
+<tr><td>錢包對帳不一致</td><td>≥ 1 筆</td><td>≥ 1 筆</td><td><code>wallet_balance_snapshots.is_consistent=false</code> → <strong>P0</strong>（CONSTANTS §4）</td></tr>
+</table>
+<h3 id="183-replica-lag-降級策略">18.3 Replica Lag 降級策略</h3>
+<ul><li>監控指標：<code>pg_stat_replication.replay_lag</code> / <code>replication_status_log.lag_seconds</code></li><li>告警門檻：lag &gt; 10s 警告、&gt; 60s 嚴重</li><li>降級：lag 過高時，原走 Replica 的查詢（排行榜）暫改 Primary，避免讀到過期榜單</li></ul>
+<hr>
+<h2 id="19-redis-key-schema快取--限流hc-4-集中命名">19. Redis Key Schema（快取 / 限流，HC-4 集中命名）</h2>
+<blockquote><p>強一致資料一律走 PostgreSQL（錢包/權益/訂單/記錄/存檔）；Redis 僅用於 <strong>session 熱快取、排行榜頁快取、限流滑動視窗</strong>（EDD §11.3 / §21.3）。所有 key prefix 集中於此，禁各 BC 自訂（防 cache 互污染）。呈現強制兩段式：<strong>key 說明 table 先、Redis CLI 後</strong>。</p></blockquote>
+<h3 id="191-key-說明">19.1 Key 說明</h3>
+<table>
+<tr><th>Key Pattern</th><th>Type</th><th>TTL</th><th>Value</th><th>Notes（BC / 行為）</th></tr>
+<tr><td><code>prod:member:session:{token}</code></td><td>String</td><td>1800s（±10% jitter；DB 權威 TTL 30 天）</td><td><code>{accountId}</code>（JSON）</td><td>member；session 驗證熱快取；查不到回源 DB；穿透防護空值快取 30s（fail-open 讀 DB）</td></tr>
+<tr><td><code>prod:leaderboard:top:{mode}:{limit}</code></td><td>String(JSON)</td><td>30s（±10% jitter）</td><td>Top N 列表 JSON</td><td>leaderboard；整頁快取；擊穿用 <code>SET lock NX EX 5</code> 分散鎖重建</td></tr>
+<tr><td><code>prod:rate:login:{ip}</code></td><td>Sorted Set</td><td>60s</td><td>成員=請求 timestamp</td><td>member；滑動視窗（score=ts）；超限 10/min → 429（CONSTANTS §6）</td></tr>
+<tr><td><code>prod:rate:register:{ip}</code></td><td>Sorted Set</td><td>60s</td><td>成員=請求 timestamp</td><td>member；5/min → 429</td></tr>
+<tr><td><code>prod:rate:wallet:{accountId}</code></td><td>Sorted Set</td><td>60s</td><td>成員=請求 timestamp</td><td>wallet；topup/spend 60/min → 429</td></tr>
+<tr><td><code>prod:rate:buy:{accountId}</code></td><td>Sorted Set</td><td>60s</td><td>成員=請求 timestamp</td><td>entitlement；buy 30/min → 429</td></tr>
+<tr><td><code>prod:rate:lb:{ip}</code></td><td>Sorted Set</td><td>60s</td><td>成員=請求 timestamp</td><td>leaderboard；公開查詢 120/min → 429</td></tr>
+</table>
+<blockquote><p>wallet/deposit/entitlement/record/game-save 的業務資料<strong>無 Redis 快取</strong>（強一致走 DB，EDD §21.3）；僅限流與 session/leaderboard 用 Redis。</p></blockquote>
+<h3 id="192-redis-cli-命令範例">19.2 Redis CLI 命令範例</h3>
+<pre><code class="language-redis"># 【session 快取】寫入（登入後）/ 讀取（Bearer 驗證）/ 失效（登出）
+SET prod:member:session:a1b2c3...f6a1b2 &quot;{\&quot;accountId\&quot;:1001}&quot; EX 1800 NX
+GET prod:member:session:a1b2c3...f6a1b2
+DEL prod:member:session:a1b2c3...f6a1b2
+
+# 【排行榜頁快取】寫入 / 讀取 / 上榜後失效
+SET prod:leaderboard:top:sandbox:20 &quot;[{\&quot;runId\&quot;:\&quot;run-1001-a\&quot;,\&quot;score\&quot;:128000}]&quot; EX 30
+GET prod:leaderboard:top:sandbox:20
+DEL prod:leaderboard:top:sandbox:20
+
+# 【限流滑動視窗】加入當前請求 / 清過期 / 計數 / 設 TTL（對應 EDD §11.3 Lua 原子腳本）
+ZADD prod:rate:login:203.0.113.7 1730000000000 1730000000000
+ZREMRANGEBYSCORE prod:rate:login:203.0.113.7 0 1729999940000   # now - 60s
+ZCARD prod:rate:login:203.0.113.7                              # &gt;= 10 → 429
+PEXPIRE prod:rate:login:203.0.113.7 60000</code></pre>
+<hr>
+<h2 id="seed-data">Seed Data</h2>
+<blockquote><p>本地開發 + CI 測試用。執行前提：V001–V010 migration 完成。INSERT 順序滿足 FK 依賴（catalog/parent 先）。</p></blockquote>
+<pre><code class="language-sql">-- ===== Seed Data（本地開發 + CI 測試用）=====
+
+-- §0 catalog（parent，先插）------------------------------------------------
+-- deposit 包目錄（CONSTANTS §7）
+INSERT INTO deposit.deposit_pack (pack_id, currency, amount, label, bonus_pct, is_active) VALUES
+  (&#x27;g_small&#x27;, &#x27;gems&#x27;, 60,   &#x27;小寶石包&#x27;,           NULL, TRUE),
+  (&#x27;g_mid&#x27;,   &#x27;gems&#x27;, 330,  &#x27;中寶石包（+10%）&#x27;,    10,   TRUE),
+  (&#x27;g_big&#x27;,   &#x27;gems&#x27;, 700,  &#x27;大寶石包（+16%）&#x27;,    16,   TRUE),
+  (&#x27;cap_1000&#x27;,&#x27;cash&#x27;, 1000, &#x27;儲值 1000 資本（測試）&#x27;, NULL, TRUE);
+
+-- entitlement 目錄（CONSTANTS §9 kind）
+INSERT INTO entitlement.entitlement_catalog (item_id, kind, label, price_currency, price_amount, is_active) VALUES
+  (&#x27;skin_ceo_gold&#x27;,   &#x27;cosmetic&#x27;, &#x27;黃金執行長外觀&#x27;, &#x27;gems&#x27;, 120, TRUE),
+  (&#x27;dream_ada&#x27;,       &#x27;dream&#x27;,    &#x27;夢想員工：Ada&#x27;, &#x27;gems&#x27;, 300, TRUE),
+  (&#x27;scenario_crisis&#x27;, &#x27;scenario&#x27;, &#x27;劇本：金融危機&#x27;, &#x27;cash&#x27;, 5000, TRUE),
+  (&#x27;skin_newyear&#x27;,    &#x27;cosmetic&#x27;, &#x27;新年限定外觀（活動贈與）&#x27;, &#x27;gems&#x27;, 0, TRUE);  -- price=0 免費贈與
+
+-- record 類型 Lookup（CONSTANTS §9 type）
+INSERT INTO record.record_type_catalog (type_code, label, is_active) VALUES
+  (&#x27;bankruptcy&#x27;,  &#x27;破產&#x27;, TRUE),
+  (&#x27;achievement&#x27;, &#x27;成就&#x27;, TRUE),
+  (&#x27;legacy&#x27;,      &#x27;傳承&#x27;, TRUE);
+
+-- leaderboard 模式 Lookup（CONSTANTS §9 mode）
+INSERT INTO leaderboard.leaderboard_mode_catalog (mode, label, is_active) VALUES
+  (&#x27;sandbox&#x27;,  &#x27;沙盒模式&#x27;, TRUE),
+  (&#x27;campaign&#x27;, &#x27;劇情模式&#x27;, TRUE);
+
+-- error code（CONSTANTS §10）
+INSERT INTO platform.error_code_registry (error_code, http_status, message_zh_tw) VALUES
+  (&#x27;VALIDATION_ERROR&#x27;,     400, &#x27;請求格式/參數錯誤&#x27;),
+  (&#x27;UNAUTHORIZED&#x27;,         401, &#x27;請先登入&#x27;),
+  (&#x27;INSUFFICIENT_BALANCE&#x27;, 402, &#x27;餘額不足&#x27;),
+  (&#x27;NOT_FOUND&#x27;,            404, &#x27;找不到&#x27;),
+  (&#x27;CONFLICT&#x27;,             409, &#x27;衝突（已存在/已擁有）&#x27;),
+  (&#x27;RATE_LIMITED&#x27;,         429, &#x27;請求過於頻繁&#x27;),
+  (&#x27;INTERNAL_ERROR&#x27;,       500, &#x27;伺服器錯誤&#x27;);
+
+-- BC: member（帳號，parent）-----------------------------------------------
+-- 正常帳號 + 邊界（已軟刪除帳號）
+INSERT INTO member.accounts (id, email, display_name, pass_hash, is_active, created_at, deleted_at) OVERRIDING SYSTEM VALUE VALUES
+  (1001, &#x27;ceo@example.com&#x27;,  &#x27;貓咪科技&#x27;,   &#x27;0123456789abcdef0123456789abcdef$aa...bb&#x27;, TRUE,  now(), NULL),
+  (1002, &#x27;boss@example.com&#x27;, &#x27;魚罐頭工業&#x27;, &#x27;fedcba9876543210fedcba9876543210$cc...dd&#x27;, TRUE,  now(), NULL),
+  (1003, &#x27;gone@example.com&#x27;, &#x27;Deleted User&#x27;,&#x27;&#x27;, FALSE, now() - INTERVAL &#x27;40 days&#x27;, now() - INTERVAL &#x27;31 days&#x27;);  -- 邊界：待硬刪除
+SELECT setval(pg_get_serial_sequence(&#x27;member.accounts&#x27;,&#x27;id&#x27;), 1003, TRUE);
+
+INSERT INTO member.sessions (token, account_id, created_at, expires_at) VALUES
+  (&#x27;a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2&#x27;, 1001, now(), now() + INTERVAL &#x27;30 days&#x27;),
+  (&#x27;f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5&#x27;, 1002, now(), now() + INTERVAL &#x27;30 days&#x27;);
+
+-- BC: wallet（依賴 account_id app-layer）-----------------------------------
+INSERT INTO wallet.wallets (account_id, cash, gems, updated_at) VALUES
+  (1001, 20000, 50, now()),   -- 正常
+  (1002, 0,     0,  now());   -- 邊界：破產後歸零（CHECK&gt;=0）
+INSERT INTO wallet.wallet_ledger (account_id, currency, delta, reason, balance, meta, created_at) VALUES
+  (1001, &#x27;gems&#x27;, 0,    &#x27;init&#x27;,  0,     NULL, now()),                       -- 開帳 init（CONSTANTS §7）
+  (1001, &#x27;gems&#x27;, 700,  &#x27;topup&#x27;, 700,   &#x27;{&quot;orderId&quot;:&quot;o-700&quot;,&quot;packId&quot;:&quot;g_big&quot;}&#x27;::jsonb, now()),
+  (1001, &#x27;gems&#x27;, -120, &#x27;buy_cosmetic&#x27;, 580, &#x27;{&quot;itemId&quot;:&quot;skin_ceo_gold&quot;}&#x27;::jsonb, now()),
+  (1002, &#x27;cash&#x27;, -20,  &#x27;rescue&#x27;, 0,    NULL, now());                       -- 邊界：破產注資
+
+-- BC: entitlement（依賴 catalog + account_id）-------------------------------
+INSERT INTO entitlement.entitlements (account_id, kind, item_id, acquired_at) VALUES
+  (1001, &#x27;cosmetic&#x27;, &#x27;skin_ceo_gold&#x27;, now()),     -- 付費購買
+  (1001, &#x27;cosmetic&#x27;, &#x27;skin_newyear&#x27;,  now());     -- 邊界：免費贈與（amount=0）
+
+-- BC: record（依賴 type catalog + account_id）------------------------------
+INSERT INTO record.records (account_id, type, payload, created_at) VALUES
+  (1002, &#x27;bankruptcy&#x27;,  &#x27;{&quot;company&quot;:&quot;魚罐頭工業&quot;,&quot;cashAtFail&quot;:-15200}&#x27;::jsonb, now()),  -- 邊界：破產記錄
+  (1001, &#x27;achievement&#x27;, &#x27;{&quot;name&quot;:&quot;首次獲利&quot;,&quot;day&quot;:7}&#x27;::jsonb, now());
+
+-- BC: leaderboard（依賴 account_id）-----------------------------------------
+INSERT INTO leaderboard.leaderboard (run_id, account_id, display_name, mode, score, grade, detail, updated_at) VALUES
+  (&#x27;run-1001-a&#x27;, 1001, &#x27;貓咪科技&#x27;,   &#x27;sandbox&#x27;, 128000, &#x27;S&#x27;, &#x27;{&quot;days&quot;:30}&#x27;::jsonb, now()),
+  (&#x27;run-1002-a&#x27;, 1002, &#x27;魚罐頭工業&#x27;, &#x27;sandbox&#x27;, 0,      &#x27;F&#x27;, &#x27;{&quot;days&quot;:5}&#x27;::jsonb,  now());  -- 邊界：破產 0 分
+
+-- BC: game-save（依賴 account_id）-------------------------------------------
+INSERT INTO game_save.saves (account_id, slot, data, updated_at) VALUES
+  (1001, &#x27;main&#x27;, &#x27;{&quot;day&quot;:7,&quot;cash&quot;:20000,&quot;morale&quot;:72}&#x27;::jsonb, now()),
+  (1001, &#x27;auto&#x27;, &#x27;{&quot;day&quot;:6,&quot;cash&quot;:18000,&quot;morale&quot;:70}&#x27;::jsonb, now());  -- 邊界：非預設 slot
+
+-- platform: feature flag（示例）--------------------------------------------
+INSERT INTO platform.feature_flags (flag_key, is_enabled, rollout_pct, description) VALUES
+  (&#x27;deposit.real_payment_phase_b&#x27;, FALSE, 0, &#x27;Phase B 真金流（預留，預設關閉）&#x27;);</code></pre>
+<blockquote><p>此 Seed Data 同步作為 <code>docs/db/seed.sql</code> 來源（若專案有 <code>docs/db/</code>）。</p></blockquote>
+<hr>
+<h2 id="admin-seed-sql">Admin Seed SQL</h2>
+<blockquote><p><strong>N/A — <code>has_admin_backend = false</code>、<code>client_type = api-only</code></strong>（state file / CONSTANTS §12 無 admin BC）。本系統無後台管理帳號表（無 admin user / role / MFA 欄位），故 Admin Bootstrap Seed 整節跳過。營運/客服對帳以既有帳號 + 讀取權限（未來若新增 admin BC 再補）。</p></blockquote>
+<hr></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

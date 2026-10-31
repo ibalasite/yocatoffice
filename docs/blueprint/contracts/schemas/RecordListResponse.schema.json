@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/RecordListResponse",
+  "title": "RecordListResponse",
+  "description": "GET /records 回應",
+  "type": "object",
+  "properties": {
+    "records": {
+      "type": "array",
+      "items": {
+        "$ref": "BusinessRecordView.schema.json"
+      }
+    }
+  },
+  "required": [
+    "records"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ResponseDTO>>"
+}

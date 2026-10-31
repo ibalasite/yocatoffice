@@ -1,0 +1,63 @@
+# k8s/base/network-policy.yaml — default-deny + explicit-allow zoning (EDD §3.4 Schema Ownership + §3.6).
+# Aligned with docs/blueprint/infra/k8s/network-policy.yaml. API accepts Ingress only from edge-zone
+# namespaces on :8080, egresses only to data-zone PostgreSQL(5432)/Redis(6379) + DNS.
+#
+# SCOPE: this applies to dev/staging/prod namespaces that carry zone labels (zone=edge on the ingress
+# namespace, zone=data on the data namespace). It is intentionally NOT wired into overlays/local, because
+# the local Rancher Desktop topology (Traefik in kube-system, yocat-pg in the unlabelled `yocat` namespace)
+# does not carry zone labels and a default-deny there would break local connectivity (LOCAL_DEPLOY §4.5
+# ships the local overlay without a NetworkPolicy). Apply this file explicitly per non-local environment.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: yocat-office-backend-default-deny
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: yocat-office-backend-api-policy
+  labels:
+    app: yocat-office-backend-api
+spec:
+  podSelector:
+    matchLabels:
+      app: yocat-office-backend-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              zone: "edge"
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              zone: "data"
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              zone: "data"
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

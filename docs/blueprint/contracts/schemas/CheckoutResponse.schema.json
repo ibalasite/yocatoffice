@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/CheckoutResponse",
+  "title": "CheckoutResponse",
+  "description": "POST /deposit/checkout 回應",
+  "type": "object",
+  "properties": {
+    "orderId": {
+      "type": "string"
+    },
+    "packId": {
+      "type": "string"
+    },
+    "currency": {
+      "$ref": "Currency.schema.json"
+    },
+    "amount": {
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "OrderStatus.schema.json"
+    }
+  },
+  "required": [
+    "orderId",
+    "packId",
+    "currency",
+    "amount",
+    "status"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ResponseDTO>>"
+}

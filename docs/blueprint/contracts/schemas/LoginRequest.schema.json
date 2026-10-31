@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/LoginRequest",
+  "title": "LoginRequest",
+  "description": "POST /auth/login",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "password": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "email",
+    "password"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<RequestDTO>>"
+}

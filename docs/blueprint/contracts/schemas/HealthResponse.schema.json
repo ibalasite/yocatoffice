@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/HealthResponse",
+  "title": "HealthResponse",
+  "description": "GET /health/live|ready 回應",
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "UP",
+        "DOWN"
+      ]
+    },
+    "db": {
+      "type": "string",
+      "enum": [
+        "UP",
+        "DOWN"
+      ]
+    },
+    "redis": {
+      "type": "string",
+      "enum": [
+        "UP",
+        "DOWN"
+      ]
+    }
+  },
+  "required": [
+    "status"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ResponseDTO>>"
+}

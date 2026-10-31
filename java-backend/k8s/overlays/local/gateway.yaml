@@ -1,0 +1,69 @@
+# yocat-gateway — 單一對外入口（唯一 NodePort 30088）。
+# nginx 服務 client 靜態 + 反向代理：會員 API → yocat-office-backend-api:8080、
+# /character/* 與 /health → yocat-character:3001。整包 client + server 都在 k8s 上，一個路口進出。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yocat-gateway
+  labels:
+    app: yocat-gateway
+spec:
+  replicas: 2                      # 單一入口，維持 HA（與專案 HA≥2 精神一致）
+  selector:
+    matchLabels:
+      app: yocat-gateway
+  template:
+    metadata:
+      labels:
+        app: yocat-gateway
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: yocat-gateway
+      containers:
+        - name: gateway
+          image: yocat-office-backend/gateway:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yocat-gateway
+  labels:
+    app: yocat-gateway
+spec:
+  type: NodePort
+  selector:
+    app: yocat-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 30088          # ← 唯一對外入口：http://127.0.0.1:30088

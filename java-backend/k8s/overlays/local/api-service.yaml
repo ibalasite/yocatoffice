@@ -1,0 +1,16 @@
+# k8s/overlays/local/api-service.yaml — API Service (LOCAL_DEPLOY §4.5 / §5 / §12).
+# ClusterIP：API 只在叢集內被 yocat-gateway 反向代理存取；唯一對外入口是 gateway（NodePort 30088）。
+apiVersion: v1
+kind: Service
+metadata:
+  name: yocat-office-backend-api
+  labels:
+    app: yocat-office-backend-api
+spec:
+  type: ClusterIP
+  selector:
+    app: yocat-office-backend-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

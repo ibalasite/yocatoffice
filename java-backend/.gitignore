@@ -1,0 +1,34 @@
+# Build output
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / local env
+*.log
+.env
+
+# Secret files — never commit (LOCAL_DEPLOY §3.5)
+*.env
+.env.*
+secrets.env
+.secrets
+k8s/overlays/local/secrets.env
+scripts/*.local
+# ...but keep the committed example templates (SSOT for variable names)
+!.env.example
+!.env.local.example
+!**/secrets.example.env
+
+# Local run lifecycle (make up/down)
+.run/

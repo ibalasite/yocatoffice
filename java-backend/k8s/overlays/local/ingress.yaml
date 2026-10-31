@@ -1,0 +1,22 @@
+# k8s/overlays/local/ingress.yaml — single external port :80 via Traefik (k3s built-in).
+# 單一入口統一走 yocat-gateway（nginx）：client 靜態 + 反向代理（會員 API → api:8080、
+# /character/* → character:3001）。Traefik :80 與 gateway NodePort 30088 都指向同一個閘道。
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: yocat-office-backend-local
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: yocat-office-backend.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: yocat-gateway
+                port:
+                  number: 80

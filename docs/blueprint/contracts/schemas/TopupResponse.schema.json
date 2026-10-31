@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/TopupResponse",
+  "title": "TopupResponse",
+  "description": "POST /wallet/topup 回應",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "currency": {
+      "$ref": "Currency.schema.json"
+    },
+    "amount": {
+      "type": "integer"
+    },
+    "balance": {
+      "type": "integer"
+    },
+    "wallet": {
+      "$ref": "WalletView.schema.json"
+    }
+  },
+  "required": [
+    "ok",
+    "currency",
+    "amount",
+    "balance",
+    "wallet"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ResponseDTO>>"
+}

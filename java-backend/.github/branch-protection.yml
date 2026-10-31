@@ -1,0 +1,22 @@
+# .github/branch-protection.yml — yocat-office-backend `main` protection (reference)
+# Authoritative source: docs/CICD.md §5.2 Branch Protection Rules.
+# This file documents the required status checks; apply it via the GitHub UI or API
+# (e.g. `gh api -X PUT repos/:owner/:repo/branches/main/protection`). GitHub does not
+# auto-read this path — it is the declarative source of truth for the §5 PR Gate.
+#
+# `contexts` MUST match the five job `name:` values in .github/workflows/ci.yml exactly
+# (docs/CICD.md §5.2 R-04): lint / unit-test / integration-test / static-analysis / image-build.
+main:
+  required_status_checks:
+    strict: true
+    contexts:
+      - "lint"
+      - "unit-test"
+      - "integration-test"
+      - "static-analysis"
+      - "image-build"
+  required_pull_request_reviews:
+    required_approving_review_count: 1
+    dismiss_stale_reviews: true
+  enforce_admins: true
+  required_linear_history: true

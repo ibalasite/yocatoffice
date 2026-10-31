@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>企画 — YoCatOffice</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="../index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">req/ › 企画</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">req/ › 企画</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="../index.html">🏠 首頁</a>
+<a class="sidebar__link" href="../idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="../brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="../prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="../edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="../arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="../api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="../schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="../constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="../test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="../runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="../local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="../rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="../align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="../cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="../contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="../developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="../dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details open>
+<summary>📎 req/</summary>
+<a class="sidebar__link active" href="../req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="../diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="../diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="../diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="../diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="../diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="../diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="../diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="../diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="../diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="../diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="../diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="../diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="../diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="../diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="../diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="../diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="../diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="../diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="../diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="../diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="../diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="../diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="../diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="../diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="../diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="../diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="../diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="../diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#0-給接手-ai-的-30-秒摘要">0. 給接手 AI 的 30 秒摘要</a></li><li><a class="toc__link" href="#1-願景">1. 願景</a></li><li><a class="toc__link" href="#2-核心玩法規格">2. 核心玩法規格</a></li><li><a class="toc__link toc__link--h3" href="#玩家的四個動作唯一權力">玩家的四個動作（唯一權力）</a></li><li><a class="toc__link toc__link--h3" href="#部門5-大類--老闆">部門（5 大類 + 老闆）</a></li><li><a class="toc__link toc__link--h3" href="#角色模型每個-npc">角色模型（每個 NPC）</a></li><li><a class="toc__link toc__link--h3" href="#724-作息世界-tick">7×24 作息（世界 tick）</a></li><li><a class="toc__link" href="#3-技術架構">3. 技術架構</a></li><li><a class="toc__link" href="#4-本地資源地圖-全部現成嚴禁重新下載">4. 本地資源地圖（★★★ 全部現成，嚴禁重新下載 ★★★）</a></li><li><a class="toc__link toc__link--h3" href="#41-硬體--os">4.1 硬體 / OS</a></li><li><a class="toc__link toc__link--h3" href="#42-本地-llm角色大腦-vllm">4.2 本地 LLM（角色大腦）— vLLM</a></li><li><a class="toc__link toc__link--h3" href="#43-本地素材生成ai-agent-自動產出非人工手繪">4.3 本地素材生成（AI agent 自動產出，非人工手繪）</a></li><li><a class="toc__link" href="#6-分階段計畫與驗收標準">6. 分階段計畫與驗收標準</a></li><li><a class="toc__link" href="#7-資料模型給接手者可直接開建">7. 資料模型（給接手者可直接開建）</a></li><li><a class="toc__link" href="#8-規劃目錄結構落腳-project-root">8. 規劃目錄結構（落腳 &amp;lt;project-root&amp;gt;）</a></li><li><a class="toc__link" href="#9-啟動速查resume-cheatsheet">9. 啟動速查（Resume Cheatsheet）</a></li><li><a class="toc__link" href="#10-監察機制與目前進度">10. 監察機制與目前進度</a></li><li><a class="toc__link" href="#11-下一步接手-ai-從這裡開始">11. 下一步（接手 AI 從這裡開始）</a></li><li><a class="toc__link" href="#12-已知踩坑與解法hard-won別重踩">12. 已知踩坑與解法（hard-won，別重踩）</a></li><li><a class="toc__link" href="#13-開放決策待與使用者確認">13. 開放決策（待與使用者確認）</a></li><li><a class="toc__link" href="#14-遊戲性設計與差異化已實作">14. 遊戲性設計與差異化（已實作）</a></li><li><a class="toc__link toc__link--h3" href="#定位">定位</a></li><li><a class="toc__link toc__link--h3" href="#三大支柱">三大支柱</a></li><li><a class="toc__link toc__link--h3" href="#核心循環已實作">核心循環（已實作）</a></li><li><a class="toc__link toc__link--h3" href="#為什麼需要本地-llm而非腳本">為什麼需要本地 LLM（而非腳本）</a></li><li><a class="toc__link" href="#15-商業化策略企畫人員觀點2026-10-30">15. 商業化策略（企畫人員觀點，2026-10-30）</a></li><li><a class="toc__link toc__link--h3" href="#151-關鍵商業決策llm-跑在哪決定一切">15.1 關鍵商業決策：LLM 跑在哪（決定一切）</a></li><li><a class="toc__link toc__link--h3" href="#152-收入來源依優先序">15.2 收入來源（依優先序）</a></li><li><a class="toc__link toc__link--h3" href="#153-病毒成長引擎">15.3 病毒成長引擎</a></li><li><a class="toc__link toc__link--h3" href="#154-不要做">15.4 不要做</a></li><li><a class="toc__link toc__link--h3" href="#155-最小可行商業化接下來要蓋的">15.5 最小可行商業化（接下來要蓋的）</a></li><li><a class="toc__link toc__link--h3" href="#156-go-to-market-階段">15.6 Go-to-market 階段</a></li><li><a class="toc__link toc__link--h3" href="#157-三條算力路線並行2026-10-30-使用者決策">15.7 三條算力路線並行（2026-10-30 使用者決策）</a></li><li><a class="toc__link" href="#16-獲利方式定案2026-10-30以玩家渴望為核心">16. 獲利方式（定案，2026-10-30・以玩家渴望為核心）</a></li><li><a class="toc__link toc__link--h3" href="#161-核心診斷">16.1 核心診斷</a></li><li><a class="toc__link toc__link--h3" href="#162-兩個情感對象--兩台變現引擎">16.2 兩個情感對象 → 兩台變現引擎</a></li><li><a class="toc__link toc__link--h3" href="#163-公式">16.3 公式</a></li><li><a class="toc__link toc__link--h3" href="#164-人才庫系統招募解職的核心樞紐">16.4 人才庫系統（招募／解職的核心樞紐）</a></li><li><a class="toc__link toc__link--h3" href="#165-儲值管道錢進來的地方">16.5 儲值管道（錢進來的地方）</a></li><li><a class="toc__link toc__link--h3" href="#166-虧錢壓力曲線漸進非猝死">16.6 虧錢壓力曲線（漸進，非猝死）</a></li><li><a class="toc__link toc__link--h3" href="#167-破產-recycle重經營-整套靈魂防作惡關鍵">16.7 破產 Recycle（重經營）— 整套靈魂，防作惡關鍵</a></li><li><a class="toc__link toc__link--h3" href="#168-轉化時刻總表">16.8 轉化時刻總表</a></li><li><a class="toc__link toc__link--h3" href="#169-不作惡三底線長線關鍵">16.9 不作惡三底線（長線關鍵）</a></li><li><a class="toc__link toc__link--h3" href="#1610-開發順序">16.10 開發順序</a></li><li><a class="toc__link" href="#17-會員系統與雲端架構2026-10-30">§17 會員系統與雲端架構（2026-10-30）</a></li><li><a class="toc__link toc__link--h3" href="#171-核心原則算力留本地信任上雲端">17.1 核心原則：算力留本地，信任上雲端</a></li><li><a class="toc__link toc__link--h3" href="#172-基礎設施全-local">17.2 基礎設施（全 local）</a></li><li><a class="toc__link toc__link--h3" href="#173-資料模型schema-per-bc7-個-bc">17.3 資料模型（schema-per-BC，7 個 BC）</a></li><li><a class="toc__link toc__link--h3" href="#174-api伺服器權威">17.4 API（伺服器權威）</a></li><li><a class="toc__link toc__link--h3" href="#175-玩家體驗流程">17.5 玩家體驗流程</a></li><li><a class="toc__link toc__link--h3" href="#176-開發進度">17.6 開發進度</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="企画書ai-電商公司辦公室模擬遊戲代號-yocat-office">企画書：AI 電商公司辦公室模擬遊戲（代號 <strong>yoCat Office</strong>）</h1>
+<blockquote><p><strong>這份文件是「交接聖經」。</strong> 任何接手的 AI（含 context 被壓縮/重置後的我自己）都要先完整讀這份，再從 [§11 下一步] 開始做。</p></blockquote>
+<hr>
+<h2 id="0-給接手-ai-的-30-秒摘要">0. 給接手 AI 的 30 秒摘要</h2>
+<ul><li><strong>做什麼</strong>：一個 2.5D 等角視角的「電商公司辦公室」模擬遊戲。員工（NPC）7×24 自主上班、走動、討論、辦公，每個角色的「大腦」由<strong>本地 LLM</strong> 驅動。玩家扮演老闆，只有四個權力：<strong>招募 / 解職 / 派任務 / 貼公告</strong>，外加與角色互動。</li><li><strong>立刻能用的本地資源</strong>：見 [§4]，<strong>全部現成、嚴禁重新下載</strong>。</li><li><strong>怎麼接手續跑</strong>：見 [§9 啟動速查] 與 [§11 下一步]。</li></ul>
+<hr>
+<h2 id="1-願景">1. 願景</h2>
+<p>把一間電商公司的日常，做成一個會自己「活著」的 2.5D 辦公室。玩家像經營模擬遊戲（類 Game Dev Tycoon / 開羅遊戲）的老闆，俯視整間辦公室：五大部門的員工各自有個性、會走到茶水間聊天、回工位辦公、開會討論、對老闆公告有反應。所有行為不是腳本寫死，而是<strong>本地 LLM 即時生成</strong>的決策與對話。</p>
+<p>美術風格：參考使用者提供的 2.5D 等角、明亮多彩、Q 版可愛風（Monster/竹笋 海報風格）。</p>
+<hr>
+<h2 id="2-核心玩法規格">2. 核心玩法規格</h2>
+<h3 id="玩家的四個動作唯一權力">玩家的四個動作（唯一權力）</h3>
+<ol><li><strong>解職（Fire）</strong>：移除某角色。</li><li><strong>派任務（Assign Task）</strong>：對某人/某部門下任務；角色依個性與能力去執行、回報。</li><li><strong>貼老闆公告（Announcement）</strong>：全公司廣播一段文字；角色們會各自解讀並產生反應。</li></ol>
+<p>5.（互動）<strong>與角色對話</strong>：點某角色聊天，走本地 LLM。</p>
+<h3 id="部門5-大類--老闆">部門（5 大類 + 老闆）</h3>
+<table>
+<tr><th>代號</th><th>部門</th><th>職責（電商情境）</th></tr>
+<tr><td>產</td><td>產品</td><td>選品、商品企劃、上架</td></tr>
+<tr><td>銷</td><td>銷售／業務</td><td>開發客戶、下單、業績</td></tr>
+<tr><td>人</td><td>人力資源</td><td>招募、考核、員工關懷</td></tr>
+<tr><td>發</td><td>研發</td><td>系統開發、技術架構、工程實作</td></tr>
+<tr><td>財</td><td>財務</td><td>帳務、預算、報表</td></tr>
+<tr><td>—</td><td><strong>老闆（Boss）</strong></td><td>玩家視角；也可有一個 NPC 高管代理人</td></tr>
+</table>
+<h3 id="角色模型每個-npc">角色模型（每個 NPC）</h3>
+<ul><li>狀態：精力、心情、目前任務、所在位置（工位/會議室/茶水間）。</li><li>大腦：個性檔 + 當前情境 → 組 prompt → call 本地 LLM → 得到「下一步行為 + 台詞」。</li></ul>
+<h3 id="724-作息世界-tick">7×24 作息（世界 tick）</h3>
+<ul><li>後端有一個世界時鐘（可加速，如 1 現實分鐘 = 遊戲 10 分鐘）。</li><li>時段驅動行為：上班/開會/午休/下班/加班；夜間與週末表現不同。</li><li>事件系統：訂單尖峰、客訴、系統當機、發薪日等，觸發部門協作。</li></ul>
+<hr>
+<h2 id="3-技術架構">3. 技術架構</h2>
+<pre><code class="language-text">┌─ HTML5 Client（等角 2.5D，Canvas）──────────────────────┐
+│  渲染辦公室與員工精靈動畫；UI：招募/解職/派任務/貼公告   │
+│  LLM 雙引擎：後端 vLLM ／ 瀏覽器 WebLLM（WebGPU）        │
+└──────────────────────────┬──────────────────────────────┘
+                           │ 同源 HTTP（全部經單一入口）
+┌─ gateway（nginx，NodePort :30088）──────────────────────┐
+│  靜態服務 client + 反向代理（單一入口）                  │
+└───────┬──────────────────────────────┬──────────────────┘
+        │ /auth /wallet /save…          │ /character /health
+┌─ api（Java · Spring Modulith）───┐  ┌─ character（Node）───────┐
+│  會員/錢包/存檔/記錄（7 個 BC）   │  │  NPC 大腦（LLM 代理）     │
+│  → PostgreSQL(yocat-pg) + Redis   │  │  → vLLM(Qwen2.5-7B，本地) │
+└───────────────────────────────────┘  └──────────────────────────┘</code></pre>
+<hr>
+<h2 id="4-本地資源地圖-全部現成嚴禁重新下載">4. 本地資源地圖（★★★ 全部現成，嚴禁重新下載 ★★★）</h2>
+<h3 id="41-硬體--os">4.1 硬體 / OS</h3>
+<ul><li><strong>RTX 5090 Laptop GPU，24GB VRAM</strong>（Blackwell sm_120）。Windows 端常駐占用 ~6–8GB，WSL 內可用 ~15–16GB。</li><li>Windows 11 + <strong>WSL2 Ubuntu 24.04</strong>（發行版名稱：<code>Ubuntu</code>）。</li><li><strong>WSL root 免密碼</strong>：<code>wsl -d Ubuntu -u root -- &lt;cmd&gt;</code>（忘記 sudo 密碼也能裝系統套件）。</li></ul>
+<h3 id="42-本地-llm角色大腦-vllm">4.2 本地 LLM（角色大腦）— vLLM</h3>
+<ul><li>環境：WSL 內 <code>~/vllm-test/.venv</code>（Python 3.12，vLLM 0.32.0，torch 2.13+cu130）。</li><li>模型：<strong><code>Qwen/Qwen2.5-7B-Instruct-AWQ</code> @ 64K context（YaRN）</strong>。</li><li style="margin-left:1.0rem">64K 怎麼來：7B 原生只有 32K，用 <strong>YaRN rope scaling（factor 2.0）</strong>延伸到 64K。</li><li><strong>端點：<code>http://localhost:8000/v1</code></strong>（OpenAI 相容；Windows、WSL 皆可連）。</li></ul>
+<pre><code class="language-bash">  VLLM_USE_FLASHINFER_SAMPLER=0 VLLM_ATTENTION_BACKEND=FLASH_ATTN VLLM_ALLOW_LONG_MAX_MODEL_LEN=1 \
+  .venv/bin/vllm serve Qwen/Qwen2.5-7B-Instruct-AWQ \
+    --max-model-len 64000 --gpu-memory-utilization 0.6 --port 8000</code></pre>
+<ul><li><strong>前置一次性設定</strong>：已把 YaRN 寫進該模型 HF 快取的 <code>config.json</code>（<code>rope_scaling={rope_type:yarn,factor:2.0,original_max_position_embeddings:32768}</code>），patch 腳本 <code>scratchpad/patch_rope.py</code>。若重抓模型需重跑。</li><li>測試腳本：<code>~/vllm-test/tool_test_openai.py</code>。</li><li><strong>踩坑與解法見 [§12]</strong>。</li></ul>
+<h3 id="43-本地素材生成ai-agent-自動產出非人工手繪">4.3 本地素材生成（AI agent 自動產出，非人工手繪）</h3>
+<ul><li><strong>美術（角色 / 場景）</strong>：由 <strong>AI agent 直接程式化操控 Blender</strong>（headless + Python 腳本 <code>blender_anim2.py</code>）渲染 3D 可愛 chibi → 2.5D 精靈圖與動畫（走 / 坐 / 講 / 待機 × 6 部門 × 4 變體、方向性貼圖）。<strong>全程由 AI 自動產生，不是人工開軟體繪製。</strong></li><li><strong>音樂 / 音效</strong>：由 <strong>AI agent 呼叫 AudioLDM2</strong> 生成辦公室 BGM 與環境音效。</li></ul>
+<h2 id="6-分階段計畫與驗收標準">6. 分階段計畫與驗收標準</h2>
+<ul><li><strong>Phase 0 — 地基</strong>（進行中）</li><li><strong>Phase 1 — 可看的 MVP 垂直切片</strong>（本次主目標 A）</li><li style="margin-left:1.0rem">HTML5 等角辦公室可在瀏覽器打開；6 個角色（5 部門+老闆）會走動並在工位辦公。</li><li style="margin-left:1.0rem">四個玩家動作（招募/解職/派任務/貼公告）可操作並生效。</li><li style="margin-left:1.0rem">角色「心聲/回應」<strong>即時來自本地 LLM</strong>（經 Node 後端 router）。</li><li style="margin-left:1.0rem">美術先用乾淨向量/色塊佔位。</li><li style="margin-left:1.0rem"><strong>驗收</strong>：瀏覽器打開能玩；派任務/貼公告後角色有來自本地 LLM 的差異化反應。</li><li><strong>Phase 2 — 素材管線</strong>（本次目標 B，與 P1 並行）</li><li style="margin-left:1.0rem"><strong>驗收</strong>：佔位美術被生成素材取代，<code>output/</code> 有成套可用資產並接進 client。</li><li><strong>Phase 3 — 7×24 自主營運</strong></li><li style="margin-left:1.0rem"><strong>驗收</strong>：關掉玩家輸入，辦公室仍持續產生合理、不重複的日常行為。</li><li><strong>Phase 4 — 打磨</strong>：互動深度、公告效果、經營數值、UI/UX。</li></ul>
+<hr>
+<h2 id="7-資料模型給接手者可直接開建">7. 資料模型（給接手者可直接開建）</h2>
+<blockquote><p>以下為 client 端（單檔 HTML5/JS）世界狀態的概念模型；伺服器信任層另以 Java 實作（見 §17）。</p></blockquote>
+<pre><code class="language-ts">type Dept = &#x27;產&#x27; | &#x27;銷&#x27; | &#x27;人&#x27; | &#x27;發&#x27; | &#x27;財&#x27; | &#x27;老闆&#x27;;
+type Place = &#x27;desk&#x27; | &#x27;meeting&#x27; | &#x27;pantry&#x27; | &#x27;walking&#x27;;
+
+interface Character {
+  id: string; name: string; dept: Dept; title: string;
+  avatar: string;                 
+  personality: string[];          // 個性標籤
+  traits: { diligence:number; sociability:number; skill:number }; // 0..1
+  mood: number; energy: number;   // 0..1
+  pos: { x:number; y:number };    // 等角座標
+  place: Place;
+  currentTaskId?: string;
+}
+
+interface Task {
+  id: string; title: string; desc: string;
+  dept?: Dept; assigneeId?: string;
+  status: &#x27;open&#x27;|&#x27;doing&#x27;|&#x27;done&#x27;|&#x27;failed&#x27;;
+  createdBy: &#x27;player&#x27;|&#x27;system&#x27;; progress: number;
+}
+
+interface Announcement { id:string; text:string; at:number; }
+
+interface WorldState {
+  tick:number; gameTime:string;    // 作息時鐘
+  characters: Character[]; tasks: Task[]; announcements: Announcement[];
+  metrics: { revenue:number; morale:number; orders:number };
+}</code></pre>
+<p><strong>角色大腦 prompt 範式</strong>（Node → 本地 LLM）：</p>
+<blockquote><p>system：你是 {name}，{dept}部門{title}，個性{personality}。你在一間電商公司上班。只能用工具改變狀態；不知道即時資訊就說不知道，不要瞎掰。</p></blockquote>
+<blockquote><p>user：現在是 {gameTime}，你在 {place}，心情{mood}精力{energy}。目前任務：{task}。老闆最新公告：{announcement}。請決定你接下來 10 分鐘要做什麼，並說一句符合個性的內心話（≤20字）。回傳 JSON：{action, target, line}。</p></blockquote>
+<hr>
+<h2 id="8-規劃目錄結構落腳-project-root">8. 規劃目錄結構（落腳 <code>&lt;project-root&gt;</code>）</h2>
+<pre><code class="">yocatoffice/
+  README.md               ← 專案說明
+  企画.md                 ← 總企畫書（交接文件）
+  client/index.html       ← 遊戲本體（單檔 HTML5 + Canvas）
+  assets/                 ← Blender 精靈圖/動畫 + WebLLM 載入器
+  java-backend/           ← 會員後端（Java Spring Modulith）+ k8s
+    apps/api/             ← Spring Boot 原始碼（7 個 BC）
+    k8s/edge/{gateway,character}/  ← nginx 單一入口、NPC 大腦服務
+    k8s/overlays/local/   ← Kustomize 本地部署
+    migrations/           ← Flyway schema-per-BC
+  docs/                   ← 設計文件、架構圖、API、部署指南</code></pre>
+<hr>
+<h2 id="9-啟動速查resume-cheatsheet">9. 啟動速查（Resume Cheatsheet）</h2>
+<table>
+<tr><th>要啟動什麼</th><th>指令</th></tr>
+<tr><td>本地 LLM（WSL）</td><td>見 [§4.2] 的 <code>vllm serve …</code>（埠 8000）</td></tr>
+<tr><td>確認 LLM 活著</td><td><code>wsl -d Ubuntu -- curl -s localhost:8000/v1/models</code></td></tr>
+<tr><td>後端 + 單一入口（k8s）</td><td><code>kubectl apply -k java-backend/k8s/overlays/local/</code>（gateway 對外 :30088）</td></tr>
+<tr><td>遊戲前端</td><td>開 <code>http://127.0.0.1:30088/</code>（gateway 服務 client）</td></tr>
+</table>
+<hr>
+<h2 id="10-監察機制與目前進度">10. 監察機制與目前進度</h2>
+<blockquote><p>細項進度請用 <code>PROGRESS.md</code>（待建）。此處為高層狀態。</p></blockquote>
+<table>
+<tr><th>項目</th><th>狀態</th><th>備註</th></tr>
+<tr><td>本地 vLLM 端點</td><td>✅</td><td>8000，tool-calling 已驗證</td></tr>
+<tr><td>企画書（本文件）</td><td>✅</td><td>—</td></tr>
+<tr><td>Phase 1 MVP（可玩辦公室）</td><td>✅</td><td>單檔 client + Node 後端，角色心聲/對話全 LLM</td></tr>
+<tr><td>Phase 2 角色美術（動畫）</td><td>✅</td><td>Blender 3D 可愛 chibi，走/坐/講/待機×6 部門×4 變體，方向性貼圖</td></tr>
+<tr><td>遊戲系統 P0 經濟核心</td><td>✅</td><td>技能×心情×精力→營收/訂單；日終結算；過勞/虧損張力</td></tr>
+<tr><td>遊戲系統 P1 關係網+事件</td><td>✅</td><td>關係/八卦（LLM）＋員工主動請求（加薪/請假/抱怨/提案/離職）</td></tr>
+<tr><td>遊戲系統 P2 存檔+離線進度</td><td>✅</td><td>localStorage 存檔；回來時「歡迎回來」離線營運報告</td></tr>
+</table>
+<hr>
+<h2 id="11-下一步接手-ai-從這裡開始">11. 下一步（接手 AI 從這裡開始）</h2>
+<blockquote><p>Phase 0–2 + 遊戲系統 P0/P1/P2 已完成（見 §10、§14、<code>PROGRESS.md</code>）。以下為可選的下一波。</p></blockquote>
+<ol><li><strong>確認地基</strong>：跑 [§9] 確認 vLLM(8000)、gateway 單一入口(30088) 活著；開 <code>client/index.html</code> 應顯示「LLM：已連線 ✅」。</li><li><strong>平衡調校</strong>：營收係數 <code>*3.2</code>、薪資區間、離線封頂 5 天、請求觸發門檻（<code>mood/energy/skill</code>）等數值的手感微調。</li></ol>
+<ol><li><strong>角色跨日記憶</strong>：把關係/事件餵進角色 prompt 的長期記憶（目前為 session 內 <code>W.events</code> 近 8 則）。</li></ol>
+<hr>
+<h2 id="12-已知踩坑與解法hard-won別重踩">12. 已知踩坑與解法（hard-won，別重踩）</h2>
+<ul><li><strong>vLLM 在 RTX 5090(Blackwell) 上</strong>：</li><li style="margin-left:1.0rem">缺 <code>Python.h</code> → Triton gcc 編譯失敗。解：<code>wsl -u root -- apt install -y python3.12-dev</code>（WSL root 免密碼）。</li><li style="margin-left:1.0rem">flashinfer 會在執行期用 <code>nvcc</code> JIT（本機無 CUDA toolkit）→ 崩。<strong>不要移除 flashinfer</strong>（vLLM 0.32 硬 import 它），改用環境變數 <code>VLLM_USE_FLASHINFER_SAMPLER=0</code> + <code>VLLM_ATTENTION_BACKEND=FLASH_ATTN</code> 繞過。</li><li style="margin-left:1.0rem"><code>--gpu-memory-utilization 0.55</code>：因 GPU 同時供 Windows 顯示，留緩衝免 OOM。</li><li><strong>WSL 背景行程陷阱</strong>：<code>wsl -- bash -c &quot;... &amp;&quot;</code> 的背景行程會隨連線結束被回收。要常駐請用 Windows 端背景執行（工具的 run_in_background）。</li><li><strong><code>pkill -f</code> 自殺</strong>：用 <code>pkill -f &#x27;apt&#x27;</code> 之類時，若自己的命令列也含該字串會把自己 SIGKILL。改用埠精準定位（<code>fuser -k 8000/tcp</code> / <code>ss</code> 找 PID 殺 pgid）。</li><li><strong>PowerShell→wsl→bash 多層引號</strong>：巢狀 <code>&quot;</code>/JSON 常被吃成 parse error。解：把 python/JSON 寫成檔案再執行，別硬塞 inline。</li><li><strong>Qwen 會對常識題瞎掰</strong>（如天氣）：用強系統提示「無即時知識、一律查工具、不准瞎掰」可修正（實測從 3/4 → 4/4）。</li><li><strong>config.yaml 自訂端點</strong>：<code>model: {default, provider: custom, base_url, api_key, streaming: false}</code>。</li></ul>
+<hr>
+<h2 id="13-開放決策待與使用者確認">13. 開放決策（待與使用者確認）</h2>
+<ul><li>世界時鐘加速比例、公司初始人數與部門配額。</li></ul>
+<hr>
+<h2 id="14-遊戲性設計與差異化已實作">14. 遊戲性設計與差異化（已實作）</h2>
+<blockquote><p>這段是把「一個會自己活著的辦公室」變成<strong>一個有玩頭的遊戲</strong>的設計主軸。核心差異化＝<strong>湧現式敘事 + 人際關係 + 記憶</strong>，三者都靠本地 LLM 才成立，是純腳本遊戲做不到的。</p></blockquote>
+<h3 id="定位">定位</h3>
+<p>一句話：<strong>「你是老闆，但公司是活的。」</strong> 不是放置掛機、也不是數值最佳化，而是看一群有個性的人在你手下相處、摩擦、成長、出事，你用四個權力去影響這個生態。</p>
+<h3 id="三大支柱">三大支柱</h3>
+<ol><li><strong>湧現敘事</strong>：營收/訂單是骨架，真正好玩的是人——誰跟誰變好朋友、誰在八卦誰、誰忽然要離職。沒有兩局一樣。</li><li><strong>人際關係</strong>：每對員工有關係分數，受個性相容性（BOND/CLASH）與互動歷史影響；好友被解職會讓其他人心情掉。</li><li><strong>記憶</strong>：兩層。<strong>公司層</strong>近期事件（招募/解職/公告/完成任務）進入對話 prompt；<strong>個人層</strong>每位員工累積自己的經歷（被加薪/提案被採納/好友離職/當 MVP…），存進存檔、顯示在資訊面板「個人經歷」、並餵進他跟老闆對話與八卦的 prompt，讓他會提起自己的過去。世界因此有連續感、每個人都是一條故事線。</li></ol>
+<h3 id="核心循環已實作">核心循環（已實作）</h3>
+<ul><li><strong>P0 經濟核心</strong>：每人 <code>生產力 = 技能 × 心情 × 精力 × 部門權重</code>；上班時段累積營收/訂單，技能隨工作成長；每天 18:00 日終結算（營收 − 薪資 = 淨利 → 現金，MVP 表揚）。<strong>張力＝人太多 → 薪資 &gt; 營收 → 虧損</strong>，逼玩家取捨。</li><li><strong>P1 關係網 + 茶水間八卦</strong>：相容性決定互動是拉近或推遠；後端 <code>/character/converse</code> 吃「關係 + 公司事件」生成帶八卦、語氣隨關係的對話（好友同情、死對頭互嗆）。</li><li><strong>P1 員工主動事件</strong>：員工會依狀態主動向老闆<strong>開口</strong>——加薪（技能高心情好）、請假（精力低）、抱怨（心情差）、提案（心情好技能夠，採納可賺錢）、離職（心情太差，可加薪慰留或放人）。台詞全 LLM 生成，玩家用卡片「採納／否決」回應，各有後果。</li><li><strong>個人記憶（記憶支柱落地）</strong>：每位員工 <code>c.memory</code> 累積帶日期的個人經歷（加薪/請假/抱怨/提案/慰留/交友/鬧翻/完成任務/當 MVP/好友離職…），在上述所有事件點 <code>pushMem()</code> 寫入、存進存檔、顯示在資訊面板「個人經歷」、並以 <code>recentMem()</code> 餵進 chat／converse 的 prompt（後端 <code>ChatReq.memory</code>、<code>Peer.mem</code>）。員工跟老闆聊天或跟同事八卦時會自然帶到自己的過去。</li><li><strong>性別外型 + 辦公室戀情</strong>：角色有性別，<strong>外型一眼可辨</strong>——男性短髮＋長褲、女性長髮＋洋裝＋睫毛（Blender <code>blender_anim2.py</code> 加 <code>gender</code>，女性變體 v1/v3 重渲，男性 v0/v2 沿用；貼圖以 960 格全域 union bbox 重裁對齊）。姓名、貼圖、性別三者一致（先定性別→取對應名字池→取對應奇偶變體），初始陣容 3 男 3 女均衡。<strong>戀情子系統</strong>：單身異性同事（非總經理）隨相處累積好感 <code>W.crush</code>，夠高且關係好 → <strong>告白</strong>（LLM 對白）→ 情投意合就<strong>交往</strong>（頭上 💞、心情加成、偶爾放閃甜言蜜語），否則<strong>被拒</strong>；交往後若心情差/關係惡化可能<strong>分手</strong>；對方離職會自動解除。所有戀愛事件寫進公司動態 + 個人記憶（後端 <code>/character/romance</code>：confess/accept/reject/sweet/breakup）。</li></ul>
+<h3 id="為什麼需要本地-llm而非腳本">為什麼需要本地 LLM（而非腳本）</h3>
+<p>支柱 1–3 的質感全來自「每句話都是當下生成、吃得到情境」。腳本化的罐頭台詞會讓湧現敘事崩塌成重複感。本地 LLM 讓這一切零邊際成本、可 7×24、資料不出機。</p>
+<hr>
+<h2 id="15-商業化策略企畫人員觀點2026-10-30">15. 商業化策略（企畫人員觀點，2026-10-30）</h2>
+<blockquote><p><strong>鐵則：絕不對「AI 互動」收費。</strong> 本地 LLM＝AI 對話/戀愛/八卦零邊際成本，是對手（付 API 費的 AI NPC 遊戲）做不到的護城河。要賣的是<strong>內容、外觀、規模、便利</strong>，不是魔力本身。</p></blockquote>
+<h3 id="151-關鍵商業決策llm-跑在哪決定一切">15.1 關鍵商業決策：LLM 跑在哪（決定一切）</h3>
+<table>
+<tr><th>方案</th><th>說明</th><th>商業模式</th><th>優劣</th></tr>
+<tr><td><strong>A 自帶算力（建議起步）</strong></td><td>玩家用自己的 GPU 跑本地模型</td><td><strong>買斷</strong>（Steam/itch $10–15）</td><td>零伺服器成本、利潤 100%；但受眾＝有顯卡的玩家，小眾。先用來驗證題材、養社群、產病毒內容</td></tr>
+<tr><td><strong>B 雲端小模型</strong></td><td>官方雲端跑量化 3B–7B</td><td><strong>F2P + 訂閱/IAP</strong></td><td>受眾最大（手機也能玩）；但有推論成本，需靠訂閱覆蓋。7×24 離線營運＝付費雲端功能</td></tr>
+<tr><td><strong>C 瀏覽器 WebLLM</strong></td><td>玩家瀏覽器用 WebGPU 跑</td><td>F2P</td><td>零伺服器、觸及廣；模型受限、低階機跑不動</td></tr>
+</table>
+<p><strong>建議路線：A → B。</strong> 先以「自帶算力」買斷版在 itch/Steam 上線養社群，再推雲端 F2P 版擴散。</p>
+<h3 id="152-收入來源依優先序">15.2 收入來源（依優先序）</h3>
+<ol><li><strong>內容／劇本 DLC</strong>：劇情化關卡——「90 天衝上市」「併購危機」「從車庫到獨角獸」；以及電商以外的行業皮（遊戲公司/餐飲/新創）。<strong>賣故事與挑戰</strong>，不碰 AI 收費。</li><li><strong>外觀 cosmetics（高毛利、不影響平衡）</strong>：辦公室主題（賽博/和風/聖誕）、家具皮膚包、員工服裝/寵物。引擎已有完整家具系統，加一層換皮即可。</li><li><strong>角色訂製（病毒點）</strong>：讓玩家<strong>命名／設計自己的員工</strong>（做成自己的同事、朋友、偶像）→ 高度社群分享。</li></ol>
+<p>recurring 收入、剛好用到雲端 LLM。</p>
+<ol><li><strong>便利性（謹慎、不 pay-to-win）</strong>：存檔槽、離線加速、額外部門上限。</li></ol>
+<h3 id="153-病毒成長引擎">15.3 病毒成長引擎</h3>
+<p>AI 湧現劇情天生可分享——「我的員工今天談戀愛了」「財務跟研發吵架了」。要做 <strong>一鍵分享精華</strong>（截圖/GIF of drama moments）→ 社群傳播帶自然量，比買量便宜。</p>
+<h3 id="154-不要做">15.4 不要做</h3>
+<ul><li>按則收 AI 費、核心玩法轉蛋、硬性體力牆、能看不能玩的 demo。這些都會殺死「活著的公司」的魔力。</li></ul>
+<h3 id="155-最小可行商業化接下來要蓋的">15.5 最小可行商業化（接下來要蓋的）</h3>
+<ol><li><strong>主題／外觀系統</strong>：辦公室主題 + 可換家具皮膚（沿用現有道具系統加 skin 層）。</li><li><strong>軟貨幣商店</strong>：現金已存在 → 開一個商店買外觀；之後再加硬貨幣。</li><li><strong>1 個付費劇本</strong>：如「90 天衝上市」當內容付費驗證。</li><li><strong>分享功能</strong>：drama 時刻的截圖/GIF 匯出。</li></ol>
+<h3 id="156-go-to-market-階段">15.6 Go-to-market 階段</h3>
+<ul><li><strong>A 期</strong>：打磨免費核心，itch/web 以「自帶 GPU」demo 上線，養社群、產病毒 clip。</li><li><strong>B 期</strong>：Steam 買斷（$10–15）＋劇本 DLC ＋外觀。</li><li><strong>C 期</strong>：雲端 F2P（手機）＋離線營運訂閱。</li></ul>
+<h3 id="157-三條算力路線並行2026-10-30-使用者決策">15.7 三條算力路線並行（2026-10-30 使用者決策）</h3>
+<p>不鎖單一路線，程式與內容跟「算力位置」解耦（client 只打一個可切換的生成來源）。<strong>三條都做</strong>：</p>
+<ul><li><strong>A 自帶算力</strong>：連本機 vLLM（現狀）。</li><li><strong>B 雲端</strong>：連官方雲端端點（換 BACKEND_URL 即可）。</li><li><strong>C 瀏覽器 WebLLM（戰略最高）</strong>：模型跑在玩家瀏覽器（WebGPU，如 Qwen2.5-1.5B/Llama-3.2-3B，首次下載快取）。<strong>零伺服器成本 + 免玩家自架 + 可大規模發行</strong>。做法：client 增加「瀏覽器生成」路徑，複用同一套 prompt 組裝，產出走 WebLLM 而非 fetch 後端。三者以設定切換，優先序：有後端用後端，否則用瀏覽器 WebLLM，再否則內建保底。</li></ul>
+<h2 id="16-獲利方式定案2026-10-30以玩家渴望為核心">16. 獲利方式（定案，2026-10-30・以玩家渴望為核心）</h2>
+<blockquote><p><strong>§15 講的是「成本結構」（給投資人）；§16 講的是「玩家為什麼想付錢」（給遊戲）。後者才是關鍵——沒有渴望，任何定價都是空的。</strong></p></blockquote>
+<h3 id="161-核心診斷">16.1 核心診斷</h3>
+<p>玩家不會為「系統」付錢，只會為「在乎的東西」付錢。目前的失敗點：①代管預設開＝玩家在看戲、沒有擁有感；②角色是「隨機活的」但不是「我的」，可替換故無依附；③沒有跨天懸念故無回訪。<strong>變現軌道（商店/劇本/分享）都鋪好了，缺的是製造渴望的情感引擎。</strong></p>
+<h3 id="162-兩個情感對象--兩台變現引擎">16.2 兩個情感對象 → 兩台變現引擎</h3>
+<ul><li><strong>對員工的愛</strong> → 收集、挽留、打扮、延續其故事。</li><li><strong>對公司的愛</strong> → 公司是「我建的、有歷史、有排名、會倒」的東西。<strong>會倒才有賭注</strong>，賭注＝「不想失去」＝儲值引擎。</li></ul>
+<h3 id="163-公式">16.3 公式</h3>
+<p><strong>免費玩到飽（隨機員工＋玩家端算力＝零成本）→ 玩家養出感情 → 付費點全是「深化／表達／收集／延續」那份感情。</strong> 永不賣 AI、不賣戰力、不搞「付錢才不會失去朋友」。</p>
+<h3 id="164-人才庫系統招募解職的核心樞紐">16.4 人才庫系統（招募／解職的核心樞紐）</h3>
+<p>招募與解職進出一個<strong>人才庫</strong>，三來源：</p>
+<ol><li><strong>🎓 校友庫</strong>：被解職／自主離職／被挖角的人全進校友庫<strong>不消失</strong>，可<strong>花現金再招回</strong>（後悔驅動消費）。</li><li><strong>🌟 夢想人才市場</strong>：輪替的精品角色清單（獨特人格/背景/立繪，LLM 演活），<strong>指定購買非抽卡</strong>（道德、好過審、玩家信任）。這是「活靈魂收集」，比 gacha 強。</li><li><strong>🧑‍💼 一般招募</strong>：免費隨機員工。</li></ol>
+<h3 id="165-儲值管道錢進來的地方">16.5 儲值管道（錢進來的地方）</h3>
+<p>premium 貨幣「💎 資本／注資」：真錢 → 資本 → 換 公司現金／夢想人才／外觀／羈絆深化／季票。<strong>現金見底又有限時夢想人才＝最強轉化時刻。</strong></p>
+<h3 id="166-虧錢壓力曲線漸進非猝死">16.6 虧錢壓力曲線（漸進，非猝死）</h3>
+<p>①現金低→警告、士氣跌、暫停招募 → ②轉負→有人提離職（進校友庫）→ ③深負 N 天→逼近破產清算。懸崖邊給兩條路：<strong>①儲值注資救公司（公司情感變現）／②讓它倒，進 recycle。</strong></p>
+<h3 id="167-破產-recycle重經營-整套靈魂防作惡關鍵">16.7 破產 Recycle（重經營）— 整套靈魂，防作惡關鍵</h3>
+<p><strong>公司會倒，但捨不得的東西一樣都不奪走。</strong> 破產時保留：✅人才庫/校友庫（心愛的人回名冊，下一間公司帶著東山再起）、✅所有付費特聘靈魂（信任底線）、✅成就/排行榜/大事記、✅外觀。<strong>只重置當前公司的現金與營運進度</strong>＝開新公司（roguelike 新一輪）但帶著收集與傳奇長大。一招解四題：公司真的會死（有賭注撐轉化）、絕不作惡（付費/心愛永不永久失去）、跨局 meta 成長（收集越玩越厚）、正是要的 recycle。</p>
+<h3 id="168-轉化時刻總表">16.8 轉化時刻總表</h3>
+<table>
+<tr><th>時刻</th><th>掏錢理由</th><th>情感來源</th></tr>
+<tr><td>招募夢想人才</td><td>「想要這個獨一無二的靈魂」</td><td>收集</td></tr>
+<tr><td>招回後悔開除/被挖走的人</td><td>「想把他請回來」</td><td>後悔、依附</td></tr>
+<tr><td>懸崖邊救公司</td><td>「不想失去我建的公司」</td><td>公司情感、損失趨避</td></tr>
+<tr><td>外觀/羈絆/季票</td><td>「讓他更好看、故事傳下去」</td><td>表達、延續</td></tr>
+</table>
+<h3 id="169-不作惡三底線長線關鍵">16.9 不作惡三底線（長線關鍵）</h3>
+<ol><li>免費玩家永遠能靠 recycle 重生，不被 paywall 卡死。</li><li>付費與心愛的人永不永久奪走——儲值＝加速/情感/收集，非「不付就毀滅」。</li><li>夢想人才賣人格與獨特<strong>非碾壓戰力</strong>——維持「收集」而非 pay-to-win。</li></ol>
+<h3 id="1610-開發順序">16.10 開發順序</h3>
+<ol><li>✅ <strong>最愛角色依附迴圈（已實作 2026-10-30）</strong>：羈絆值 <code>bond</code>(聊天/答應請求/慰留加深，疏於互動退)、⭐最愛(單選、頭上標記)、5 條個人故事線 <code>ARCS</code>(隨羈絆跨門檻推進 beat→達成夢想 payoff)。inspect 面板有羈絆條+夢想進度+最愛鈕。這是讓下面變現有意義的情感引擎。</li><li><strong>人才庫原型</strong>（校友庫＋夢想市場＋再招回，先用遊戲現金跑通「失去→想念→招回/收集」迴圈）。</li><li><strong>破產 recycle</strong>（含跨局保留）。</li><li><strong>儲值</strong>（真錢→資本）疊上。</li><li>外觀/羈絆/季票/劇本加乘。</li></ol>
+<hr>
+<h2 id="17-會員系統與雲端架構2026-10-30">§17 會員系統與雲端架構（2026-10-30）</h2>
+<h3 id="171-核心原則算力留本地信任上雲端">17.1 核心原則：算力留本地，信任上雲端</h3>
+<p>一旦要收真錢，錢包就不能放 localStorage（F12 一行 <code>W.gems=99999</code> 就破功）。</p>
+<p>身分／錢包／已購項目／記錄／排行必須由<strong>伺服器</strong>當權威。但這不違反「不對 AI 收費」哲學——</p>
+<p>LLM 推論與遊戲模擬仍留本地（零成本），只有「信任層」上伺服器。</p>
+<table>
+<tr><th>留本地（胖客戶端，零成本）</th><th>上伺服器（瘦信任層）</th></tr>
+<tr><td>LLM 推論、遊戲模擬、NPC、辦公室狀態</td><td>帳號身分／登入</td></tr>
+<tr><td>所有玩法運算</td><td><strong>伺服器權威錢包</strong>（資本儲值、寶石）</td></tr>
+<tr><td></td><td>已購權益（外觀／夢想員工／劇本）</td></tr>
+<tr><td></td><td>經營史記錄（破產／成就／傳承）</td></tr>
+<tr><td></td><td>排行榜、跨裝置存檔</td></tr>
+</table>
+<h3 id="172-基礎設施全-local">17.2 基礎設施（全 local）</h3>
+<ul><li><strong>Rancher Desktop k8s 叢集</strong>（k3s）＝「本地的雲端」。namespace <code>yocat</code>。</li><li><strong>PostgreSQL 16</strong>（Deployment + PVC local-path 持久化 + NodePort 30432）＝雲端 DB。</li><li>後端：<strong>Java 21 · Spring Boot · Spring Modulith</strong>（<code>java-backend/apps/api</code>，7 個 BC、Clean Architecture），部署於 k8s，連 in-cluster PostgreSQL。（早期 Node 原型 <code>server/</code> 未採用）</li><li>manifests：<code>docs/req/postgres.yaml</code> + <code>java-backend/k8s/overlays/local/</code>（Kustomize）；schema：<strong>schema-per-BC</strong> Flyway 遷移 <code>java-backend/migrations/*.sql</code>。</li><li>整條流程都在本機跑完，符合 local-first 要求。</li></ul>
+<h3 id="173-資料模型schema-per-bc7-個-bc">17.3 資料模型（schema-per-BC，7 個 BC）</h3>
+<p>member（accounts/sessions…）、wallet（wallets/wallet_ledger…）、deposit、entitlement、record、leaderboard、game_save，各 BC 獨立 schema（另有 platform / modulith 橫切 schema）。</p>
+<h3 id="174-api伺服器權威">17.4 API（伺服器權威）</h3>
+<ul><li><code>/auth/register</code>、<code>/auth/login</code>、<code>/auth/logout</code>、<code>/auth/me</code>（scrypt 雜湊、session token）</li><li><code>/wallet/topup</code>（假付費，走 ledger）、<code>/wallet/spend</code>（交易扣款，餘額不足回 402）</li><li><code>/entitlements</code>、<code>/entitlements/buy</code>（原子：扣款+授予，重複回 409）</li><li><code>/save</code>（GET/PUT，跨裝置）、<code>/records</code>（破產/成就/傳承）、<code>/leaderboard</code>（公開 Top N）</li></ul>
+<h3 id="175-玩家體驗流程">17.5 玩家體驗流程</h3>
+<p>啟動 → 帳號選擇（建立辦公室／登入／訪客試玩）→ 我的辦公室（存檔、錢包、記錄都掛此帳號）。</p>
+<p>訪客可玩，要收費／上榜／跨裝置才要求註冊（降低進入門檻，符合 F2P 哲學）。</p>
+<p>破產不是刪號，是這個帳號經營史上的一筆記錄。</p>
+<h3 id="176-開發進度">17.6 開發進度</h3>
+<ul><li>✅ 基礎設施（k8s Postgres + schema）</li><li>✅ 後端 API 全套（Java Spring Modulith；含 JUnit / BDD / 合約 / E2E 測試套件）</li><li>✅ 客戶端整合（帳號畫面、API client、錢包/記錄/存檔/排行上雲）全綠</li><li>之後：真金流 SDK（Phase B，接口已預留）</li></ul></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="../assets/app.js"></script>
+</body>
+</html>

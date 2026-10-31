@@ -1,0 +1,1034 @@
+openapi: 3.1.0
+info:
+  title: yocat-office-backend
+  version: "1.0.0"
+  description: |
+    yoCat Office 後端信任層 API（Server-Authoritative Trust Layer）。
+    Spring Modulith 模組化單體，單一對外發布服務，內含 7 個有界上下文：
+    member / wallet / deposit / entitlement / record / leaderboard / game-save。
+    錢包餘額、權益、記錄、排行分數一律由伺服器為權威來源；餘額變動必寫 append-only wallet_ledger。
+    來源：docs/API.md（18 端點 / 16 業務 + 2 健康檢查）、docs/EDD.md、docs/SCHEMA.md、docs/CONSTANTS.md。
+  contact:
+    name: Backend Lead / API Guild（聖祐遊戲）
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.yocat.example/v1
+    description: Production
+  - url: https://staging-api.yocat.example/v1
+    description: Staging
+  - url: http://localhost:8080
+    description: Local Development（Rancher Desktop）
+
+tags:
+  - name: platform
+    description: 平台底座（健康探針，橫切，非 BC）
+  - name: member
+    description: member BC — 帳號 / Session（/auth/*）
+  - name: wallet
+    description: wallet BC — 錢包 / 帳本（/wallet/*）
+  - name: deposit
+    description: deposit BC — 儲值包目錄 / 訂單（/deposit/*）
+  - name: entitlement
+    description: entitlement BC — 權益購買 / 清單（/entitlements/*）
+  - name: record
+    description: record BC — 經營史記錄（/records）
+  - name: leaderboard
+    description: leaderboard BC — 排行榜（/leaderboard）
+  - name: game-save
+    description: game-save BC — 辦公室存檔（/save）
+
+paths:
+  /health/live:
+    get:
+      summary: 存活探針（Liveness）
+      operationId: healthLive
+      tags: [platform]
+      security: []
+      responses:
+        '200':
+          description: 程序存活
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example: { status: "UP" }
+        '503':
+          description: 程序關閉中（Graceful Shutdown）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example: { status: "DOWN" }
+
+  /health/ready:
+    get:
+      summary: 就緒探針（Readiness）
+      operationId: healthReady
+      tags: [platform]
+      security: []
+      responses:
+        '200':
+          description: DB / Redis 依賴可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example: { status: "UP", db: "UP", redis: "UP" }
+        '503':
+          description: DB 或 Redis 不可用（Pod 暫不接流量）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example: { status: "DOWN", db: "DOWN" }
+
+  /auth/register:
+    post:
+      summary: 註冊新帳號
+      operationId: register
+      tags: [member]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example: { email: "boss@yocat.example", displayName: "喵喵科技", password: "s3cret!" }
+      responses:
+        '200':
+          description: 註冊成功，簽發 session token（TTL 30 天）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/login:
+    post:
+      summary: 登入並簽發 session token
+      operationId: login
+      tags: [member]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example: { email: "boss@yocat.example", password: "s3cret!" }
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/logout:
+    post:
+      summary: 登出（刪除當前 session，冪等）
+      operationId: logout
+      tags: [member]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 登出成功（冪等；token 無效亦回 200）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkFlagResponse'
+              example: { ok: true }
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/me:
+    get:
+      summary: 取得當前登入帳號資料（彙整 wallet + entitlements）
+      operationId: getMe
+      tags: [member]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 當前帳號彙整資料
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /wallet/topup:
+    post:
+      summary: 儲值（假付費）
+      operationId: walletTopup
+      tags: [wallet]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TopupRequest'
+            example: { pack: "g_mid" }
+      responses:
+        '200':
+          description: 加值成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopupResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /wallet/spend:
+    post:
+      summary: 花費（扣款，FOR UPDATE 行鎖）
+      operationId: walletSpend
+      tags: [wallet]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpendRequest'
+            example: { currency: "cash", amount: 1250, reason: "salary_day_42" }
+      responses:
+        '200':
+          description: 扣款成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpendResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PaymentRequired'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /deposit/packs:
+    get:
+      summary: 列出可購買的儲值包目錄
+      operationId: listDepositPacks
+      tags: [deposit]
+      security: []
+      responses:
+        '200':
+          description: 儲值包目錄
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepositPackListResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /deposit/checkout:
+    post:
+      summary: 建立儲值訂單（冪等 Idempotency-Key）
+      operationId: depositCheckout
+      tags: [deposit]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: 冪等鍵（= orderId），UUID v4，伺服器保存 24 小時
+          schema:
+            type: string
+            format: uuid
+          example: "7d793037-a076-4c05-9a70-b7e8b2e3c4f5"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+            example: { packId: "g_big" }
+      responses:
+        '200':
+          description: 訂單建立（Phase A 假付費恆 confirmed）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /entitlements:
+    get:
+      summary: 列出當前帳號已購權益
+      operationId: listEntitlements
+      tags: [entitlement]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 權益清單（依 acquired_at 升序）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntitlementListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /entitlements/buy:
+    post:
+      summary: 購買權益（原子：扣款 + 授予）
+      operationId: buyEntitlement
+      tags: [entitlement]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuyRequest'
+            example: { kind: "cosmetic", itemId: "suit_gold", currency: "gems", amount: 120 }
+      responses:
+        '200':
+          description: 購買成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuyResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PaymentRequired'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /records:
+    post:
+      summary: 記錄經營史（append-only）
+      operationId: addRecord
+      tags: [record]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordRequest'
+            example: { type: "bankruptcy", payload: { day: 42, finalCash: -15200, reason: "資金鏈斷裂" } }
+      responses:
+        '200':
+          description: 新增成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkFlagResponse'
+              example: { ok: true }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    get:
+      summary: 查詢經營史（可依 type 篩選，≤100 筆）
+      operationId: listRecords
+      tags: [record]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: 省略則回全部類型
+          schema:
+            $ref: '#/components/schemas/RecordType'
+      responses:
+        '200':
+          description: 記錄清單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /leaderboard:
+    get:
+      summary: 公開查詢全域排行 Top N
+      operationId: getLeaderboard
+      tags: [leaderboard]
+      security: []
+      parameters:
+        - name: mode
+          in: query
+          required: false
+          description: 排行模式；空字串 = 全模式
+          schema:
+            type: string
+            default: ""
+        - name: limit
+          in: query
+          required: false
+          description: 回傳筆數，夾擠 [1,100]
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Top N 排行
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      summary: 上榜（歸戶寫入，冪等 by run_id upsert）
+      operationId: submitLeaderboard
+      tags: [leaderboard]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaderboardSubmitRequest'
+            example: { runId: "run-7781", mode: "sandbox", score: 982300, grade: "S", detail: { days: 120, peakWorkers: 8 } }
+      responses:
+        '200':
+          description: 上榜成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkFlagResponse'
+              example: { ok: true }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /save:
+    get:
+      summary: 取得辦公室存檔（跨裝置還原）
+      operationId: getSave
+      tags: [game-save]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: slot
+          in: query
+          required: false
+          description: 存檔槽
+          schema:
+            type: string
+            default: "main"
+      responses:
+        '200':
+          description: 存檔內容（save 可為 null 表示該 slot 無存檔）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SaveResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      summary: 上傳/覆寫辦公室存檔（upsert，冪等）
+      operationId: putSave
+      tags: [game-save]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavePutRequest'
+            example: { slot: "main", data: { day: 42, cash: 18750, morale: 70, roster: ["m1", "m2", "m3"] } }
+      responses:
+        '200':
+          description: 存檔成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkFlagResponse'
+              example: { ok: true }
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: 請求 body > 4,000,000 bytes（連線中斷，無 body）
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Opaque session token（32B hex；EDD ADR-003）。Authorization 'Bearer <token>'。
+
+  responses:
+    ValidationError:
+      description: 請求格式錯誤（400，fail-fast）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: { error: "金額不正確" }
+    Unauthorized:
+      description: 未認證（無 / 過期 / 無效 token）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: { error: "請先登入" }
+    PaymentRequired:
+      description: 餘額不足（402），附現有 wallet
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: { error: "餘額不足", wallet: { cash: 500, gems: 0 } }
+    Conflict:
+      description: 衝突（409，email 已註冊 / 已擁有項目）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: { error: "已經擁有這個項目" }
+    IdempotencyConflict:
+      description: 冪等鍵衝突（409，同 Idempotency-Key 但 body 不同）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: { error: "idempotency key 衝突" }
+    RateLimited:
+      description: 請求過於頻繁（429）
+      headers:
+        Retry-After:
+          description: 建議重試秒數
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: { error: "請求過於頻繁" }
+    InternalError:
+      description: 未預期例外（500，交易回滾）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: { error: "internal error" }
+
+  schemas:
+    Currency:
+      type: string
+      enum: [cash, gems]
+      description: 幣別（wallet BC 權威，CONSTANTS §9）
+    EntitlementKind:
+      type: string
+      enum: [cosmetic, dream, scenario]
+      description: 權益類型（entitlement BC）
+    RecordType:
+      type: string
+      enum: [bankruptcy, achievement, legacy]
+      description: 經營史記錄類型（record BC）
+    OrderStatus:
+      type: string
+      enum: [pending, confirmed, failed]
+      description: 訂單狀態（deposit BC）
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: 人類可讀錯誤訊息（zh-TW）
+          example: "請先登入"
+        wallet:
+          $ref: '#/components/schemas/WalletView'
+          description: 僅 402 餘額不足時附帶現有錢包
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [UP, DOWN]
+        db:
+          type: string
+          enum: [UP, DOWN]
+        redis:
+          type: string
+          enum: [UP, DOWN]
+
+    OkFlagResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+    AccountView:
+      type: object
+      required: [id, email, display_name]
+      properties:
+        id:
+          type: string
+          example: "1024"
+        email:
+          type: string
+          format: email
+          example: "boss@yocat.example"
+        display_name:
+          type: string
+          example: "喵喵科技"
+
+    WalletView:
+      type: object
+      required: [cash, gems]
+      properties:
+        cash:
+          type: integer
+          format: int64
+          minimum: 0
+          example: 18750
+        gems:
+          type: integer
+          format: int64
+          minimum: 0
+          example: 330
+
+    EntitlementView:
+      type: object
+      required: [kind, itemId, acquiredAt]
+      properties:
+        kind:
+          $ref: '#/components/schemas/EntitlementKind'
+        itemId:
+          type: string
+          example: "suit_gold"
+        acquiredAt:
+          type: string
+          format: date-time
+          example: "2026-10-30T02:11:00Z"
+
+    RegisterRequest:
+      type: object
+      required: [email, displayName, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: 登入識別，RFC 5322；伺服器 trim + lowercase；全域唯一
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 24
+          description: 公司/老闆名（DISPLAY_NAME_MIN/MAX）
+        password:
+          type: string
+          minLength: 6
+          description: 密碼，≥6 碼（PASSWORD_MIN）；scrypt 雜湊儲存
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, account, wallet]
+      properties:
+        token:
+          type: string
+          description: opaque session token（32B hex）
+          example: "3f8c1d2ae9b74c0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8"
+        account:
+          $ref: '#/components/schemas/AccountView'
+        wallet:
+          $ref: '#/components/schemas/WalletView'
+
+    MeResponse:
+      type: object
+      required: [account, wallet, entitlements]
+      properties:
+        account:
+          $ref: '#/components/schemas/AccountView'
+        wallet:
+          $ref: '#/components/schemas/WalletView'
+        entitlements:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntitlementView'
+
+    TopupRequest:
+      type: object
+      description: pack 與 currency+amount 二擇一
+      properties:
+        pack:
+          type: string
+          nullable: true
+          description: 儲值包 ID（g_small/g_mid/g_big/cap_1000）
+          example: "g_mid"
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amount:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 1
+          maximum: 10000000
+          description: 自訂金額 [1, 10_000_000]（TOPUP_AMOUNT_MIN/MAX）
+
+    TopupResponse:
+      type: object
+      required: [ok, currency, amount, balance, wallet]
+      properties:
+        ok:
+          type: boolean
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amount:
+          type: integer
+          format: int64
+        balance:
+          type: integer
+          format: int64
+        wallet:
+          $ref: '#/components/schemas/WalletView'
+
+    SpendRequest:
+      type: object
+      required: [currency, amount]
+      properties:
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amount:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 扣款金額 > 0（取整）
+        reason:
+          type: string
+          nullable: true
+          maxLength: 40
+          description: 花費事由，超過 40 字截斷（SPEND_REASON_MAXLEN）；預設 spend
+
+    SpendResponse:
+      type: object
+      required: [ok, currency, balance, wallet]
+      properties:
+        ok:
+          type: boolean
+        currency:
+          $ref: '#/components/schemas/Currency'
+        balance:
+          type: integer
+          format: int64
+        wallet:
+          $ref: '#/components/schemas/WalletView'
+
+    DepositPackView:
+      type: object
+      required: [packId, currency, amount, label]
+      properties:
+        packId:
+          type: string
+          example: "g_mid"
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amount:
+          type: integer
+          format: int64
+          example: 330
+        label:
+          type: string
+          example: "中寶石包（+10%）"
+        bonusPct:
+          type: integer
+          nullable: true
+          description: 加量比例（g_mid=10、g_big=16）；null = 無加贈
+          example: 10
+
+    DepositPackListResponse:
+      type: object
+      required: [packs]
+      properties:
+        packs:
+          type: array
+          items:
+            $ref: '#/components/schemas/DepositPackView'
+
+    CheckoutRequest:
+      type: object
+      required: [packId]
+      properties:
+        packId:
+          type: string
+          description: 儲值包 ID，須 ∈ GET /deposit/packs 目錄
+          example: "g_big"
+
+    CheckoutResponse:
+      type: object
+      required: [orderId, packId, currency, amount, status]
+      properties:
+        orderId:
+          type: string
+          description: 訂單 ID（= Idempotency-Key 或伺服器產生 UUID）
+          example: "7d793037-a076-4c05-9a70-b7e8b2e3c4f5"
+        packId:
+          type: string
+          example: "g_big"
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amount:
+          type: integer
+          format: int64
+          example: 700
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+
+    EntitlementListResponse:
+      type: object
+      required: [entitlements]
+      properties:
+        entitlements:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntitlementView'
+
+    BuyRequest:
+      type: object
+      required: [kind, itemId]
+      properties:
+        kind:
+          $ref: '#/components/schemas/EntitlementKind'
+        itemId:
+          type: string
+          minLength: 1
+          example: "suit_gold"
+        currency:
+          $ref: '#/components/schemas/Currency'
+        amount:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 0
+          description: 價格 ≥0（預設 0 = 免費授予）
+
+    BuyResponse:
+      type: object
+      required: [ok, wallet, entitlements]
+      properties:
+        ok:
+          type: boolean
+        wallet:
+          $ref: '#/components/schemas/WalletView'
+        entitlements:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntitlementView'
+
+    RecordRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: '#/components/schemas/RecordType'
+        payload:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: 記錄內容（任意結構，預設 {}）
+
+    BusinessRecordView:
+      type: object
+      required: [type, payload, createdAt]
+      properties:
+        type:
+          $ref: '#/components/schemas/RecordType'
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    RecordListResponse:
+      type: object
+      required: [records]
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessRecordView'
+
+    LeaderboardEntryView:
+      type: object
+      required: [runId, name, mode, score, updatedAt]
+      properties:
+        runId:
+          type: string
+          example: "run-7781"
+        name:
+          type: string
+          example: "喵喵科技"
+        mode:
+          type: string
+          example: "sandbox"
+        score:
+          type: integer
+          format: int64
+          example: 982300
+        grade:
+          type: string
+          nullable: true
+          description: 評級；null = 未評級
+          example: "S"
+        updatedAt:
+          type: string
+          format: date-time
+
+    LeaderboardResponse:
+      type: object
+      required: [leaderboard]
+      properties:
+        leaderboard:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardEntryView'
+
+    LeaderboardSubmitRequest:
+      type: object
+      required: [runId]
+      properties:
+        runId:
+          type: string
+          description: 場次 ID（upsert 鍵）；空字串回 400
+          example: "run-7781"
+        mode:
+          type: string
+          nullable: true
+          description: 排行模式，預設 sandbox
+        score:
+          type: integer
+          format: int64
+          nullable: true
+          description: 分數，取整，預設 0
+        grade:
+          type: string
+          nullable: true
+        detail:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: 明細，預設 {}
+
+    SaveView:
+      type: object
+      required: [data, updatedAt]
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+        updatedAt:
+          type: string
+          format: date-time
+
+    SaveResponse:
+      type: object
+      required: [save]
+      properties:
+        save:
+          oneOf:
+            - $ref: '#/components/schemas/SaveView'
+            - type: "null"
+          description: null = 該 slot 無存檔
+
+    SavePutRequest:
+      type: object
+      required: [data]
+      properties:
+        slot:
+          type: string
+          nullable: true
+          description: 存檔槽，預設 main
+        data:
+          type: object
+          additionalProperties: true
+          description: 存檔資料；null 回 400
+
+security:
+  - BearerAuth: []

@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="1040" viewBox="0 0 1180 1040" font-family="'Noto Sans TC','Microsoft JhengHei',sans-serif">
+  <defs>
+    <marker id="c" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#334155"/></marker>
+    <marker id="cp" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#7c3aed"/></marker>
+  </defs>
+  <style>
+    .t{fill:#0f2740} .mut{fill:#64748b} .mono{font-family:Consolas,'Courier New',monospace;font-size:10.5px}
+    .msg{font-size:11px;fill:#1e293b} .ret{font-size:10px;fill:#64748b}
+    .call{stroke:#334155;stroke-width:1.6} .call2{stroke:#7c3aed;stroke-width:1.8}
+    .back{stroke:#94a3b8;stroke-width:1.3;stroke-dasharray:5 3}
+    .ph{font-size:12px;font-weight:700}
+  </style>
+  <rect width="1180" height="1040" fill="#f8fafc"/>
+  <text x="26" y="32" font-size="20" class="t" font-weight="700">yoCat Office — 請求循序圖（一次會話的完整時序 · 含 vLLM 呼叫與引擎切換）</text>
+
+  <!-- lifeline headers -->
+  <g text-anchor="middle" font-size="12" font-weight="700">
+    <rect x="40" y="52" width="140" height="34" rx="6" fill="#ecfdf5" stroke="#10b981"/><text x="110" y="74" fill="#065f46">瀏覽器 client</text>
+    <rect x="250" y="52" width="130" height="34" rx="6" fill="#e0f2fe" stroke="#0284c7"/><text x="315" y="74" fill="#075985">gateway nginx</text>
+    <rect x="452" y="52" width="130" height="34" rx="6" fill="#eef2ff" stroke="#4f46e5"/><text x="517" y="74" fill="#3730a3">api (Java)</text>
+    <rect x="636" y="52" width="140" height="34" rx="6" fill="#fff7ed" stroke="#ea580c"/><text x="706" y="74" fill="#9a3412">character (Node)</text>
+    <rect x="830" y="52" width="120" height="34" rx="6" fill="#faf5ff" stroke="#7c3aed"/><text x="890" y="74" fill="#5b21b6">vLLM (host)</text>
+    <rect x="1004" y="52" width="130" height="34" rx="6" fill="#f1f5f9" stroke="#475569"/><text x="1069" y="74" fill="#334155">yocat-pg</text>
+  </g>
+  <!-- lifelines -->
+  <g stroke="#cbd5e1" stroke-width="1.3" stroke-dasharray="3 4">
+    <line x1="110" y1="86" x2="110" y2="1010"/><line x1="315" y1="86" x2="315" y2="1010"/>
+    <line x1="517" y1="86" x2="517" y2="1010"/><line x1="706" y1="86" x2="706" y2="1010"/>
+    <line x1="890" y1="86" x2="890" y2="1010"/><line x1="1069" y1="86" x2="1069" y2="1010"/>
+  </g>
+
+  <!-- Phase A -->
+  <rect x="24" y="98" width="1140" height="86" fill="#f0f9ff" opacity="0.6"/>
+  <text x="30" y="114" class="ph" fill="#0369a1">A · 載入遊戲（靜態）</text>
+  <line x1="110" y1="132" x2="315" y2="132" class="call" marker-end="url(#c)"/><text x="116" y="128" class="msg">GET /　（:30088）</text>
+  <line x1="315" y1="152" x2="110" y2="152" class="back" marker-end="url(#c)"/><text x="130" y="148" class="ret">200 /srv/index.html</text>
+  <line x1="110" y1="174" x2="315" y2="174" class="call" marker-end="url(#c)"/><text x="116" y="170" class="msg">GET /assets/webllm.js · /assets/sprites… <tspan class="ret">→ 200 靜態</tspan></text>
+
+  <!-- Phase B -->
+  <rect x="24" y="190" width="1140" height="150" fill="#f5f3ff" opacity="0.55"/>
+  <text x="30" y="206" class="ph" fill="#6d28d9">B · 引擎決策：GET /health 探 vLLM → 決定走後端 or 瀏覽器</text>
+  <rect x="40" y="214" width="300" height="20" rx="4" fill="#fff" stroke="#a78bfa"/><text x="48" y="228" class="mono" fill="#5b21b6">GEN.mode=auto → checkBackend() 打 /health</text>
+  <line x1="110" y1="252" x2="315" y2="252" class="call" marker-end="url(#c)"/><text x="116" y="248" class="msg">GET /health</text>
+  <line x1="315" y1="272" x2="706" y2="272" class="call" marker-end="url(#c)"/><text x="321" y="268" class="msg">proxy → yocat-character:3001/health</text>
+  <line x1="706" y1="292" x2="890" y2="292" class="call2" marker-end="url(#cp)"/><text x="712" y="288" class="msg" fill="#6d28d9">GET /v1/models（host.docker.internal:8000）</text>
+  <line x1="890" y1="312" x2="706" y2="312" class="back" marker-end="url(#c)"/><text x="726" y="308" class="ret">200（模型清單）</text>
+  <line x1="706" y1="332" x2="110" y2="332" class="back" marker-end="url(#c)"/><text x="130" y="328" class="ret">200 {ok:true, llm:"up"} → backendOK=true（走後端）；同時背景 WLLM.ensure() 開始下載</text>
+
+  <!-- Phase C -->
+  <rect x="24" y="346" width="1140" height="210" fill="#eef2ff" opacity="0.5"/>
+  <text x="30" y="362" class="ph" fill="#4338ca">C · 會員系統（→ Java api → yocat-pg）</text>
+  <line x1="110" y1="384" x2="315" y2="384" class="call" marker-end="url(#c)"/><text x="116" y="380" class="msg">POST /auth/register {email, password, displayName}</text>
+  <line x1="315" y1="404" x2="517" y2="404" class="call" marker-end="url(#c)"/><text x="321" y="400" class="msg">proxy → api:8080（路徑不改寫）</text>
+  <line x1="517" y1="424" x2="1069" y2="424" class="call" marker-end="url(#c)"/><text x="523" y="420" class="msg">INSERT member.accounts / wallet.wallets（scrypt 雜湊）</text>
+  <line x1="1069" y1="444" x2="517" y2="444" class="back" marker-end="url(#c)"/><text x="537" y="440" class="ret">rows</text>
+  <line x1="517" y1="464" x2="110" y2="464" class="back" marker-end="url(#c)"/><text x="130" y="460" class="ret">200 {token, account{id,display_name}, wallet{cash,gems}}</text>
+  <line x1="110" y1="492" x2="315" y2="492" class="call" marker-end="url(#c)"/><text x="116" y="488" class="msg">POST /wallet/topup {currency:"gems", amount:1000}　Authorization: Bearer</text>
+  <line x1="315" y1="512" x2="517" y2="512" class="call" marker-end="url(#c)"/><text x="321" y="508" class="msg">proxy → api（BearerTokenFilter + redis rate-limit）</text>
+  <line x1="517" y1="532" x2="110" y2="532" class="back" marker-end="url(#c)"/><text x="130" y="528" class="ret">200 {wallet.gems:1000}（假儲值）；/spend→餘額；超額→402</text>
+
+  <!-- Phase D -->
+  <rect x="24" y="562" width="1140" height="200" fill="#fff7ed" opacity="0.5"/>
+  <text x="30" y="578" class="ph" fill="#c2410c">D · NPC 生成（後端階段：useBrowserGen()=false，真打 server vLLM）</text>
+  <rect x="40" y="586" width="420" height="20" rx="4" fill="#fff" stroke="#fdba74"/><text x="48" y="600" class="mono" fill="#9a3412">觸發：發呆心聲 think() / 鄰座 converse() / 玩家對話 chat()</text>
+  <line x1="110" y1="624" x2="315" y2="624" class="call" marker-end="url(#c)"/><text x="116" y="620" class="msg">POST /character/chat {name,dept,persona,message,memory}</text>
+  <line x1="315" y1="644" x2="706" y2="644" class="call" marker-end="url(#c)"/><text x="321" y="640" class="msg">proxy → character:3001（read_timeout 60s）</text>
+  <line x1="706" y1="664" x2="890" y2="664" class="call2" marker-end="url(#cp)"/><text x="712" y="660" class="msg" fill="#6d28d9">POST /v1/chat/completions（組 system prompt + 訊息）</text>
+  <line x1="890" y1="684" x2="706" y2="684" class="back" marker-end="url(#c)"/><text x="726" y="680" class="ret">生成文字（choices[0].message.content）</text>
+  <rect x="636" y="694" width="150" height="18" rx="4" fill="#fff" stroke="#fdba74"/><text x="644" y="707" class="mono" fill="#9a3412">簡→繁 + 清洗/限長</text>
+  <line x1="706" y1="736" x2="110" y2="736" class="back" marker-end="url(#c)"/><text x="130" y="732" class="ret">200 {reply} → client 顯示 NPC 泡泡（約 24 筆/次會話皆 200）</text>
+
+  <!-- Phase E -->
+  <rect x="24" y="768" width="1140" height="180" fill="#ecfdf5" opacity="0.55"/>
+  <text x="30" y="784" class="ph" fill="#047857">E · 引擎切換（WebLLM 載好 + 實測成功 → 之後零 server 呼叫）</text>
+  <rect x="40" y="792" width="520" height="38" rx="4" fill="#fff" stroke="#34d399"/>
+  <text x="48" y="808" class="mono" fill="#065f46">背景：WLLM.ensure() 下載 100% → probe = await WLLM.think(測試)</text>
+  <text x="48" y="823" class="mono" fill="#065f46">probe 非空 ⇒ GEN.mode='browser'（conn：瀏覽器模型就緒，已切換）</text>
+  <path d="M110 848 h40 v18 h-40" fill="none" class="call"/><text x="156" y="860" class="msg">client 內部：useBrowserGen()=true</text>
+  <line x1="110" y1="890" x2="150" y2="890" stroke="#10b981" stroke-width="1.6"/>
+  <path d="M150 884 l12 6 l-12 6" fill="none" stroke="#10b981"/>
+  <text x="170" y="894" class="msg" fill="#047857">之後 think/chat/converse 由瀏覽器 WebLLM（WebGPU）生成</text>
+  <line x1="110" y1="916" x2="690" y2="916" stroke="#cbd5e1" stroke-width="1.4" stroke-dasharray="6 4"/>
+  <text x="120" y="912" class="ret">✗ 不再送 /character/*（截圖驗證：切換後 server 呼叫數停在 20）</text>
+  <text x="30" y="972" font-size="11" class="mut">備註：headless 無 WebGPU → 永遠停在 D 階段（乾淨證明 server 路徑）；真實瀏覽器約 35–40 秒完成 E 切換。</text>
+  <text x="30" y="992" font-size="11" class="mut">所有外部請求同源相對路徑 → 全部經 :30088 gateway；紫色箭頭＝character 跨出叢集打 host 上的 vLLM。</text>
+</svg>

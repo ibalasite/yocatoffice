@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/OkFlagResponse",
+  "title": "OkFlagResponse",
+  "description": "通用 {ok:true} 回應",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ResponseDTO>>"
+}

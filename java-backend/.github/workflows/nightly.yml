@@ -1,0 +1,251 @@
+# .github/workflows/nightly.yml — yocat-office-backend Nightly / Scheduled Pipeline (O-34)
+# Authoritative sources:
+#   - docs/CICD.md §2 (GitHub Actions workflow skeleton) + §4 (Shared Make Targets) + §1.3 (S7-S9 post-merge/scheduled)
+#   - docs/test-plan.md §3.3 (E2E/BDD), §3.4 (four perf scenarios: Smoke/Load/Stress/Soak), §10 (Load Targets), metrics table (每日/每週排程)
+#   - docs/PRD.md US-GCA-009 (perf baseline informs SCALE; perf does NOT block the pipeline)
+#   - docs/ARCH.md §CI (GitHub Actions: lint/test/build/deploy/k6) + HA topology (no prod scheduled downtime → off-peak run)
+# Design: CI == Local. Every test/scan/perf step invokes the SAME `make` target a developer runs locally
+#   (docs/CICD.md §4). All actions pinned to a concrete major version (no @latest / @main).
+# Scope: heavy, scheduled work that is too slow for the PR gate (ci.yml) — full regression + full E2E,
+#   full k6 perf (load nightly; soak + stress weekly), deep dependency/security scan, coverage trend.
+name: nightly
+
+on:
+  schedule:
+    # cron is UTC. Asia/Taipei = UTC+8 → 18:00 UTC == 02:00 Taipei (off-peak; ARCH HA topology forbids prod scheduled downtime).
+    - cron: "0 18 * * *"   # DAILY  02:00 Taipei — full regression + full E2E + load perf + security + coverage
+    - cron: "0 18 * * 0"   # WEEKLY Mon 02:00 Taipei — additionally runs the 2h soak + stress release-gate profile
+  workflow_dispatch:
+    inputs:
+      run_heavy:
+        description: "Also run the weekly heavy profile (2h soak + stress)"
+        type: boolean
+        default: false
+      perf_base_url:
+        description: "Perf/E2E target base URL (staging or dedicated perf env; NEVER production)"
+        type: string
+        default: ""
+
+# Least privilege: read source; notify job opens a tracking Issue on failure via the built-in GITHUB_TOKEN
+# (no fabricated secret). Slack is used only when the SLACK_WEBHOOK_URL secret is actually configured.
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  # Only one nightly run per ref; a newer scheduled/dispatch run supersedes a stale one.
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  JAVA_VERSION: "21"
+  # NOTE: the `secrets` context is NOT available in workflow-level env, so the perf target
+  # (workflow_dispatch input ?? PERF_BASE_URL secret, a staging/perf env — never production)
+  # is resolved in each perf job's own env below, and enforced by that job's "Guard" step.
+
+jobs:
+  # ── Full regression: unit + all integration layers + FULL E2E (all features, not only @smoke) + coverage trend ──
+  full-regression:
+    name: full-regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      # The Makefile defaults DOCKER_HOST to a Windows npipe (Rancher Desktop, local dev). On the Linux
+      # runner pin the standard docker socket so Testcontainers negotiates against the runner's Docker.
+      DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Unit tests + JaCoCo coverage (trend input)
+        run: make ci-test-unit          # Line>=80% / Branch>=70% gate from pom.xml (test-plan §2)
+      - name: "Integration tests (Testcontainers: real PostgreSQL 16 / Redis 7.2)"
+        run: make ci-test-integration    # Failsafe *IT (test-plan §3.2)
+      - name: Spring Modulith boundary verify — ApplicationModules.verify()
+        run: make ci-test-modulith       # HC-1~HC-5 no cycles, BC boundaries intact (EDD §4.3)
+      - name: Pact consumer-driven contracts
+        run: make ci-contract-test       # *PactTest (EDD §4.6.1)
+      - name: Schema isolation scan (cross-BC JOIN = 0, HC-1)
+        run: make ci-test-schema-isolation
+      - name: Full E2E / BDD acceptance suite (all features — nightly, not just @smoke)
+        run: make test-e2e              # RunBddContractIT over real HTTP + Testcontainers (test-plan §3.3)
+      - name: Upload coverage report (trend, 30-day retention)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-coverage-report
+          path: apps/api/target/site/jacoco/
+          retention-days: 30
+      - name: Upload integration / E2E reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-it-e2e-reports
+          path: apps/api/target/failsafe-reports/
+          retention-days: 30
+
+  # ── Deep security scan: OWASP dependency CVE + SpotBugs + Semgrep (heavier than the PR gate) ──
+  security-scan:
+    name: security-scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Dependency vulnerability scan (OWASP Dependency-Check)
+        run: make ci-dependency-scan
+      - name: SpotBugs SAST (0 High/Critical)
+        run: make ci-spotbugs
+      - name: Semgrep SAST (0 High/Critical)
+        run: make ci-semgrep
+      - name: Upload security reports (30-day retention)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-security-report
+          path: apps/api/target/dependency-check-report.*
+          retention-days: 30
+
+  # ── Load perf (nightly): 500 PCU / 30 min. NON-BLOCKING — perf never fails the pipeline (PRD US-GCA-009 / test-plan §3.4). ──
+  perf-load:
+    name: perf-load
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    continue-on-error: true   # perf is a baseline signal for SCALE, never a gate (PRD AC-4)
+    env:
+      BASE_URL: ${{ github.event.inputs.perf_base_url || secrets.PERF_BASE_URL }}
+      TOKEN: ${{ secrets.PERF_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Guard — perf must target staging/perf env, never production
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::warning::PERF_BASE_URL not configured — load test will self-skip (no fabricated target)."
+          fi
+          case "$BASE_URL" in
+            *prod*|*production*|*yocat-prod*) echo "::error::perf target '$BASE_URL' looks like production — aborting"; exit 1 ;;
+          esac
+      - name: Set up k6
+        if: ${{ env.BASE_URL != '' }}
+        uses: grafana/setup-k6-action@v1
+      - name: k6 load test — 500 PCU / 30 min
+        if: ${{ env.BASE_URL != '' }}
+        run: make ci-perf               # k6 tests/perf/load-test.js (test-plan §3.4 Scenario 2)
+      - name: Upload k6 load results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-k6-load-results
+          path: tests/perf/results/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ── Soak perf (weekly only): 2h @ ~375 PCU — mem-leak / pool / Outbox backlog. NON-BLOCKING. ──
+  perf-soak:
+    name: perf-soak
+    if: ${{ github.event.schedule == '0 18 * * 0' || (github.event_name == 'workflow_dispatch' && inputs.run_heavy) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    continue-on-error: true
+    env:
+      BASE_URL: ${{ github.event.inputs.perf_base_url || secrets.PERF_BASE_URL }}
+      TOKEN: ${{ secrets.PERF_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Guard — perf must target staging/perf env, never production
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::warning::PERF_BASE_URL not configured — soak test will self-skip."
+          fi
+          case "$BASE_URL" in
+            *prod*|*production*|*yocat-prod*) echo "::error::perf target '$BASE_URL' looks like production — aborting"; exit 1 ;;
+          esac
+      - name: Set up k6
+        if: ${{ env.BASE_URL != '' }}
+        uses: grafana/setup-k6-action@v1
+      - name: k6 soak test — 2h hold
+        if: ${{ env.BASE_URL != '' }}
+        run: make ci-soak               # k6 tests/perf/soak-test.js (test-plan §3.4 Scenario 4)
+      - name: Upload k6 soak results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-k6-soak-results
+          path: tests/perf/results/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ── Stress perf (weekly only): ramp to 150% peak (750 PCU) + recovery. NON-BLOCKING. ──
+  perf-stress:
+    name: perf-stress
+    if: ${{ github.event.schedule == '0 18 * * 0' || (github.event_name == 'workflow_dispatch' && inputs.run_heavy) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: true
+    env:
+      BASE_URL: ${{ github.event.inputs.perf_base_url || secrets.PERF_BASE_URL }}
+      TOKEN: ${{ secrets.PERF_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Guard — perf must target staging/perf env, never production
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "::warning::PERF_BASE_URL not configured — stress test will self-skip."
+          fi
+          case "$BASE_URL" in
+            *prod*|*production*|*yocat-prod*) echo "::error::perf target '$BASE_URL' looks like production — aborting"; exit 1 ;;
+          esac
+      - name: Set up k6
+        if: ${{ env.BASE_URL != '' }}
+        uses: grafana/setup-k6-action@v1
+      - name: k6 stress test — ramp to 150% peak
+        if: ${{ env.BASE_URL != '' }}
+        run: make ci-stress             # k6 tests/perf/stress-test.js (test-plan §3.4 Scenario 3)
+      - name: Upload k6 stress results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-k6-stress-results
+          path: tests/perf/results/
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ── Failure notification: only the BLOCKING jobs (regression/security) trigger it; perf is non-blocking by design. ──
+  notify:
+    name: notify
+    runs-on: ubuntu-24.04
+    needs: [full-regression, security-scan]
+    if: ${{ always() && (needs.full-regression.result == 'failure' || needs.security-scan.result == 'failure') }}
+    timeout-minutes: 10
+    steps:
+      - name: Slack notification (only if SLACK_WEBHOOK_URL is configured)
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        run: |
+          curl -sf -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"❌ Nightly pipeline failed on ${{ github.repository }} @ ${{ github.sha }} — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "${{ secrets.SLACK_WEBHOOK_URL }}"
+      - name: Open tracking issue (fallback — built-in GITHUB_TOKEN, no fabricated secret)
+        if: ${{ secrets.SLACK_WEBHOOK_URL == '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "Nightly pipeline failed ($(date -u +%Y-%m-%d))" \
+            --body "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            || echo "::warning::could not open tracking issue (issues may be disabled)"

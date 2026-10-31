@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/RecordType",
+  "title": "RecordType",
+  "description": "經營史記錄類型（record BC）",
+  "type": "string",
+  "enum": [
+    "bankruptcy",
+    "achievement",
+    "legacy"
+  ],
+  "x-source": "docs/SCHEMA.md §0 Shared ENUM / docs/CONSTANTS.md §9",
+  "x-stereotype": "<<Enum>>"
+}

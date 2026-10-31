@@ -1,0 +1,30 @@
+# === 機密：永不提交（真密碼/金鑰/token）===
+*.env
+.env
+.env.*
+secrets.env
+.secrets
+**/secrets.env
+scripts/*.local
+*.key
+*.pem
+*.pfx
+# …但保留範本（不含真值，供他人參照）
+!.env.example
+!*.example.env
+!**/secrets.example.env
+
+# === 工具產生的機器狀態（含絕對路徑、無人再用）===
+.gendoc-state*.json
+.gendoc-rules/
+.gencode-state.json
+.gencode-gate-logs/
+.gencode-rules/
+
+# === 相依與建置產物 ===
+node_modules/
+**/target/
+*.class
+dist/
+build/
+.DS_Store

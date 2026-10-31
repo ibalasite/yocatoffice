@@ -1,0 +1,7 @@
+# k8s/base/kustomization.yaml — shared base resources for non-local environments (dev/staging/prod).
+# The local overlay (k8s/overlays/local/) is self-contained per LOCAL_DEPLOY §4.5 and does not inherit
+# this base. Non-local overlays should reference ../../base and layer env-specific config/replicas/zoning.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - network-policy.yaml

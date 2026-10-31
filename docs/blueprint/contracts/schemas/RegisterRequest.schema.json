@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/RegisterRequest",
+  "title": "RegisterRequest",
+  "description": "POST /auth/register",
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "全域唯一；trim+lowercase"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 24
+    },
+    "password": {
+      "type": "string",
+      "minLength": 6
+    }
+  },
+  "required": [
+    "email",
+    "displayName",
+    "password"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<RequestDTO>>"
+}

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>機器可讀合約 — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">機器可讀合約</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">機器可讀合約</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link active" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#artifact-catalog">Artifact Catalog</a></li><li><a class="toc__link" href="#coverage-report">Coverage Report</a></li><li><a class="toc__link" href="#usage-guide">Usage Guide</a></li><li><a class="toc__link toc__link--h3" href="#openapi--swagger-ui">OpenAPI / Swagger UI</a></li><li><a class="toc__link toc__link--h3" href="#json-schema-validation">JSON Schema Validation</a></li><li><a class="toc__link toc__link--h3" href="#pact-contract-testing">Pact Contract Testing</a></li><li><a class="toc__link toc__link--h3" href="#deploy-local-first-rancher-desktop">Deploy (local-first, Rancher Desktop)</a></li><li><a class="toc__link toc__link--h3" href="#scaffold">Scaffold</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="machine-readable-contracts-index">Machine-Readable Contracts Index</h1>
+<p>Generated by <code>gendoc-gen-contracts</code> from the gendoc documentation pipeline.</p>
+<p>Source documents: <code>docs/API.md</code>（18 端點）、<code>docs/EDD.md</code>、<code>docs/SCHEMA.md</code>（40 表）、<code>docs/CONSTANTS.md</code>、<code>docs/ARCH.md</code></p>
+<p>Stack: Java 21 + Spring Boot 3.3 + Spring Modulith 1.3（7 BC Modular Monolith）+ PostgreSQL 16 + Kubernetes</p>
+<h2 id="artifact-catalog">Artifact Catalog</h2>
+<table>
+<tr><th>Artifact</th><th>Path</th><th>Purpose</th><th>Source</th></tr>
+<tr><td>OpenAPI 3.1 YAML</td><td>blueprint/contracts/openapi.yaml</td><td>API 合約（15 路徑 / 18 操作），可匯入 Postman / Swagger UI / code generator</td><td>API.md + EDD §3.4</td></tr>
+<tr><td>JSON Schema (34)</td><td>blueprint/contracts/schemas/</td><td>DTO 型別定義（draft-07），供 validator / IDE / code generator</td><td>API.md §3 DTO / EDD §3.4</td></tr>
+<tr><td>Pact Contracts (3)</td><td>blueprint/contracts/pact/</td><td>Consumer-driven 跨 BC 合約（entitlement/member/deposit → wallet）</td><td>EDD §3.4 / §4.6.1</td></tr>
+<tr><td>Helm Values</td><td>blueprint/infra/helm/values.yaml</td><td>K8s 部署（≥2 replicas、HPA 2–8、PDB、graceful shutdown）</td><td>EDD §3.5 / §3.6</td></tr>
+<tr><td>Network Policy</td><td>blueprint/infra/k8s/network-policy.yaml</td><td>default-deny + 明確允許（Ingress 8080 / Egress DB 5432、Redis 6379）</td><td>EDD §3.4 / §3.6</td></tr>
+<tr><td>Seed Code (70 .java)</td><td>blueprint/scaffold/</td><td>Spring Modulith 7 BC + Clean Architecture 4 層骨架 + 測試骨架</td><td>EDD §3.1b / §3.3 / §3.4</td></tr>
+</table>
+<h2 id="coverage-report">Coverage Report</h2>
+<ul><li><strong>OpenAPI</strong>：15 unique paths / <strong>18 operations</strong>（涵蓋 API.md 全部 18 端點：16 業務 + 2 健康檢查），8 個 BC tag；回應含 401 / 402 / 409 / 413 / 422 / 429 / 500。</li><li><strong>JSON Schema</strong>：34 個（4 enum + 8 view/VO + 10 request DTO + 12 response/error DTO）。</li><li><strong>Pact</strong>：3 對（entitlement→wallet 同步 debit + 402；member→wallet 事件 provision；deposit→wallet 事件 credit + 冪等）。</li><li><strong>IaC</strong>：Helm values（HA：replicaCount=2、HPA min=2/max=8/CPU 70%/冷卻 300s、PDB minAvailable=1、podAntiAffinity）+ default-deny NetworkPolicy。Local-first：<code>kubectl apply -k</code> / Rancher Desktop。</li><li><strong>Scaffold</strong>：7 BC 模組（member / wallet / deposit / entitlement / record / leaderboard / gamesave），每模組 <code>presentation / application / domain / infrastructure</code> 四層 + <code>@ApplicationModule</code> package-info；含 <code>Modulithic</code> 主程式與 <code>ModularityTests.verify()</code>。</li></ul>
+<h2 id="usage-guide">Usage Guide</h2>
+<h3 id="openapi--swagger-ui">OpenAPI / Swagger UI</h3>
+<pre><code class="language-bash">npx @redocly/cli lint docs/blueprint/contracts/openapi.yaml
+npx openapi-generator-cli generate -i docs/blueprint/contracts/openapi.yaml -g spring -o out/server</code></pre>
+<h3 id="json-schema-validation">JSON Schema Validation</h3>
+<pre><code class="language-bash">npx ajv validate -s docs/blueprint/contracts/schemas/SpendRequest.schema.json -d payload.json</code></pre>
+<h3 id="pact-contract-testing">Pact Contract Testing</h3>
+<pre><code class="language-bash">npx @pact-foundation/pact-cli verify --pact-urls docs/blueprint/contracts/pact/*.json \
+  --provider-base-url http://localhost:8080</code></pre>
+<h3 id="deploy-local-first-rancher-desktop">Deploy (local-first, Rancher Desktop)</h3>
+<pre><code class="language-bash">helm install yocat-office-backend ./docs/blueprint/infra/helm -f docs/blueprint/infra/helm/values.yaml
+kubectl apply -f docs/blueprint/infra/k8s/network-policy.yaml</code></pre>
+<h3 id="scaffold">Scaffold</h3>
+<pre><code class="language-bash">cp -r docs/blueprint/scaffold/* apps/api/   # 以此為實作起點
+cd apps/api &amp;&amp; ./gradlew test                # ModularityTests.verify() 驗模組邊界</code></pre>
+<hr>
+<p><em>Generated: 2026-10-30 · gendoc-gen-contracts</em></p></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

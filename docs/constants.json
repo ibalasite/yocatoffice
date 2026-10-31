@@ -1,0 +1,118 @@
+{
+  "version": "1.0",
+  "generated_from": ["docs/req/schema.sql", "docs/req/server-src/accounts.ts", "client/index.html"],
+  "last_updated": "2026-10-30",
+  "core": {
+    "SESSION_TTL_DAYS": 30,
+    "SCRYPT_KEYLEN": 64,
+    "SCRYPT_SALT_BYTES": 16,
+    "SESSION_TOKEN_BYTES": 32,
+    "WALLET_INIT_CASH": 0,
+    "WALLET_INIT_GEMS": 0,
+    "GAME_INIT_CASH": 20000,
+    "GAME_INIT_MORALE": 70,
+    "GAME_DAY_START_MIN": 540,
+    "GAME_DAY_SETTLE_MIN": 1080,
+    "MAX_WORKERS": 8,
+    "MIN_WORKERS": 1,
+    "INITIAL_ROSTER": 6,
+    "BANKRUPT_CASH": -15000,
+    "RESCUE_GEMS_COST": 20,
+    "INJECT_CASH": 20000
+  },
+  "thresholds": {
+    "DISPLAY_NAME_MIN": 1,
+    "DISPLAY_NAME_MAX": 24,
+    "PASSWORD_MIN": 6,
+    "TOPUP_AMOUNT_MIN": 1,
+    "TOPUP_AMOUNT_MAX": 10000000,
+    "REQUEST_BODY_MAX": 4000000,
+    "SPEND_REASON_MAXLEN": 40,
+    "LEADERBOARD_LIMIT_DEFAULT": 20,
+    "LEADERBOARD_LIMIT_MAX": 100,
+    "BANKRUPT_CASH": -15000,
+    "RESCUE_CASH_FLOOR": 8000
+  },
+  "multipliers": {
+    "GEM_PACK_MID_BONUS_PCT": 10,
+    "GEM_PACK_BIG_BONUS_PCT": 16
+  },
+  "slo": {
+    "availability_pct": 99.9,
+    "p50_latency_ms": 200,
+    "p99_latency_ms": 1000,
+    "p99_latency_ms_growth": 1500,
+    "error_rate_pct": 1,
+    "ha_rolling_error_rate_pct": 0.1,
+    "leaderboard_p99_ms": 300,
+    "write_tps_min": 200,
+    "wallet_inconsistency_max": 0,
+    "rto_min": 30,
+    "rpo_min": 5
+  },
+  "rtp": null,
+  "rate_limits": {
+    "POST /auth/login": {"limit": 10, "window": "1m/ip", "status": "recommended"},
+    "POST /auth/register": {"limit": 5, "window": "1m/ip", "status": "recommended"},
+    "POST /wallet/topup|spend": {"limit": 60, "window": "1m/account", "status": "recommended"},
+    "POST /entitlements/buy": {"limit": 30, "window": "1m/account", "status": "recommended"},
+    "GET /leaderboard": {"limit": 120, "window": "1m/ip", "status": "recommended"}
+  },
+  "business_rules": {
+    "init_ledger_delta": 0,
+    "free_grant_amount": 0,
+    "save_slot_default": "main",
+    "records_query_limit": 100
+  },
+  "capacity": {
+    "max_concurrent_users_launch": 500,
+    "max_concurrent_users_growth": 3000,
+    "dau_launch": 5000,
+    "dau_growth": 50000,
+    "write_tps_min": 200,
+    "hpa_base_pcu": 500,
+    "hpa_max_pcu": 3000,
+    "min_replicas": 2,
+    "log_retention_hot_days": 90,
+    "log_retention_cold_days": 365,
+    "log_retention_staging_days": 14,
+    "trace_retention_days": 7
+  },
+  "enums": {
+    "currency": ["cash", "gems"],
+    "wallet_ledger_reason": ["init", "topup", "rescue", "buy_cosmetic", "buy_dream", "buy_scenario"],
+    "entitlement_kind": ["cosmetic", "dream", "scenario"],
+    "record_type": ["bankruptcy", "achievement", "legacy"],
+    "leaderboard_mode_default": "sandbox",
+    "save_slot_default": "main"
+  },
+  "error_codes": {
+    "200": "成功",
+    "204": "無內容（CORS 預檢）",
+    "400": "請求格式/參數錯誤",
+    "401": "未授權",
+    "402": "餘額不足",
+    "404": "找不到",
+    "409": "衝突（已存在/已擁有）",
+    "500": "伺服器錯誤"
+  },
+  "deposit_packs": {
+    "GEM_PACK": {"g_small": 60, "g_mid": 330, "g_big": 700},
+    "CAP_PACK": {"cap_1000": 1000}
+  },
+  "modulith_bounded_contexts": ["member", "wallet", "deposit", "entitlement", "record", "leaderboard", "game-save"],
+  "config_keys": {
+    "SESSION_TTL_DAYS": 30,
+    "CONFIG_BACKEND_URL_default": "",
+    "CONFIG_USE_BACKEND": true,
+    "CORS_ALLOW_ORIGIN": "*",
+    "CORS_ALLOW_METHODS": "GET,POST,PUT,OPTIONS",
+    "tracing_sample_prod_pct": 10,
+    "tracing_sample_staging_pct": 100
+  },
+  "_notes": [
+    "本地算力遊戲常數（BANKRUPT_CASH / MAX_WORKERS / INJECT_CASH / RESCUE_GEMS_COST）屬客戶端模擬 BC，後端信任層僅經 wallet_ledger.reason='rescue' 感知結果，不持有遊戲數值本身。",
+    "wallet_ledger_reason 的 'hire_dream' 為業務語意別名；實作上夢想員工購買寫入為 'buy_dream'（buy_<kind>）。真實集合＝buy_<entitlement.kind> + topup + rescue + init。",
+    "rate_limits 為 PRD §7.4 建議值（原型未實作），待 EDD §9 定稿。"
+  ]
+}

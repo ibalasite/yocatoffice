@@ -1,0 +1,165 @@
+# .github/workflows/ci.yml — yocat-office-backend PR Gate (O-33)
+# Authoritative source: docs/CICD.md §2.1 (PR Gate Workflow) + §5 (PR Gate) + §4 (Shared Make Targets).
+# CI == Local: every step invokes the SAME `make ci-*` target a developer runs locally
+#   (docs/CICD.md §4 / Makefile header), so "local OK, CI broken" cannot happen.
+# Local dry-run of this exact file: `make ci-dry-run` (act) or Gitea Actions (act_runner), docs/CICD.md §3.
+# All actions are pinned to a concrete major version (YAML-01); no @latest / @main.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write   # cosign keyless (OIDC) image signing (docs/CICD.md §2.1 / §10.2)
+
+concurrency:
+  # One in-flight run per ref; a new push cancels the stale run (docs/CICD.md §2.1).
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: registry.sayyogames.internal/yocat-office-backend
+  IMAGE_NAME: api
+  JAVA_VERSION: "21"
+
+jobs:
+  # ── Stage S2: Lint + ArchUnit (Clean Architecture dependency rules) ──
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Lint (SpotBugs High/Critical = 0)
+        run: make ci-lint
+      - name: ArchUnit — Clean Architecture dependency rules
+        run: make ci-archunit   # Domain must not import org.springframework.* / java.sql.* (EDD §3.1b, @architecture)
+
+  # ── Stage S3: Unit Test + JaCoCo coverage gate ──
+  unit-test:
+    name: unit-test
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Unit Test + JaCoCo gate (Line >=80% / Branch >=70% / core txn 100%)
+        run: make ci-test-unit   # JaCoCo check goal fails the build below threshold (pom.xml jacoco.line.min=0.80 / branch.min=0.70; test-plan §2)
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: apps/api/target/site/jacoco/
+
+  # ── Stage S4: Integration Test (Testcontainers + Pact + Modulith verify) ──
+  integration-test:
+    name: integration-test
+    needs: unit-test
+    runs-on: ubuntu-24.04
+    env:
+      # The Makefile defaults DOCKER_HOST to a Windows npipe (Rancher Desktop, local dev).
+      # On the Linux runner, pin the standard docker socket so Testcontainers negotiates
+      # against the runner's preinstalled Docker (the Makefile uses ?= and keeps this value).
+      DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_RYUK_DISABLED: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: "Integration Test (Testcontainers: real PostgreSQL 16 / Redis 7.2)"
+        run: make ci-test-integration   # REST-assured + Testcontainers (test-plan §3.2)
+      - name: Spring Modulith boundary verify — ApplicationModules.verify()
+        run: make ci-test-modulith      # HC-1~HC-5: 0 cycles, BC boundaries intact (EDD §4.3, @modulith)
+      - name: Pact consumer-driven contracts (BC Public API, 100% pass)
+        run: make ci-contract-test       # *PactTest (EDD §4.6.1 / test-plan §3.2)
+      - name: Schema isolation scan (cross-BC JOIN = 0, HC-1)
+        run: make ci-test-schema-isolation
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: apps/api/target/failsafe-reports/
+
+  # ── Stage S5: Static Analysis (SpotBugs + Semgrep + dependency scan) ──
+  static-analysis:
+    name: static-analysis
+    needs: unit-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: SpotBugs SAST (0 High/Critical)
+        run: make ci-spotbugs
+      - name: Semgrep SAST (0 High/Critical)
+        run: make ci-semgrep   # quality gate: High/Critical = 0 (test-plan §2 / PRD §9.3)
+      - name: Dependency vulnerability scan (OWASP Dependency-Check, 0 CRITICAL)
+        run: make ci-dependency-scan
+
+  # ── Stage S6: Image Build + cosign sign + Trivy scan ──
+  image-build:
+    name: image-build
+    needs: [integration-test, static-analysis]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Compute image tag (git-sha8)
+        id: meta
+        run: echo "tag=$(git rev-parse --short=8 HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Set up Buildx (rootless, replaces DinD)
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.sayyogames.internal
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+      - name: Build & Push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api/Dockerfile   # multi-stage, same Dockerfile as LOCAL_DEPLOY §4.4
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign image (cosign keyless / OIDC)
+        run: make ci-image-sign IMAGE_TAG=${{ steps.meta.outputs.tag }}
+      - name: Trivy image scan (0 CRITICAL vulnerabilities, quality gate)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"           # fail on CRITICAL/HIGH (0 CRITICAL vulnerability gate)

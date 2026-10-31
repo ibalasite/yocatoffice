@@ -1,0 +1,70 @@
+# docker-compose.yml — AUXILIARY local runtime (LOCAL_DEPLOY §19).
+# The PRIMARY, authoritative local deployment is Kubernetes/Kustomize: `kubectl apply -k k8s/overlays/local/`
+# (infra_runtime=k8s-local, EDD §3.5/§13.1, LOCAL_DEPLOY §2/§4.5). This Compose file exists only for a
+# fast API check without k8s; all behaviour defers to the k8s manifests.
+#
+# Usage:
+#   cp .env.example .env            # then set DB_PASSWORD (or let the :- default stand for a throwaway run)
+#   docker compose build && docker compose up -d
+#   docker compose exec api java -jar /app/app.jar --spring.flyway.migrate-only=true
+#   curl -s http://localhost:8080/health/ready | jq .
+
+services:
+  # yocat-pg equivalent (k8s: external PostgreSQL in namespace `yocat`, NodePort 30432)
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: yocat
+      POSTGRES_DB: yocat
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me-local-only}
+    ports: ["30432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "yocat", "-d", "yocat"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # redis (k8s: in-namespace redis Deployment, NodePort 30379)
+  cache:
+    image: redis:7.2-alpine
+    ports: ["30379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # yocat-office-backend-api (k8s: Deployment, >=2 replicas minimum HA, EDD §3.7.2)
+  api:
+    image: yocat-office-backend/api:local
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    environment:
+      SERVER_PORT: "8080"
+      DB_HOST: db
+      DB_NAME: yocat
+      DB_USER: yocat
+      DB_PASSWORD: ${DB_PASSWORD:-change-me-local-only}
+      REDIS_HOST: cache
+      REDIS_PORT: "6379"
+      CACHE_ENV: local
+    ports: ["8080:8080"]
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health/live"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: 2        # local minimum HA, never 1 (aligns with k8s; use `docker compose up --scale api=2`)
+
+volumes:
+  pgdata:

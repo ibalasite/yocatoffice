@@ -1,0 +1,56 @@
+# k8s/overlays/local/flyway-migration-job.yaml — pre-deploy DB migration as a K8s Job (EDD §13.3:
+# "migration 於部署前以 initContainer/Job 執行"). Flyway runs the versioned V001..Vnnn SQL against the
+# existing yocat-pg (namespace yocat). The migration SQL is supplied via the `flyway-migrations` ConfigMap,
+# which `make db-migrate` creates imperatively from ./migrations (kubectl create configmap --from-file),
+# then applies this Job. History table = platform.schema_migrations (SCHEMA §8).
+#
+# Run order: db-up (yocat-pg) → k8s-apply (redis/api/ingress) → db-migrate (this Job) → db-seed.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: yocat-office-backend-flyway-migrate
+  labels:
+    app: yocat-office-backend-flyway
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: yocat-office-backend-flyway
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: flyway
+          image: flyway/flyway:10-alpine
+          args: ["migrate"]
+          env:
+            - name: FLYWAY_URL
+              value: jdbc:postgresql://yocat-pg.yocat.svc.cluster.local:5432/yocat
+            - name: FLYWAY_USER
+              value: yocat
+            - name: FLYWAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: yocat-office-backend-api-secret
+                  key: DB_PASSWORD
+            - name: FLYWAY_LOCATIONS
+              value: filesystem:/flyway/sql
+            - name: FLYWAY_SCHEMAS
+              value: platform
+            - name: FLYWAY_DEFAULT_SCHEMA
+              value: platform
+            - name: FLYWAY_TABLE
+              value: schema_migrations
+            - name: FLYWAY_CREATE_SCHEMAS
+              value: "true"
+            - name: FLYWAY_BASELINE_ON_MIGRATE
+              value: "true"
+          volumeMounts:
+            - name: migrations
+              mountPath: /flyway/sql
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: flyway-migrations

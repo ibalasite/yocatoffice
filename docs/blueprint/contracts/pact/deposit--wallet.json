@@ -1,0 +1,63 @@
+{
+  "consumer": { "name": "deposit-bc" },
+  "provider": { "name": "wallet-bc" },
+  "interactions": [
+    {
+      "description": "DepositConfirmed event credits wallet + writes topup ledger (Outbox async, orderId dedup)",
+      "providerState": "account 1024 has a wallet and order 7d793037 not yet credited",
+      "request": {
+        "method": "POST",
+        "path": "/internal/events/DepositConfirmed",
+        "headers": { "Content-Type": "application/json" },
+        "body": {
+          "eventId": "e-9001",
+          "accountId": "1024",
+          "orderId": "7d793037-a076-4c05-9a70-b7e8b2e3c4f5",
+          "currency": "gems",
+          "amount": 700
+        },
+        "matchingRules": {
+          "$.body.orderId": { "match": "regex", "regex": "[0-9a-fA-F-]{36}" },
+          "$.body.currency": { "match": "regex", "regex": "cash|gems" },
+          "$.body.amount": { "match": "integer" }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "ok": true, "currency": "gems", "balance": 1030, "wallet": { "cash": 18750, "gems": 1030 } },
+        "matchingRules": {
+          "$.body.balance": { "match": "integer" },
+          "$.body.wallet.gems": { "match": "integer" }
+        }
+      }
+    },
+    {
+      "description": "DepositConfirmed redelivery with same orderId credits only once (idempotent)",
+      "providerState": "order 7d793037 already credited to account 1024",
+      "request": {
+        "method": "POST",
+        "path": "/internal/events/DepositConfirmed",
+        "headers": { "Content-Type": "application/json" },
+        "body": {
+          "eventId": "e-9001",
+          "accountId": "1024",
+          "orderId": "7d793037-a076-4c05-9a70-b7e8b2e3c4f5",
+          "currency": "gems",
+          "amount": 700
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "ok": true, "currency": "gems", "balance": 1030, "wallet": { "cash": 18750, "gems": 1030 } }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "x-source": "docs/EDD.md §3.4 / §4.6.1 (deposit → wallet, Customer/Supplier Event) + docs/API.md POST /deposit/checkout",
+    "x-integration": "async domain event via JDBC Outbox, orderId dedup, up to 5 retries exponential backoff",
+    "x-generated-by": "gendoc-gen-contracts"
+  }
+}

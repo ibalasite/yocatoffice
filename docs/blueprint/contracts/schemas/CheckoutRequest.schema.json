@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/CheckoutRequest",
+  "title": "CheckoutRequest",
+  "description": "POST /deposit/checkout（+ header Idempotency-Key）",
+  "type": "object",
+  "properties": {
+    "packId": {
+      "type": "string",
+      "description": "須 ∈ GET /deposit/packs 目錄"
+    }
+  },
+  "required": [
+    "packId"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<RequestDTO>>"
+}

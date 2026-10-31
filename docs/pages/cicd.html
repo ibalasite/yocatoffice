@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cicd — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">Cicd</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">Cicd</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link active" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control">Document Control</a></li><li><a class="toc__link" href="#1-pipeline-architecture">§1 Pipeline Architecture</a></li><li><a class="toc__link toc__link--h3" href="#11-cicd-總架構圖github-actions--argocd-gitops">1.1 CI/CD 總架構圖（GitHub Actions + ArgoCD GitOps）</a></li><li><a class="toc__link toc__link--h3" href="#12-ci-runner--job-執行環境設計">1.2 CI Runner / Job 執行環境設計</a></li><li><a class="toc__link toc__link--h3" href="#13-pipeline-stage-總覽pr--merge--deploy">1.3 Pipeline Stage 總覽（PR → merge → deploy）</a></li><li><a class="toc__link" href="#2-ci-workflow-骨架github-actions--githubworkflowsciyml">§2 CI Workflow 骨架（GitHub Actions — .github/workflows/ci.yml）</a></li><li><a class="toc__link toc__link--h3" href="#21-pr-gate-workflow--githubworkflowsciyml">2.1 PR Gate Workflow — .github/workflows/ci.yml</a></li><li><a class="toc__link toc__link--h3" href="#22-deploy-workflow--githubworkflowsdeployymlmerge-main-後gitops-bump">2.2 Deploy Workflow — .github/workflows/deploy.yml（merge main 後，GitOps bump）</a></li><li><a class="toc__link" href="#3-local-pipeline-dry-runact--gitea-actions">§3 Local Pipeline Dry-Run（act / Gitea Actions）</a></li><li><a class="toc__link toc__link--h3" href="#31-為何需要-local-dry-runlocal-first">3.1 為何需要 Local Dry-Run（Local-First）</a></li><li><a class="toc__link toc__link--h3" href="#32-act-安裝本機跑-github-actions">3.2 act 安裝（本機跑 GitHub Actions）</a></li><li><a class="toc__link toc__link--h3" href="#33-local-dry-run-執行">3.3 Local Dry-Run 執行</a></li><li><a class="toc__link toc__link--h3" href="#34-mock-secrets-設定本機假值不含真實憑證">3.4 Mock Secrets 設定（本機假值，不含真實憑證）</a></li><li><a class="toc__link" href="#4-shared-make-targetsci--local-共用介面">§4 Shared Make Targets（CI ↔ Local 共用介面）</a></li><li><a class="toc__link toc__link--h3" href="#41-標準-make-target-清單ci-stage--make-target--local_deploy-6-對照">4.1 標準 Make Target 清單（CI stage ↔ Make target ↔ LOCAL_DEPLOY §6 對照）</a></li><li><a class="toc__link toc__link--h3" href="#42-makefile-實作範例cicd-區塊">4.2 Makefile 實作範例（CI/CD 區塊）</a></li><li><a class="toc__link" href="#5-pr-gate">§5 PR Gate</a></li><li><a class="toc__link toc__link--h3" href="#51-pr-gate-清單">5.1 PR Gate 清單</a></li><li><a class="toc__link toc__link--h3" href="#52-branch-protection-rulesgithub-required-status-checks">5.2 Branch Protection Rules（GitHub）— required-status-checks</a></li><li><a class="toc__link toc__link--h3" href="#53-開發者-pre-pr-checklist">5.3 開發者 Pre-PR Checklist</a></li><li><a class="toc__link" href="#6-self-hosted-runner-on-k3s--安裝與設定">§6 Self-Hosted Runner on k3s — 安裝與設定</a></li><li><a class="toc__link toc__link--h3" href="#61-安裝-actions-runner-controllerhelm">6.1 安裝 actions-runner-controller（Helm）</a></li><li><a class="toc__link toc__link--h3" href="#62-arc-valuesyaml--runnerdeployment-範例">6.2 arc-values.yaml / RunnerDeployment 範例</a></li><li><a class="toc__link toc__link--h3" href="#63-runner-service-account--rbac最小權限">6.3 Runner Service Account + RBAC（最小權限）</a></li><li><a class="toc__link toc__link--h3" href="#64-registry-credentials-secret">6.4 Registry Credentials Secret</a></li><li><a class="toc__link" href="#7-argocd-cd-integrationgitops">§7 ArgoCD CD Integration（GitOps）</a></li><li><a class="toc__link toc__link--h3" href="#71-argocd-安裝本地--staging--prod">7.1 ArgoCD 安裝（本地 / Staging / Prod）</a></li><li><a class="toc__link toc__link--h3" href="#72-argocd-application-定義每環境一個">7.2 ArgoCD Application 定義（每環境一個）</a></li><li><a class="toc__link toc__link--h3" href="#73-環境晉升dev--staging--prod">7.3 環境晉升（dev → staging → prod）</a></li><li><a class="toc__link toc__link--h3" href="#74-回滾rollback">7.4 回滾（Rollback）</a></li><li><a class="toc__link" href="#8-local-developer-platformgitea">§8 Local Developer Platform（Gitea）</a></li><li><a class="toc__link toc__link--h3" href="#81-架構圖">8.1 架構圖</a></li><li><a class="toc__link toc__link--h3" href="#82-gitea-安裝helm">8.2 Gitea 安裝（Helm）</a></li><li><a class="toc__link toc__link--h3" href="#83-gitea-valuesyaml-範例">8.3 gitea-values.yaml 範例</a></li><li><a class="toc__link toc__link--h3" href="#84-gitea-actions--webhook-設定">8.4 Gitea Actions / Webhook 設定</a></li><li><a class="toc__link toc__link--h3" href="#85-argocd-從-gitea-讀取本地環境專用">8.5 ArgoCD 從 Gitea 讀取（本地環境專用）</a></li><li><a class="toc__link" href="#9-makefile-dev-tools-targets">§9 Makefile dev-tools Targets</a></li><li><a class="toc__link" href="#10-security--secret-management-in-ci">§10 Security &amp;amp; Secret Management in CI</a></li><li><a class="toc__link toc__link--h3" href="#101-secret-location-表格對齊-local_deploy-35-三層策略">10.1 Secret Location 表格（對齊 LOCAL_DEPLOY §3.5 三層策略）</a></li><li><a class="toc__link toc__link--h3" href="#102-供應鏈安全supply-chain">10.2 供應鏈安全（Supply Chain）</a></li><li><a class="toc__link" href="#11-observability">§11 Observability</a></li><li><a class="toc__link toc__link--h3" href="#111-pipeline--應用-metricsprometheus">11.1 Pipeline / 應用 Metrics（Prometheus）</a></li><li><a class="toc__link toc__link--h3" href="#112-build--deploy-notification">11.2 Build / Deploy Notification</a></li><li><a class="toc__link" href="#appendixcicd-工具選型決策">Appendix：CI/CD 工具選型決策</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="cicd-pipeline-design-document--yocat-office-後端信任層yocat-office-backend">CI/CD Pipeline Design Document — yoCat Office 後端信任層（yocat-office-backend）</h1>
+<blockquote><p><strong>本文件描述</strong> yocat-office-backend 的持續整合（CI）與持續交付（CD）設計，包含工具選型、Pipeline 階段、GitHub Actions workflow 骨架、本地 Dry-Run 能力（<code>act</code> / Gitea Actions）、以及 Shared Make Targets 模式。</p></blockquote>
+<p>&gt;</p>
+<blockquote><p><strong>CI Tool</strong>: GitHub Actions（EDD §3.3）</p></blockquote>
+<blockquote><p><strong>CD Tool</strong>: ArgoCD 2.12（GitOps + Canary，EDD §3.3 / runbook §4.2）</p></blockquote>
+<blockquote><p><strong>Design Principle（Local-First）</strong>：CI 與本地使用<strong>相同的 Make targets 與相同的 workflow YAML</strong>——雲端走 GitHub Actions、本機 Rancher Desktop 以 Gitea Actions / <code>act</code> 跑同一份 <code>.github/workflows</code>，消除「本地 OK、CI 炸掉」問題（EDD §1.2 Local-First / PRD §5.5 AC-5）。</p></blockquote>
+<p>&gt;</p>
+<blockquote><p>⚠️ <strong>CI_TOOL 偵測結果</strong>：EDD §3.3 技術棧明定 <strong>CI 工具 = GitHub Actions、CD 工具 = ArgoCD</strong>；runbook §2 亦載明「ArgoCD GitOps + GitHub Actions」。本文件依 CICD.gen.md §0 的 CI_TOOL 分流，採 <strong>GitHub Actions 分支</strong>（§2 為 <code>.github/workflows/*.yml</code>、§3 為 <code>act</code> 本地 runner），非 Jenkins 預設骨架。</p></blockquote>
+<hr>
+<h2 id="document-control">Document Control</h2>
+<table>
+<tr><th>欄位</th><th>值</th></tr>
+<tr><td><strong>CI 工具</strong></td><td>GitHub Actions（EDD §3.3；self-hosted runner on k3s + GitHub-hosted <code>ubuntu-24.04</code>）</td></tr>
+<tr><td><strong>CD 工具</strong></td><td>ArgoCD 2.12（GitOps、Canary via GitOps，EDD §3.3 / §3.5）</td></tr>
+<tr><td><strong>K8s Cluster（CI 執行環境）</strong></td><td>Local: <code>rancher-desktop</code>（k3s，Gitea Actions / <code>act</code>） / Prod: <code>prod-cluster</code>（self-hosted runner、ArgoCD 同步）</td></tr>
+<tr><td><strong>Container Registry</strong></td><td><code>registry.sayyogames.internal/yocat-office-backend</code>（EDD §3.5）</td></tr>
+<tr><td><strong>Source Repository</strong></td><td><code>sayyogames/yocat-office-backend</code>（EDD Document Control）</td></tr>
+<tr><td><strong>Branch Strategy</strong></td><td>GitHub Flow（<code>main</code> 受保護，功能走 PR branch；release 以 tag <code>vX.Y.Z</code> 標記）</td></tr>
+<tr><td><strong>Image Tag 策略</strong></td><td><code>git-sha8</code>（CI 產出，EDD §3.5 / runbook §2）</td></tr>
+<tr><td><strong>Base Image</strong></td><td>build <code>maven:3.9-eclipse-temurin-21</code> → runtime <code>eclipse-temurin:21-jre-alpine</code>（EDD §3.5 / LOCAL_DEPLOY §4.4）</td></tr>
+<tr><td><strong>PR Gate Policy</strong></td><td>§5 所有 required-status-checks 通過 + 1 review approval 後方可合併至 <code>main</code></td></tr>
+<tr><td><strong>Author</strong></td><td>資深 DevOps Engineer（gendoc gen CICD）</td></tr>
+<tr><td><strong>Last Updated</strong></td><td>2026-10-30</td></tr>
+</table>
+<hr>
+<h2 id="1-pipeline-architecture">§1 Pipeline Architecture</h2>
+<h3 id="11-cicd-總架構圖github-actions--argocd-gitops">1.1 CI/CD 總架構圖（GitHub Actions + ArgoCD GitOps）</h3>
+<div class="diagram-container"><pre class="mermaid">graph TD
+    Dev[&quot;開發者&lt;br/&gt;git push / open PR&quot;] --&gt; GH[&quot;GitHub Repo&lt;br/&gt;sayyogames/yocat-office-backend&quot;]
+    GH --&gt;|&quot;on: pull_request / push&quot;| CI[&quot;GitHub Actions&lt;br/&gt;ci.yml（PR Gate）&quot;]
+
+    subgraph CIFlow[&quot;CI Flow（ci.yml）&quot;]
+        CI --&gt; J1[&quot;lint + ArchUnit&quot;]
+        J1 --&gt; J2[&quot;unit-test（JaCoCo ≥80%）&quot;]
+        J2 --&gt; J3[&quot;integration-test&lt;br/&gt;Testcontainers + Pact + Modulith verify&quot;]
+        J3 --&gt; J4[&quot;static-analysis&lt;br/&gt;SpotBugs + Semgrep + 依賴掃描&quot;]
+        J4 --&gt; J5[&quot;image-build&lt;br/&gt;Buildx/Kaniko + cosign 簽章&quot;]
+    end
+
+    J5 --&gt;|&quot;push image:git-sha8&lt;br/&gt;（簽章後）&quot;| Reg[&quot;Container Registry&lt;br/&gt;registry.sayyogames.internal&quot;]
+    J5 --&gt;|&quot;on: push main → deploy.yml&lt;br/&gt;bump k8s/overlays/* imageTag&quot;| GitOps[&quot;Git（k8s overlays / helm values）&quot;]
+
+    subgraph CDFlow[&quot;CD Flow（ArgoCD GitOps）&quot;]
+        GitOps --&gt; Argo[&quot;ArgoCD 2.12&lt;br/&gt;watch k8s/overlays/*&quot;]
+        Argo --&gt;|&quot;auto sync&quot;| DevEnv[&quot;dev（yocat-dev）&quot;]
+        Argo --&gt;|&quot;Blue-Green&quot;| StgEnv[&quot;staging（yocat-staging）&quot;]
+        Argo --&gt;|&quot;Canary&quot;| ProdEnv[&quot;prod（yocat-prod）&lt;br/&gt;≥2 replicas + HPA 2-8 + PDB&quot;]
+    end
+
+    subgraph Local[&quot;Local-First（Rancher Desktop k3s）&quot;]
+        LDev[&quot;開發者（本機）&quot;] --&gt;|&quot;git push&quot;| Gitea[&quot;Gitea（dev-tools ns）&quot;]
+        Gitea --&gt;|&quot;Gitea Actions（act_runner）&lt;br/&gt;跑同一份 .github/workflows&quot;| LCI[&quot;本機 CI&quot;]
+        LDev -.-&gt;|&quot;ad-hoc: make ci-dry-run（act）&quot;| LCI
+    end</pre></div>
+<h3 id="12-ci-runner--job-執行環境設計">1.2 CI Runner / Job 執行環境設計</h3>
+<p>CI 以兩種 runner 執行，兩者跑<strong>完全相同</strong>的 workflow YAML（Local-First 核心）：</p>
+<table>
+<tr><th>屬性</th><th>GitHub-hosted（雲端 PR Gate）</th><th>Self-Hosted on k3s（部署 / 本機）</th></tr>
+<tr><td><strong>Runner</strong></td><td><code>ubuntu-24.04</code>（GitHub 託管）</td><td>actions-runner-controller（ARC）/ Gitea <code>act_runner</code></td></tr>
+<tr><td><strong>Namespace</strong></td><td>N/A（GitHub SaaS）</td><td><code>yocat-office-backend-ci</code></td></tr>
+<tr><td><strong>Service Account</strong></td><td>N/A</td><td><code>yocat-ci-runner</code></td></tr>
+<tr><td><strong>Build 容器 Image</strong></td><td><code>maven:3.9-eclipse-temurin-21</code>（EDD §3.3 build tool = Maven + Java 21）</td><td><code>maven:3.9-eclipse-temurin-21</code></td></tr>
+<tr><td><strong>Image Build</strong></td><td><code>docker/build-push-action</code>（buildx，非 privileged DinD）</td><td><strong>Kaniko</strong>（<code>gcr.io/kaniko-project/executor</code>，k3s 無 privileged）</td></tr>
+<tr><td><strong>CPU Request / Limit</strong></td><td>GitHub 託管規格</td><td><code>500m</code> / <code>2</code></td></tr>
+<tr><td><strong>Memory Request / Limit</strong></td><td>GitHub 託管規格</td><td><code>1Gi</code> / <code>4Gi</code></td></tr>
+<tr><td><strong>Testcontainers</strong></td><td>透過 runner 內 Docker</td><td>DinD-free：Testcontainers 以 <code>TESTCONTAINERS_RYUK_DISABLED</code> + rootless buildkit / 既有 k3s containerd</td></tr>
+</table>
+<blockquote><p><strong>禁止 DinD</strong>：self-hosted（k3s）影像建置一律用 <strong>Kaniko</strong>（免 privileged container），對齊 Rancher Desktop k3s 預設禁用 privileged 的限制（EDD §3.5）。GitHub-hosted runner 使用官方 <code>docker/build-push-action</code>（buildx），非特權 DinD。</p></blockquote>
+<h3 id="13-pipeline-stage-總覽pr--merge--deploy">1.3 Pipeline Stage 總覽（PR → merge → deploy）</h3>
+<div class="diagram-container"><pre class="mermaid">graph TD
+    S1[&quot;Checkout&quot;] --&gt; S2[&quot;Lint + ArchUnit&lt;br/&gt;（Clean Arch 依賴規則）&quot;]
+    S2 --&gt; S3[&quot;Unit Test&lt;br/&gt;JaCoCo ≥80%&quot;]
+    S3 --&gt; S4[&quot;Integration Test&lt;br/&gt;Testcontainers + Pact&lt;br/&gt;+ Modulith verify()&quot;]
+    S4 --&gt; S5[&quot;Static Analysis&lt;br/&gt;SpotBugs + Semgrep + 依賴掃描&quot;]
+    S5 --&gt; S6[&quot;Image Build + Sign&lt;br/&gt;Kaniko/Buildx + cosign&quot;]
+    S6 --&gt;|&quot;merge main&quot;| S7[&quot;Deploy dev → staging → prod&lt;br/&gt;（ArgoCD GitOps）&quot;]
+    S7 --&gt; S8[&quot;HA Verify（≥2 replicas）&lt;br/&gt;+ Smoke + k6&quot;]
+    S8 --&gt;|&quot;FAIL&quot;| S9[&quot;Rollback&lt;br/&gt;（git revert → ArgoCD sync）&quot;]</pre></div>
+<ul><li>6 個 CI stage（S1-S6）為 <strong>PR Gate</strong>（§5）；S7-S9 於 merge <code>main</code> 後由 <code>deploy.yml</code> + ArgoCD 執行。</li><li>Fail-Fast（test-plan §2.2）：任一 stage 失敗立即中止，不進入下一階段。</li></ul>
+<hr>
+<h2 id="2-ci-workflow-骨架github-actions--githubworkflowsciyml">§2 CI Workflow 骨架（GitHub Actions — <code>.github/workflows/ci.yml</code>）</h2>
+<blockquote><p>CI_TOOL = GitHub Actions：本節取代 Jenkins 預設骨架。所有 action 均鎖定<strong>具體版本號</strong>（YAML-01），不得使用 <code>@latest</code> / <code>@main</code>。每個 job 均含完整可執行 <code>steps</code>。</p></blockquote>
+<h3 id="21-pr-gate-workflow--githubworkflowsciyml">2.1 PR Gate Workflow — <code>.github/workflows/ci.yml</code></h3>
+<pre><code class="language-yaml"># .github/workflows/ci.yml — yocat-office-backend PR Gate
+# CI ↔ Local 共用：本機以 Gitea Actions（act_runner）或 `make ci-dry-run`（act）跑同一份檔案
+name: ci
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write   # cosign keyless（OIDC）簽章需要
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: registry.sayyogames.internal/yocat-office-backend
+  IMAGE_NAME: api
+  JAVA_VERSION: &quot;21&quot;
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: &quot;21&quot;
+          cache: maven
+      - name: Spotless / Checkstyle
+        run: make ci-lint
+      - name: ArchUnit（Clean Architecture 依賴規則）
+        run: make ci-archunit   # Domain 不得 import org.springframework.* / java.sql.*（EDD §3.1b）
+
+  unit-test:
+    name: unit-test
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: &quot;21&quot;
+          cache: maven
+      - name: Unit Test + JaCoCo 覆蓋率閘（Line ≥80% / Branch ≥70% / 核心交易 100%）
+        run: make ci-test-unit   # JaCoCo check goal 低於門檻即 fail（test-plan §3.1）
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: apps/api/target/site/jacoco/
+
+  integration-test:
+    name: integration-test
+    needs: unit-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: &quot;21&quot;
+          cache: maven
+      - name: Integration Test（Testcontainers：真實 PostgreSQL 16 / Redis 7.2）
+        run: make ci-test-integration   # REST-assured + Testcontainers（test-plan §3.2）
+      - name: Spring Modulith 邊界驗證 — ApplicationModules.verify()
+        run: make ci-test-modulith      # HC-1~HC-5：0 循環依賴、BC 邊界完整（EDD §4.3）
+      - name: Pact Consumer-Driven Contract（BC 間 Public API 合約，100% 通過）
+        run: make ci-contract-test       # WalletService.debit() 等合約（test-plan §3.2）
+      - name: Schema 隔離掃描（跨 BC JOIN = 0，HC-1）
+        run: make ci-test-schema-isolation
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: apps/api/target/failsafe-reports/
+
+  static-analysis:
+    name: static-analysis
+    needs: unit-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: &quot;21&quot;
+          cache: maven
+      - name: SpotBugs + FindSecBugs（SAST，0 High/Critical）
+        run: make ci-spotbugs
+      - name: Semgrep（SAST 規則集，0 High/Critical）
+        run: make ci-semgrep   # 品質閘：High/Critical = 0（test-plan §2 / PRD §9.3）
+      - name: 依賴漏洞掃描（OWASP Dependency-Check / Trivy fs，0 CRITICAL）
+        run: make ci-dependency-scan
+
+  image-build:
+    name: image-build
+    needs: [integration-test, static-analysis]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Compute image tag（git-sha8）
+        id: meta
+        run: echo &quot;tag=$(git rev-parse --short=8 HEAD)&quot; &gt;&gt; &quot;$GITHUB_OUTPUT&quot;
+      - name: Set up Buildx（非特權，取代 DinD）
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.sayyogames.internal
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
+      - name: Build &amp; Push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api/Dockerfile   # multi-stage，對齊 LOCAL_DEPLOY §4.4（同一份 Dockerfile）
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign image（cosign keyless / OIDC）
+        run: make ci-image-sign IMAGE_TAG=${{ steps.meta.outputs.tag }}
+      - name: Trivy image scan（0 CRITICAL 漏洞，品質閘）
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.tag }}
+          severity: CRITICAL,HIGH
+          exit-code: &quot;1&quot;           # 發現 CRITICAL/HIGH 即 fail（0 CRITICAL 漏洞閘）</code></pre>
+<h3 id="22-deploy-workflow--githubworkflowsdeployymlmerge-main-後gitops-bump">2.2 Deploy Workflow — <code>.github/workflows/deploy.yml</code>（merge main 後，GitOps bump）</h3>
+<pre><code class="language-yaml"># .github/workflows/deploy.yml — 環境晉升 dev → staging → prod（GitOps，ArgoCD 同步）
+name: deploy
+on:
+  push:
+    branches: [main]
+    paths-ignore: [&quot;docs/**&quot;, &quot;**/*.md&quot;]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: &quot;部署目標環境&quot;
+        required: true
+        default: dev
+        type: choice
+        options: [dev, staging, prod]
+
+permissions:
+  contents: write   # bump overlays imageTag（git commit）需要
+
+env:
+  REGISTRY: registry.sayyogames.internal/yocat-office-backend
+
+jobs:
+  bump-image-tag:
+    name: bump-image-tag
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Compute image tag
+        id: meta
+        run: echo &quot;tag=$(git rev-parse --short=8 HEAD)&quot; &gt;&gt; &quot;$GITHUB_OUTPUT&quot;
+      - name: Bump imageTag in overlays（dev → staging → prod 依序 PR/commit）
+        run: |
+          make cd-bump-image ENV=dev     IMAGE_TAG=${{ steps.meta.outputs.tag }}
+          make cd-bump-image ENV=staging IMAGE_TAG=${{ steps.meta.outputs.tag }}
+          make cd-bump-image ENV=prod    IMAGE_TAG=${{ steps.meta.outputs.tag }}
+      - name: Commit &amp; push（ArgoCD watch 後自動同步）
+        run: |
+          git config user.name &quot;ci-bot&quot;
+          git config user.email &quot;ci-bot@sayyogames.com&quot;
+          git commit -am &quot;ci(cd): bump image to ${{ steps.meta.outputs.tag }}&quot; || echo &quot;no change&quot;
+          git push
+
+  verify-rollout:
+    name: verify-rollout
+    needs: bump-image-tag
+    runs-on: [self-hosted, k3s]   # self-hosted runner 具 kubectl 權限
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Wait ArgoCD sync + HA ready（≥2 replicas）
+        run: make cd-verify-ha ENV=${{ github.event.inputs.target_env || &#x27;dev&#x27; }}
+      - name: Smoke test
+        run: make ci-smoke ENV=${{ github.event.inputs.target_env || &#x27;dev&#x27; }}
+      - name: k6 部署後壓測（P99 ≤ 1000ms @ 500 PCU）
+        run: make ci-perf ENV=${{ github.event.inputs.target_env || &#x27;dev&#x27; }}</code></pre>
+<blockquote><p><strong>gendoc 原則落實</strong>：<code>ci.yml</code> 的 <code>integration-test</code> job 強制執行 <code>ApplicationModules.verify()</code>（Spring Modulith 邊界）與 ArchUnit（Clean Architecture 依賴規則）；<code>deploy.yml</code> 的 <code>verify-rollout</code> 強制驗證 <strong>≥2 replicas</strong>（HA）。</p></blockquote>
+<hr>
+<h2 id="3-local-pipeline-dry-runact--gitea-actions">§3 Local Pipeline Dry-Run（<code>act</code> / Gitea Actions）</h2>
+<h3 id="31-為何需要-local-dry-runlocal-first">3.1 為何需要 Local Dry-Run（Local-First）</h3>
+<p>開發者在開 PR 前應能於本機 Rancher Desktop 模擬完整 CI，避免「本地 OK、CI 炸掉」（EDD §1.2）：</p>
+<table>
+<tr><th>問題類型</th><th>發生率</th><th>Local Dry-Run 可提前發現？</th></tr>
+<tr><td>Makefile target 語法 / 名稱錯誤</td><td>高</td><td>✅ 是</td></tr>
+<tr><td>workflow YAML 語法錯誤</td><td>中</td><td>✅ 是（<code>act</code> 解析同一份 <code>.github/workflows</code>）</td></tr>
+<tr><td>JaCoCo 覆蓋率未達 80%</td><td>高</td><td>✅ 是（<code>make ci-test-unit</code> 本機即跑 JaCoCo gate）</td></tr>
+<tr><td>Testcontainers 整合測試失敗</td><td>中</td><td>✅ 是（本機 Docker/containerd 起真實 PostgreSQL/Redis）</td></tr>
+<tr><td>Modulith / ArchUnit 邊界違規</td><td>中</td><td>✅ 是（<code>make ci-test-modulith</code> / <code>make ci-archunit</code>）</td></tr>
+<tr><td>自架 runner image 不相容</td><td>低</td><td>部分（需相同 build image）</td></tr>
+</table>
+<h3 id="32-act-安裝本機跑-github-actions">3.2 <code>act</code> 安裝（本機跑 GitHub Actions）</h3>
+<pre><code class="language-bash"># 方式 A：choco（Windows）
+choco install act-cli
+
+# 方式 B：下載 release（鎖定版本，與 CI runner 對齊）
+ACT_VERSION=&quot;0.2.69&quot;
+curl -L &quot;https://github.com/nektos/act/releases/download/v${ACT_VERSION}/act_Windows_x86_64.zip&quot; -o /tmp/act.zip
+unzip /tmp/act.zip -d /c/tools/act</code></pre>
+<h3 id="33-local-dry-run-執行">3.3 Local Dry-Run 執行</h3>
+<pre><code class="language-bash"># 方式 A：act 跑 PR Gate（與 CI 完全相同的 .github/workflows/ci.yml）
+act pull_request \
+  -W .github/workflows/ci.yml \
+  --container-architecture linux/amd64 \
+  -P ubuntu-24.04=catthehacker/ubuntu:act-24.04 \
+  --secret-file ci/mock-secrets/env
+
+# 方式 B：Gitea Actions（act_runner）— 本機 push 到 Gitea 自動觸發（見 §8）
+#   Gitea Actions 與 GitHub Actions 語法相容，直接複用 .github/workflows
+
+# 方式 C（推薦日常）：透過 make target
+make ci-dry-run</code></pre>
+<h3 id="34-mock-secrets-設定本機假值不含真實憑證">3.4 Mock Secrets 設定（本機假值，不含真實憑證）</h3>
+<pre><code class="language-bash">mkdir -p ci/mock-secrets
+
+cat &gt; ci/mock-secrets/env &lt;&lt; &#x27;EOF&#x27;
+REGISTRY_USERNAME=ci-mock-user
+REGISTRY_TOKEN=ci-mock-token-not-real
+DB_PASSWORD=ci-mock-password-not-real
+SESSION_SIGNING_KEY=ci-mock-session-signing-key-not-real-64chars
+ENCRYPTION_KEY=ci-mock-encryption-key-not-real-32chars
+EOF
+
+# 真實憑證請用 .real 後綴並由 .gitignore 保護
+echo &quot;ci/mock-secrets/*.real&quot; &gt;&gt; .gitignore</code></pre>
+<blockquote><p><strong>說明</strong>：<code>ci/mock-secrets/env</code> 存放本機 dry-run 用的假值（可進版控供他人參考）；真實憑證一律 <code>.real</code> 後綴且被 <code>.gitignore</code> 保護，不進 git 歷史。Mock 清單涵蓋 §2 workflow 所有 <code>secrets.*</code> 引用（<code>REGISTRY_USERNAME</code> / <code>REGISTRY_TOKEN</code>）與應用 Secret（對齊 LOCAL_DEPLOY §3.5）。</p></blockquote>
+<hr>
+<h2 id="4-shared-make-targetsci--local-共用介面">§4 Shared Make Targets（CI ↔ Local 共用介面）</h2>
+<blockquote><p><strong>設計原則</strong>：GitHub Actions / Gitea Actions / 開發者本機使用<strong>相同的 Make targets</strong>。§2 workflow 的每個 step 均呼叫 <code>make</code>，確保雲端 CI 與本機行為一致（消除 CI-as-snowflake）。</p></blockquote>
+<h3 id="41-標準-make-target-清單ci-stage--make-target--local_deploy-6-對照">4.1 標準 Make Target 清單（CI stage ↔ Make target ↔ LOCAL_DEPLOY §6 對照）</h3>
+<table>
+<tr><th>CI Stage（§2 job）</th><th>Make Target</th><th>底層</th><th>對齊 LOCAL_DEPLOY §6</th></tr>
+<tr><td>lint</td><td><code>make ci-lint</code></td><td><code>make lint</code>（<code>./mvnw spotless:check</code>）</td><td>✅ 既有（§6 <code>lint</code>）</td></tr>
+<tr><td>lint</td><td><code>make ci-archunit</code></td><td><code>./mvnw -pl apps/api test -Dtest=ArchUnitRulesTest</code></td><td>⚠️ 新增，需同步加入 LOCAL_DEPLOY §6</td></tr>
+<tr><td>unit-test</td><td><code>make ci-test-unit</code></td><td><code>make test-unit</code> + JaCoCo check（<code>./mvnw -pl apps/api test jacoco:check</code>）</td><td>✅ 既有（§6 <code>test-unit</code>，追加 JaCoCo gate）</td></tr>
+<tr><td>integration-test</td><td><code>make ci-test-integration</code></td><td><code>make test-integration</code>（<code>./mvnw verify -Pintegration</code>，Testcontainers）</td><td>✅ 既有（§6 <code>test-integration</code>）</td></tr>
+<tr><td>integration-test</td><td><code>make ci-test-modulith</code></td><td><code>make test-modulith</code>（<code>./mvnw test -Dtest=ModularityTests</code>）</td><td>✅ 既有（§6 <code>test-modulith</code>）</td></tr>
+<tr><td>integration-test</td><td><code>make ci-contract-test</code></td><td><code>./mvnw -pl apps/api test -Dpact</code></td><td>⚠️ 新增，需同步加入 LOCAL_DEPLOY §6</td></tr>
+<tr><td>integration-test</td><td><code>make ci-test-schema-isolation</code></td><td><code>make test-schema-isolation</code></td><td>✅ 既有（§6 <code>test-schema-isolation</code>）</td></tr>
+<tr><td>static-analysis</td><td><code>make ci-spotbugs</code> / <code>ci-semgrep</code> / <code>ci-dependency-scan</code></td><td>SpotBugs / Semgrep / Trivy fs</td><td>⚠️ 新增，需同步加入 LOCAL_DEPLOY §6</td></tr>
+<tr><td>image-build</td><td><code>make image-build-api</code></td><td><code>nerdctl --namespace k8s.io build ...</code>（本機）/ buildx（CI）</td><td>✅ 既有（§6 <code>image-build-api</code>）</td></tr>
+<tr><td>image-build</td><td><code>make ci-image-sign</code></td><td><code>cosign sign ...</code></td><td>⚠️ 新增，需同步加入 LOCAL_DEPLOY §6</td></tr>
+<tr><td>verify-rollout</td><td><code>make cd-verify-ha</code></td><td><code>kubectl rollout status</code> + <code>grep -c Running ≥ 2</code></td><td>⚠️ 新增（HA 驗證），需同步加入 LOCAL_DEPLOY §6</td></tr>
+<tr><td>verify-rollout</td><td><code>make ci-smoke</code></td><td><code>make health-check</code> 包裝</td><td>✅ 既有（§6 <code>health-check</code>）</td></tr>
+<tr><td>verify-rollout</td><td><code>make ci-perf</code></td><td><code>k6 run tests/performance/load-test.js</code></td><td>⚠️ 新增，需同步加入 LOCAL_DEPLOY §6</td></tr>
+<tr><td>rollback</td><td><code>make ci-rollback</code></td><td><code>kubectl rollout undo</code> + git revert</td><td>⚠️ 新增，需同步加入 LOCAL_DEPLOY §6</td></tr>
+<tr><td>dry-run</td><td><code>make ci-dry-run</code></td><td><code>act pull_request -W .github/workflows/ci.yml</code></td><td>⚠️ 新增，需同步加入 LOCAL_DEPLOY §6</td></tr>
+</table>
+<blockquote><p><strong>對齊備註（R-03）</strong>：以 LOCAL_DEPLOY §6 既有 target（<code>lint</code> / <code>test-unit</code> / <code>test-integration</code> / <code>test-modulith</code> / <code>test-schema-isolation</code> / <code>image-build-api</code> / <code>health-check</code>）為準，CI 以 <code>ci-*</code> wrapper 包裝呼叫；標記 ⚠️ 的新增 target（含 CI 專屬 SAST / 簽章 / HA 驗證 / rollback / dry-run）<strong>需同步加入 LOCAL_DEPLOY.md §6</strong>。</p></blockquote>
+<h3 id="42-makefile-實作範例cicd-區塊">4.2 Makefile 實作範例（CI/CD 區塊）</h3>
+<pre><code class="language-makefile"># ── CI/CD Make targets — yocat-office-backend ──────────────────
+# 所有 ci-* / cd-* targets 於 GitHub Actions、Gitea Actions、本機均可執行
+IMAGE_TAG     ?= $(shell git rev-parse --short=8 HEAD)
+REGISTRY      ?= registry.sayyogames.internal/yocat-office-backend
+PROJECT_SLUG  ?= yocat-office-backend
+ENV           ?= dev
+NS_dev        := yocat-dev
+NS_staging    := yocat-staging
+NS_prod       := yocat-prod
+NS_local      := yocat-office-backend-local
+
+.PHONY: ci-lint ci-archunit ci-test-unit ci-test-integration ci-test-modulith \
+        ci-contract-test ci-spotbugs ci-semgrep ci-dependency-scan \
+        ci-image-sign ci-smoke ci-perf ci-rollback ci-dry-run \
+        cd-bump-image cd-verify-ha
+
+ci-lint:
+	./mvnw -pl apps/api spotless:check
+	@echo &quot;✅ Lint passed&quot;
+
+ci-archunit:
+	./mvnw -pl apps/api test -Dtest=ArchUnitRulesTest   # Clean Arch 依賴規則（EDD §3.1b）
+	@echo &quot;✅ ArchUnit passed（Domain 無 Spring/JDBC import）&quot;
+
+ci-test-unit:
+	./mvnw -pl apps/api test jacoco:report jacoco:check  # Line ≥80% / Branch ≥70% / 核心 100%
+	@echo &quot;✅ Unit tests + JaCoCo gate passed&quot;
+
+ci-test-integration:
+	./mvnw -pl apps/api verify -Pintegration             # Testcontainers（PostgreSQL 16 / Redis 7.2）
+	@echo &quot;✅ Integration tests passed&quot;
+
+ci-test-modulith:
+	./mvnw -pl apps/api test -Dtest=ModularityTests      # ApplicationModules.verify()（HC-1~HC-5）
+	@echo &quot;✅ Spring Modulith boundary verified&quot;
+
+ci-contract-test:
+	./mvnw -pl apps/api test -Dpact                      # Pact consumer-driven contract（100%）
+	@echo &quot;✅ Pact contracts passed&quot;
+
+ci-spotbugs:
+	./mvnw -pl apps/api com.github.spotbugs:spotbugs-maven-plugin:check
+ci-semgrep:
+	semgrep --config=auto --error --severity=ERROR apps/api/src
+ci-dependency-scan:
+	trivy fs --severity CRITICAL,HIGH --exit-code 1 .    # 0 CRITICAL 漏洞閘
+
+ci-image-sign:
+	cosign sign --yes $(REGISTRY)/api:$(IMAGE_TAG)        # keyless（OIDC）
+
+cd-bump-image:
+	cd k8s/overlays/$(ENV) &amp;&amp; kustomize edit set image \
+	  $(REGISTRY)/api=$(REGISTRY)/api:$(IMAGE_TAG)
+
+cd-verify-ha:
+	kubectl rollout status deployment/$(PROJECT_SLUG)-api -n $(NS_$(ENV)) --timeout=300s
+	@n=$$(kubectl get pods -l app=$(PROJECT_SLUG)-api -n $(NS_$(ENV)) | grep -c Running); \
+	 echo &quot;running replicas = $$n&quot;; test $$n -ge 2   # Iron Constraint：≥2 replicas（EDD §3.7）
+
+ci-smoke:
+	curl -sf https://api.yocat.sayyogames.com/health/ready | jq .   # prod；其他環境替換 host
+	@echo &quot;✅ Smoke test passed&quot;
+
+ci-perf:
+	k6 run tests/performance/load-test.js                # P99 ≤ 1000ms @ 500 PCU（test-plan §5）
+
+ci-rollback:
+	kubectl rollout undo deployment/$(PROJECT_SLUG)-api -n $(NS_$(ENV))
+	kubectl rollout status deployment/$(PROJECT_SLUG)-api -n $(NS_$(ENV)) --timeout=120s
+	@echo &quot;⚠️  Rolled back（並以 git revert 同步 GitOps 真相）&quot;
+
+ci-dry-run:
+	act pull_request -W .github/workflows/ci.yml \
+	  -P ubuntu-24.04=catthehacker/ubuntu:act-24.04 \
+	  --secret-file ci/mock-secrets/env</code></pre>
+<hr>
+<h2 id="5-pr-gate">§5 PR Gate</h2>
+<p>所有 Pull Request 必須通過以下 GitHub Actions jobs 後方可合併至 <code>main</code>。</p>
+<h3 id="51-pr-gate-清單">5.1 PR Gate 清單</h3>
+<table>
+<tr><th>Stage（§2 job）</th><th>必須通過</th><th>允許跳過條件</th></tr>
+<tr><td>Checkout</td><td>✅ 必須</td><td>無</td></tr>
+<tr><td>lint + ArchUnit（<code>make ci-lint</code> / <code>ci-archunit</code>）</td><td>✅ 必須</td><td>無</td></tr>
+<tr><td>unit-test + JaCoCo ≥80%（<code>make ci-test-unit</code>）</td><td>✅ 必須</td><td>無</td></tr>
+<tr><td>integration-test（Testcontainers + Pact + Modulith verify）</td><td>✅ 必須</td><td>無</td></tr>
+<tr><td>static-analysis（SpotBugs + Semgrep + 依賴掃描，0 High/Critical）</td><td>✅ 必須</td><td>無</td></tr>
+<tr><td>image-build + cosign sign + Trivy（0 CRITICAL）</td><td>✅ 必須（PR 建置驗證）</td><td><code>[skip-image]</code> commit prefix（僅 docs-only PR）</td></tr>
+</table>
+<h3 id="52-branch-protection-rulesgithub-required-status-checks">5.2 Branch Protection Rules（GitHub）— <code>required-status-checks</code></h3>
+<pre><code class="language-yaml"># .github/branch-protection.yml（參考；實際於 GitHub UI / API 設定）
+# contexts 必須與 §2 ci.yml 的 job name 完全一致
+main:
+  required_status_checks:
+    strict: true
+    contexts:
+      - &quot;lint&quot;
+      - &quot;unit-test&quot;
+      - &quot;integration-test&quot;
+      - &quot;static-analysis&quot;
+      - &quot;image-build&quot;
+  required_pull_request_reviews:
+    required_approving_review_count: 1
+    dismiss_stale_reviews: true
+  enforce_admins: true
+  required_linear_history: true</code></pre>
+<blockquote><p><strong>一致性（R-04）</strong>：<code>contexts</code> 清單（<code>lint</code> / <code>unit-test</code> / <code>integration-test</code> / <code>static-analysis</code> / <code>image-build</code>）與 §2 <code>ci.yml</code> 的 5 個 job <code>name</code> 完全對應，與 §4 的 CI Stage 欄一致。</p></blockquote>
+<h3 id="53-開發者-pre-pr-checklist">5.3 開發者 Pre-PR Checklist</h3>
+<pre><code class="language-bash"># 1. 本機 lint + ArchUnit（Clean Arch 依賴規則）
+make ci-lint &amp;&amp; make ci-archunit
+
+# 2. 單元測試 + JaCoCo 覆蓋率閘（≥80%）
+make ci-test-unit
+
+# 3. 整合測試（需本機 Docker/containerd 起 Testcontainers）
+make ci-test-integration
+
+# 4. Spring Modulith 邊界 + Pact 合約
+make ci-test-modulith &amp;&amp; make ci-contract-test
+
+# 5. 靜態分析（SpotBugs + Semgrep + 依賴掃描）
+make ci-spotbugs &amp;&amp; make ci-semgrep &amp;&amp; make ci-dependency-scan
+
+# 6. 選配：模擬完整 Pipeline（act）
+make ci-dry-run
+
+# 7. 確認 workflow / manifest 無裸 placeholder
+grep -rE &#x27;\{\{[A-Z_]+\}\}&#x27; .github/workflows/ k8s/overlays/ &amp;&amp; echo &quot;⚠️ 有 placeholder 未替換&quot; || echo &quot;✅ 無裸 placeholder&quot;
+
+# 8. 確認無明文 credential
+grep -rE &#x27;password\s*=\s*[^$\{\[]&#x27; .github/workflows/ Makefile &amp;&amp; echo &quot;⚠️ 潛在明文 credential&quot; || echo &quot;✅ 無明文&quot;</code></pre>
+<hr>
+<h2 id="6-self-hosted-runner-on-k3s--安裝與設定">§6 Self-Hosted Runner on k3s — 安裝與設定</h2>
+<blockquote><p>CI_TOOL = GitHub Actions：本節取代「Jenkins on k3s」。本機 / 自建環境以 <strong>actions-runner-controller（ARC）</strong> 或 <strong>Gitea <code>act_runner</code></strong> 在 k3s 執行 self-hosted runner，用於需 <code>kubectl</code> 權限的部署驗證（§2 <code>verify-rollout</code>）與 Local-First CI。Runner namespace 統一為 <code>yocat-office-backend-ci</code>。</p></blockquote>
+<h3 id="61-安裝-actions-runner-controllerhelm">6.1 安裝 actions-runner-controller（Helm）</h3>
+<pre><code class="language-bash"># 加入 ARC Helm repo
+helm repo add actions-runner-controller https://actions-runner-controller.github.io/actions-runner-controller
+helm repo update
+
+# 建立 CI runner namespace
+kubectl create namespace yocat-office-backend-ci
+
+# 安裝 ARC（使用 GitHub App / PAT 認證，Secret 於 §10）
+helm upgrade --install arc actions-runner-controller/actions-runner-controller \
+  -n yocat-office-backend-ci \
+  -f ci/arc-values.yaml \
+  --wait</code></pre>
+<h3 id="62-arc-valuesyaml--runnerdeployment-範例">6.2 arc-values.yaml / RunnerDeployment 範例</h3>
+<pre><code class="language-yaml"># ci/arc-values.yaml（controller 資源）
+authSecret:
+  create: false
+  name: controller-manager   # 由 §10 kubectl create secret 建立
+resources:
+  requests: { cpu: &quot;500m&quot;, memory: &quot;512Mi&quot; }
+  limits:   { cpu: &quot;2&quot;,    memory: &quot;2Gi&quot; }
+---
+# ci/runner-deployment.yaml — ephemeral runner（Kaniko 建置，免 privileged DinD）
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: yocat-ci-runner
+  namespace: yocat-office-backend-ci
+spec:
+  replicas: 2                   # ≥2 runner，CI 並行且無 SPOF
+  template:
+    spec:
+      repository: sayyogames/yocat-office-backend
+      labels: [self-hosted, k3s]
+      serviceAccountName: yocat-ci-runner
+      resources:
+        requests: { cpu: &quot;500m&quot;, memory: &quot;1Gi&quot; }
+        limits:   { cpu: &quot;2&quot;,    memory: &quot;4Gi&quot; }
+      dockerEnabled: false      # 禁 DinD；image build 走 Kaniko job</code></pre>
+<h3 id="63-runner-service-account--rbac最小權限">6.3 Runner Service Account + RBAC（最小權限）</h3>
+<pre><code class="language-yaml"># k8s/ci/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: yocat-ci-runner
+  namespace: yocat-office-backend-ci
+---
+# LOCAL / Dev 環境：為簡化本機驗證可用 cluster-admin（下方註明僅限 LOCAL）
+# Staging / Production：必須改為 namespace-scoped Role（僅部署目標 namespace）
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: yocat-ci-deployer
+  namespace: yocat-office-backend-ci
+rules:
+  - apiGroups: [&quot;&quot;]
+    resources: [&quot;pods&quot;, &quot;pods/log&quot;, &quot;pods/exec&quot;]
+    verbs: [&quot;get&quot;, &quot;list&quot;, &quot;watch&quot;, &quot;create&quot;, &quot;update&quot;, &quot;patch&quot;, &quot;delete&quot;]
+  - apiGroups: [&quot;apps&quot;]
+    resources: [&quot;deployments&quot;, &quot;replicasets&quot;]
+    verbs: [&quot;get&quot;, &quot;list&quot;, &quot;watch&quot;, &quot;update&quot;, &quot;patch&quot;]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: yocat-ci-deployer
+  namespace: yocat-office-backend-ci
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: yocat-ci-deployer }
+subjects:
+  - kind: ServiceAccount
+    name: yocat-ci-runner
+    namespace: yocat-office-backend-ci</code></pre>
+<blockquote><p><strong>RBAC 原則（R-07）</strong>：<strong>LOCAL ONLY</strong> 環境可暫用 <code>ClusterRole=cluster-admin</code> 以簡化本機驗證（須明確註記「Production 禁止 cluster-admin」）；<strong>Staging / Production</strong> 一律使用上方 namespace-scoped <code>Role</code>，僅授予 <code>pods</code> / <code>pods/exec</code> / <code>pods/log</code> / <code>deployments</code> 的最小 verbs，禁止 <code>nodes</code> / <code>clusterroles</code> / 跨 namespace <code>secrets</code> 寫入權限。</p></blockquote>
+<h3 id="64-registry-credentials-secret">6.4 Registry Credentials Secret</h3>
+<pre><code class="language-bash"># 私有 registry token → K8s Secret（供 Kaniko / runner 推 image）
+kubectl create secret docker-registry registry-credentials \
+  -n yocat-office-backend-ci \
+  --docker-server=registry.sayyogames.internal \
+  --docker-username=&quot;$(powershell -c &quot;[System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Get-StoredCredential -Target yocat-registry).Password))&quot;)&quot;
+  # Windows Credential Manager 讀取（LOCAL_DEPLOY §3.5 層 2 OS Keychain）；密碼不落地明文</code></pre>
+<blockquote><p>Runner namespace 一致性：§6.1 Helm <code>-n</code>、§6.3 RBAC <code>metadata.namespace</code>、§6.4 <code>kubectl create secret -n</code>、§9 <code>dev-tools-install</code> runner 安裝 <code>-n</code>、§8.4 Webhook URL namespace 片段，<strong>五處均為 <code>yocat-office-backend-ci</code></strong>。</p></blockquote>
+<hr>
+<h2 id="7-argocd-cd-integrationgitops">§7 ArgoCD CD Integration（GitOps）</h2>
+<h3 id="71-argocd-安裝本地--staging--prod">7.1 ArgoCD 安裝（本地 / Staging / Prod）</h3>
+<pre><code class="language-bash"># 安裝 ArgoCD 2.12
+kubectl create namespace argocd
+kubectl apply -n argocd \
+  -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.12.3/manifests/install.yaml
+
+# 等待 ArgoCD 就緒
+kubectl wait --for=condition=Ready pods --all -n argocd --timeout=180s
+
+# 取得初始 admin password
+argocd admin initial-password -n argocd</code></pre>
+<h3 id="72-argocd-application-定義每環境一個">7.2 ArgoCD Application 定義（每環境一個）</h3>
+<pre><code class="language-yaml"># k8s/argocd/app.yaml（以 prod 為例；dev/staging 同結構，改 path 與 namespace）
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: yocat-office-backend-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # Prod/Staging/Dev: https://github.com/sayyogames/yocat-office-backend
+    # LOCAL（Rancher Desktop）: http://gitea.dev-tools.svc.cluster.local:3000/dev/yocat-office-backend.git
+    repoURL: https://github.com/sayyogames/yocat-office-backend
+    targetRevision: main
+    path: k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yocat-prod
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [&quot;CreateNamespace=true&quot;]</code></pre>
+<h3 id="73-環境晉升dev--staging--prod">7.3 環境晉升（dev → staging → prod）</h3>
+<table>
+<tr><th>環境</th><th>Namespace</th><th>ArgoCD 同步策略</th><th>觸發</th><th>品質閘</th></tr>
+<tr><td><strong>dev</strong></td><td><code>yocat-dev</code></td><td>auto sync（prune + selfHeal）</td><td>merge <code>main</code> 後 <code>deploy.yml</code> bump</td><td>CI 全綠</td></tr>
+<tr><td><strong>staging</strong></td><td><code>yocat-staging</code></td><td>Blue-Green（EDD §3.5）</td><td>dev 驗證通過 + SAST/DAST（ZAP）0 High/Critical</td><td>k6 煙霧 + 滲透測試 0 可竄改路徑（test-plan §5）</td></tr>
+<tr><td><strong>prod</strong></td><td><code>yocat-prod</code></td><td><strong>Canary via GitOps</strong>（EDD §3.5 / runbook §4.2）</td><td>staging 驗證通過 + release tag <code>vX.Y.Z</code></td><td>HA ≥2 + 5XX ≤0.1% + 錢包對帳 0 不一致（runbook §4.2）</td></tr>
+</table>
+<div class="diagram-container"><pre class="mermaid">sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub Actions
+    participant Reg as Registry
+    participant Git as Git（overlays）
+    participant Argo as ArgoCD
+    participant K8s as K8s（dev→staging→prod）
+
+    Dev-&gt;&gt;GH: PR merge to main
+    GH-&gt;&gt;GH: ci.yml（lint→test→SAST→image+sign）
+    GH-&gt;&gt;Reg: push + cosign sign image:git-sha8
+    GH-&gt;&gt;Git: deploy.yml bump overlays imageTag
+    Argo-&gt;&gt;Git: detect change（watch）
+    Argo-&gt;&gt;K8s: sync dev（auto）→ staging（Blue-Green）→ prod（Canary）
+    K8s--&gt;&gt;Argo: sync + health status
+    Argo--&gt;&gt;Dev: deployment notification（Slack）</pre></div>
+<h3 id="74-回滾rollback">7.4 回滾（Rollback）</h3>
+<table>
+<tr><th>層級</th><th>方法</th><th>指令</th></tr>
+<tr><td><strong>即時止血</strong></td><td><code>kubectl rollout undo</code>（脫離 GitOps，暫時）</td><td><code>make ci-rollback ENV=prod</code></td></tr>
+<tr><td><strong>GitOps 真相回復</strong></td><td>git revert bump commit → ArgoCD 自動同步回舊版</td><td><code>git revert &lt;bump-sha&gt; &amp;&amp; git push</code></td></tr>
+<tr><td><strong>ArgoCD history</strong></td><td>ArgoCD 回滾至前一 synced revision</td><td><code>argocd app rollback yocat-office-backend-prod &lt;id&gt;</code></td></tr>
+<tr><td><strong>DB migration</strong></td><td>Flyway <strong>不 drop</strong>，採 expand-contract 向後相容；程式回滾不需回滾 schema（runbook §7.10 / SCHEMA §8）</td><td><code>flyway:repair</code> + 新 contract migration</td></tr>
+</table>
+<blockquote><p><strong>回滾後</strong>：<code>cd-verify-ha</code> 確認 ≥2 replicas Running、smoke 通過，並於 <code>#deploy-yocat-office-backend</code> 公告（runbook §4.2）。</p></blockquote>
+<hr>
+<h2 id="8-local-developer-platformgitea">§8 Local Developer Platform（Gitea）</h2>
+<blockquote><p>Gitea 作為本機 Git Server + <strong>Gitea Actions</strong>（GitHub Actions 相容），讓整條 CI/CD 在 Rancher Desktop 完全自給自足——不依賴外部 GitHub。開發者 push 到本機 Gitea → Gitea Actions（<code>act_runner</code>）跑<strong>同一份 <code>.github/workflows</code></strong> → ArgoCD 從 Gitea 讀 overlays → k3s 同步。這是 Local-First 的本機閉環（EDD §1.2 / PRD §5.5 AC-5）。</p></blockquote>
+<h3 id="81-架構圖">8.1 架構圖</h3>
+<div class="diagram-container"><pre class="mermaid">graph TD
+    subgraph DevMachine[&quot;開發者本機（Rancher Desktop k3s）&quot;]
+        subgraph DevTools[&quot;dev-tools namespace&quot;]
+            Gitea[&quot;Gitea + act_runner&lt;br/&gt;gitea.dev-tools:3000（ClusterIP）&quot;]
+        end
+        subgraph CI[&quot;yocat-office-backend-ci namespace&quot;]
+            Runner[&quot;self-hosted runner（ARC）&lt;br/&gt;runner:8080&quot;]
+        end
+        subgraph ArgoNS[&quot;argocd namespace&quot;]
+            Argo[&quot;ArgoCD 2.12&quot;]
+        end
+        subgraph App[&quot;yocat-office-backend-local namespace&quot;]
+            AppPods[&quot;API Pods（≥2）&quot;]
+        end
+    end
+    Dev[&quot;Developer&lt;br/&gt;git push&quot;] --&gt; Gitea
+    Gitea --&gt;|&quot;Gitea Actions 執行 .github/workflows&lt;br/&gt;Webhook POST&quot;| Runner
+    Runner --&gt;|&quot;build + push image + bump overlays&quot;| Gitea
+    Argo --&gt;|&quot;watch Gitea repo&quot;| Gitea
+    Argo --&gt;|&quot;sync&quot;| AppPods</pre></div>
+<h3 id="82-gitea-安裝helm">8.2 Gitea 安裝（Helm）</h3>
+<pre><code class="language-bash">helm repo add gitea-charts https://dl.gitea.com/charts/
+helm repo update
+
+kubectl create namespace dev-tools
+
+helm upgrade --install gitea gitea-charts/gitea \
+  -n dev-tools \
+  -f k8s/dev-tools/gitea-values.yaml \
+  --wait</code></pre>
+<h3 id="83-gitea-valuesyaml-範例">8.3 gitea-values.yaml 範例</h3>
+<pre><code class="language-yaml"># k8s/dev-tools/gitea-values.yaml
+gitea:
+  admin:
+    username: &quot;gitea-admin&quot;
+    existingSecret: gitea-admin-secret     # 引用 K8s Secret，禁止明文/inline placeholder
+    email: &quot;admin@local.dev&quot;
+  config:
+    server:
+      DOMAIN: gitea.dev-tools.svc.cluster.local
+      ROOT_URL: http://gitea.dev-tools.svc.cluster.local:3000/
+    actions:
+      ENABLED: &quot;true&quot;                        # 啟用 Gitea Actions（GitHub Actions 相容）
+
+service:
+  type: ClusterIP                            # 禁 NodePort / LoadBalancer（Port 分離原則）
+  port: 3000
+
+persistence:
+  enabled: true
+  size: 256Mi
+
+resources:
+  requests: { cpu: &quot;100m&quot;, memory: &quot;128Mi&quot; }
+  limits:   { cpu: &quot;500m&quot;, memory: &quot;512Mi&quot; }</code></pre>
+<blockquote><p><strong>Gitea admin 密碼安全（R-15）</strong>：密碼<strong>不得以明文或 inline placeholder 寫入文件</strong>。改以 Gitea Helm 的 <code>existingSecret: gitea-admin-secret</code> 引用 K8s Secret，該 Secret 由 <code>scripts/bootstrap-secrets.sh</code> 以 <code>openssl rand -hex 16</code> 生成並存入 OS Keychain（LOCAL_DEPLOY §3.5 層 1/2），於部署時建立：</p></blockquote>
+<blockquote><p>```bash</p></blockquote>
+<blockquote><p>kubectl create secret generic gitea-admin-secret -n dev-tools \</p></blockquote>
+<blockquote><p>  --from-literal=username=gitea-admin \</p></blockquote>
+<blockquote><p>  --from-literal=password=&quot;$(openssl rand -hex 16)&quot;   # 一次性生成，不落地明文</p></blockquote>
+<blockquote><p>```</p></blockquote>
+<h3 id="84-gitea-actions--webhook-設定">8.4 Gitea Actions / Webhook 設定</h3>
+<p>Gitea → self-hosted runner / Gitea Actions（ClusterIP 直連，不需 Ingress）：</p>
+<pre><code class="">http://runner.yocat-office-backend-ci.svc.cluster.local:8080/gitea-webhook/post</code></pre>
+<blockquote><p>注意：URL 中的 namespace 片段為 <code>yocat-office-backend-ci</code>（與 §6 runner 安裝 namespace 相同），不得硬編碼 <code>ci</code>。Gitea Actions 原生讀取 repo 內 <code>.github/workflows</code> / <code>.gitea/workflows</code>，與 GitHub Actions 語法相容，故本機與雲端共用同一份 workflow 定義。</p></blockquote>
+<h3 id="85-argocd-從-gitea-讀取本地環境專用">8.5 ArgoCD 從 Gitea 讀取（本地環境專用）</h3>
+<pre><code class="language-yaml"># k8s/argocd/app-local.yaml（LOCAL 環境專用）
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: yocat-office-backend-local
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://gitea.dev-tools.svc.cluster.local:3000/dev/yocat-office-backend.git
+    targetRevision: main
+    path: k8s/overlays/local
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: yocat-office-backend-local
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [&quot;CreateNamespace=true&quot;]</code></pre>
+<blockquote><p><strong>Port 分離原則</strong>：App domain（<code>yocat-office-backend-local</code>）對外走單一 Ingress port 80（LOCAL_DEPLOY §2）。Dev-tools domain（Gitea 3000 / runner 8080 / ArgoCD 8443）使用各自獨立 port，不與 App port 衝突。</p></blockquote>
+<hr>
+<h2 id="9-makefile-dev-tools-targets">§9 Makefile dev-tools Targets</h2>
+<p>於 <code>Makefile</code> 加入以下 dev-tools 管理 target，與 §4 Shared Make Targets 配套，用於本機一鍵建置 Local-First CI/CD 平台。</p>
+<pre><code class="language-makefile"># ── Dev-Tools 管理（Gitea + self-hosted runner + ArgoCD）────────
+dev-tools-install:  ## 安裝 Gitea + self-hosted runner（ARC）+ ArgoCD
+	kubectl create namespace dev-tools --dry-run=client -o yaml | kubectl apply -f -
+	kubectl create namespace yocat-office-backend-ci --dry-run=client -o yaml | kubectl apply -f -
+	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+	helm upgrade --install gitea gitea-charts/gitea -n dev-tools -f k8s/dev-tools/gitea-values.yaml --wait
+	helm upgrade --install arc actions-runner-controller/actions-runner-controller \
+	  -n yocat-office-backend-ci -f ci/arc-values.yaml --wait
+	kubectl apply -n argocd -f k8s/argocd/app-local.yaml
+
+dev-tools-status:   ## 檢查 dev-tools 所有元件狀態
+	kubectl get pods -n dev-tools
+	kubectl get pods -n yocat-office-backend-ci
+	kubectl get pods -n argocd
+
+dev-tools-forward:  ## Port-forward dev-tools（背景執行）
+	kubectl port-forward -n dev-tools svc/gitea-http 3000:3000 &amp;
+	kubectl port-forward -n yocat-office-backend-ci svc/yocat-ci-runner 8080:8080 &amp;
+	kubectl port-forward -n argocd svc/argocd-server 8443:443 &amp;
+	@echo &quot;Gitea:   http://localhost:3000&quot;
+	@echo &quot;Runner:  http://localhost:8080&quot;
+	@echo &quot;ArgoCD:  https://localhost:8443&quot;
+
+dev-tools-clean:    ## 卸載 dev-tools（保留資料 PVC）
+	helm uninstall gitea -n dev-tools || true
+	helm uninstall arc -n yocat-office-backend-ci || true
+
+ci-setup-credentials:  ## 設定 CI 所需的 K8s Secrets（見 §10 Secret 表格）
+	@echo &quot;請執行 LOCAL_DEPLOY.md §3.5 bootstrap-secrets 腳本，並以 §6.4 建立 registry-credentials / ARC 認證 Secret&quot;</code></pre>
+<blockquote><p><strong>5 個必要 target 齊備</strong>：<code>dev-tools-install</code> / <code>dev-tools-status</code> / <code>dev-tools-forward</code> / <code>dev-tools-clean</code> / <code>ci-setup-credentials</code>。<code>dev-tools-install</code> 中 runner 的 <code>-n</code> 參數為 <code>yocat-office-backend-ci</code>（非硬編碼 <code>ci</code>）、Gitea 的 <code>-n</code> 為 <code>dev-tools</code>；均不與 §4 的 <code>ci-<em></code> / <code>cd-</em></code> target 命名衝突。</p></blockquote>
+<hr>
+<h2 id="10-security--secret-management-in-ci">§10 Security &amp; Secret Management in CI</h2>
+<h3 id="101-secret-location-表格對齊-local_deploy-35-三層策略">10.1 Secret Location 表格（對齊 LOCAL_DEPLOY §3.5 三層策略）</h3>
+<table>
+<tr><th>Secret</th><th>類型（LOCAL_DEPLOY §3.5）</th><th>存放位置</th><th>使用方式</th></tr>
+<tr><td><code>DB_PASSWORD</code></td><td>層 1 Ephemeral（重啟可重生）</td><td><code>bootstrap-secrets.sh</code>（<code>openssl rand</code>）→ K8s Secret <code>yocat-office-backend-api-secret</code></td><td>Pod env injection（secretKeyRef）</td></tr>
+<tr><td><code>SESSION_SIGNING_KEY</code></td><td>層 1 Ephemeral</td><td>同上（<code>openssl rand -hex 64</code>）</td><td>Pod env injection</td></tr>
+<tr><td><code>ENCRYPTION_KEY</code></td><td>層 1 Ephemeral</td><td>同上（<code>openssl rand -hex 32</code>）</td><td>Pod env injection</td></tr>
+<tr><td>Gitea admin 密碼</td><td>層 1 Ephemeral</td><td>K8s Secret <code>gitea-admin-secret</code>（<code>openssl rand -hex 16</code>，OS Keychain）</td><td>Gitea Helm <code>existingSecret</code> 引用（不落地明文）</td></tr>
+<tr><td><code>REGISTRY_TOKEN</code> / <code>REGISTRY_USERNAME</code></td><td>層 2 OS Keychain（固定憑證）</td><td>Windows Credential Manager → GitHub Actions <code>secrets.*</code> / K8s <code>registry-credentials</code></td><td><code>docker/login-action</code> / Kaniko docker config</td></tr>
+<tr><td>GitHub App / PAT（ARC runner 認證）</td><td>層 2 OS Keychain</td><td>K8s Secret <code>controller-manager</code>（§6.2）</td><td>ARC controller 讀取</td></tr>
+<tr><td>cosign signing（keyless OIDC）</td><td>無長期金鑰</td><td>GitHub OIDC token（<code>id-token: write</code>）</td><td><code>cosign sign --yes</code>（Fulcio/Rekor）</td></tr>
+<tr><td>Phase B 金流 API key</td><td>層 3 Enterprise（本機不需）</td><td>Sealed Secrets / Vault（EDD §3.5）</td><td>Phase B init container 注入</td></tr>
+</table>
+<blockquote><p><strong>禁止</strong>：任何 credential 不得以明文出現在 <code>.github/workflows/*</code>、<code>Makefile</code>、K8s manifest 或任何版本控制檔案。workflow 一律以 <code>${{ secrets.NAME }}</code> 引用；Makefile 一律以 <code>$(VAR)</code> / 環境變數引用。</p></blockquote>
+<h3 id="102-供應鏈安全supply-chain">10.2 供應鏈安全（Supply Chain）</h3>
+<table>
+<tr><th>控制</th><th>工具</th><th>品質閘</th></tr>
+<tr><td>SAST（原始碼）</td><td>SpotBugs + FindSecBugs + Semgrep</td><td>0 High/Critical（test-plan §2 / PRD §9.3）</td></tr>
+<tr><td>依賴漏洞</td><td>OWASP Dependency-Check / Trivy fs</td><td>0 CRITICAL</td></tr>
+<tr><td>容器映像掃描</td><td>Trivy image</td><td>0 CRITICAL（§2 image-build，<code>exit-code: 1</code>）</td></tr>
+<tr><td>映像簽章</td><td>cosign（keyless，Fulcio + Rekor 透明日誌）</td><td>所有 push 至 registry 的 image 均簽章並可驗證</td></tr>
+<tr><td>DAST（部署後）</td><td>OWASP ZAP</td><td>進 Staging 前 0 High/Critical（test-plan §5）</td></tr>
+</table>
+<hr>
+<h2 id="11-observability">§11 Observability</h2>
+<h3 id="111-pipeline--應用-metricsprometheus">11.1 Pipeline / 應用 Metrics（Prometheus）</h3>
+<pre><code class="language-yaml"># 應用 metrics endpoint（Spring Boot Actuator / Micrometer，EDD §3.5 / LOCAL_DEPLOY §5）
+#   http://&lt;host&gt;/actuator/prometheus
+# CI/CD 指標（GitHub Actions telemetry + DORA）
+github_actions_workflow_run_duration_seconds        # workflow 耗時
+github_actions_workflow_run_conclusion_total        # success / failure 計數
+dora_deployment_frequency                           # 部署頻率
+dora_change_failure_rate                            # 變更失敗率（回滾/修補 比例）
+dora_lead_time_for_changes_seconds                  # 交付前置時間
+dora_mean_time_to_restore_seconds                   # MTTR</code></pre>
+<blockquote><p>應用 Prometheus metrics endpoint 為 <code>/actuator/prometheus</code>（LOCAL_DEPLOY §5 / §12 Port Reference 確認），與 ARCH 可觀測性章節一致。</p></blockquote>
+<h3 id="112-build--deploy-notification">11.2 Build / Deploy Notification</h3>
+<table>
+<tr><th>事件</th><th>通知方式</th><th>通知目標</th></tr>
+<tr><td>PR gate 失敗</td><td>GitHub Status Check + Slack</td><td><code>#ci-alerts-yocat-office-backend</code></td></tr>
+<tr><td><code>main</code> build 失敗</td><td>Slack + Email</td><td><code>#oncall-yocat-office-backend</code></td></tr>
+<tr><td>Deployment 完成 / 回滾</td><td>Slack</td><td><code>#deploy-yocat-office-backend</code>（runbook §4.1 既有慣例）</td></tr>
+</table>
+<blockquote><p>Deploy 通知頻道 <code>#deploy-yocat-office-backend</code> 來自 runbook §4.1 既有公告慣例；<code>#ci-alerts-yocat-office-backend</code> / <code>#oncall-yocat-office-backend</code> 依同一命名慣例衍生（格式 <code>#&lt;用途&gt;-&lt;project-slug&gt;</code>），EDD §3.4 未另指定時以此為準（待確認實際 Slack channel）。</p></blockquote>
+<hr>
+<h2 id="appendixcicd-工具選型決策">Appendix：CI/CD 工具選型決策</h2>
+<table>
+<tr><th>工具</th><th>選用理由</th><th>替代方案</th></tr>
+<tr><td><strong>GitHub Actions</strong>（CI）</td><td>與 repo（<code>sayyogames/yocat-office-backend</code>）原生整合；Local-First 可用 Gitea Actions / <code>act</code> 跑同一份 workflow；生態成熟、免維運 CI server（EDD §3.3 / runbook §2）</td><td>Jenkins（需自建 server + agent pod，運維重）、GitLab CI（需遷移 repo）、Tekton（YAML 複雜度高）</td></tr>
+<tr><td><strong>ArgoCD 2.12</strong>（CD）</td><td>GitOps 宣告式 + 自動 drift 修正；支援 Canary（prod）/ Blue-Green（staging）；UI 直覺；Helm + Kustomize（EDD §3.3 / §3.5）</td><td>Flux（UI 較弱）、Spinnaker（重量級）</td></tr>
+<tr><td><strong>Kaniko / Buildx</strong>（Image Build）</td><td>免 Docker-in-Docker（不需 privileged container）；k3s native；對齊 Rancher Desktop 禁 privileged 限制</td><td>Buildah、<code>docker build</code>（需 DinD，禁用）</td></tr>
+<tr><td><strong>cosign</strong>（Image Sign）</td><td>keyless（OIDC）供應鏈簽章，無長期金鑰；Rekor 透明日誌</td><td>Notary v2（整合成本高）</td></tr>
+<tr><td><strong>JaCoCo + SpotBugs + Semgrep + Pact</strong>（品質閘）</td><td>覆蓋率 ≥80% hard gate、SAST 0 High/Critical、合約 100%，於 PR merge 前機械化驗收（test-plan §2/§3）</td><td>SonarQube（需自建 server，啟動期不划算）</td></tr>
+</table></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

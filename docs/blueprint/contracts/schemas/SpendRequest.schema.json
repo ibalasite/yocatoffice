@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/SpendRequest",
+  "title": "SpendRequest",
+  "description": "POST /wallet/spend",
+  "type": "object",
+  "properties": {
+    "currency": {
+      "$ref": "Currency.schema.json"
+    },
+    "amount": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "> 0"
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 40
+    }
+  },
+  "required": [
+    "currency",
+    "amount"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<RequestDTO>>"
+}

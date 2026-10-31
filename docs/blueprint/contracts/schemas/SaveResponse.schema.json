@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/SaveResponse",
+  "title": "SaveResponse",
+  "description": "GET /save 回應",
+  "type": "object",
+  "properties": {
+    "save": {
+      "oneOf": [
+        {
+          "$ref": "SaveView.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "null=該slot無存檔"
+    }
+  },
+  "required": [
+    "save"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ResponseDTO>>"
+}

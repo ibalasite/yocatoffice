@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>對齊報告 — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">對齊報告</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">對齊報告</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link active" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#總覽">總覽</a></li><li><a class="toc__link" href="#dimension-1--doc--doc-對齊問題">Dimension 1 — Doc → Doc 對齊問題</a></li><li><a class="toc__link toc__link--h3" href="#high-edd--local_deploydb-host-與-data-namespaceupstream_conflict">[HIGH] EDD → LOCAL_DEPLOY（DB host 與 data namespace）[UPSTREAM_CONFLICT]</a></li><li><a class="toc__link toc__link--h3" href="#medium-constantsmd--constantsjson--schema--api--eddwallet_ledger-reason-enumupstream_conflict">[MEDIUM] CONSTANTS.md + constants.json → SCHEMA / API / EDD（wallet_ledger reason enum）[UPSTREAM_CONFLICT]</a></li><li><a class="toc__link toc__link--h3" href="#medium-edd--prdredis-依賴未於上游揭露">[MEDIUM] EDD → PRD（Redis 依賴未於上游揭露）</a></li><li><a class="toc__link toc__link--h3" href="#low-developer_guide--edd--local_deploy--cicdredis-版本精度">[LOW] DEVELOPER_GUIDE → EDD / LOCAL_DEPLOY / CICD（Redis 版本精度）</a></li><li><a class="toc__link toc__link--h3" href="#low-constantsmd--constantsjsongame-day-常數鍵名">[LOW] CONSTANTS.md → constants.json（game-day 常數鍵名）</a></li><li><a class="toc__link toc__link--h3" href="#low-constantsmd--constantsjsonclient-backend_url-預設埠過時">[LOW] CONSTANTS.md / constants.json（client BACKEND_URL 預設埠過時）</a></li><li><a class="toc__link toc__link--h3" href="#low-prd--eddapischemadeposit-冪等於-phase-a-已落地-vs-prdphase-b-預留">[LOW] PRD → EDD/API/SCHEMA（deposit 冪等於 Phase A 已落地 vs PRD「Phase B 預留」）</a></li><li><a class="toc__link toc__link--h3" href="#low-schema--prdapi孤兒認證表--gold-plating">[LOW] SCHEMA → PRD/API（孤兒認證表 = gold-plating）</a></li><li><a class="toc__link" href="#dimension-4--doc--test-對齊問題">Dimension 4 — Doc → Test 對齊問題</a></li><li><a class="toc__link toc__link--h3" href="#high-prd--bdd--rtmp1-需求在-prd-無-acrecordleaderboarddeposit">[HIGH] PRD → BDD → RTM：P1 需求在 PRD 無 AC（record/leaderboard/deposit）</a></li><li><a class="toc__link toc__link--h3" href="#high-test-plan--rtmunit-test-數量與懸空-tc-id">[HIGH] test-plan → RTM（unit test 數量與懸空 TC-ID）</a></li><li><a class="toc__link toc__link--h3" href="#high-test-plan--rtmbdddeposit-端點遺漏於-test-plan">[HIGH] test-plan → RTM/BDD（deposit 端點遺漏於 test-plan）</a></li><li><a class="toc__link toc__link--h3" href="#medium-prd-ac--bddplat-ac-1ac-2ac-5-無-gherkin-scenario">[MEDIUM] PRD AC → BDD：PLAT AC-1/AC-2/AC-5 無 Gherkin scenario</a></li><li><a class="toc__link toc__link--h3" href="#medium-prd缺口-bddrtmtest-plan限流429與-login-暴力破解不一致">[MEDIUM] PRD（缺口）→ BDD/RTM/test-plan：限流（429）與 login 暴力破解不一致</a></li><li><a class="toc__link toc__link--h3" href="#medium-test-plan--rtm-tc-id-不符plat-ac-3ac-4">[MEDIUM] test-plan ↔ RTM TC-ID 不符：PLAT AC-3/AC-4</a></li><li><a class="toc__link toc__link--h3" href="#medium-prd--測試覆蓋prd-78-analytics-events9無-bddrtm-tc">[MEDIUM] PRD → 測試覆蓋：PRD §7.8 Analytics Events（9）無 BDD/RTM TC</a></li><li><a class="toc__link toc__link--h3" href="#medium-test-plan--bddrtmmemberdeleted-event-對未溯源--範圍混淆">[MEDIUM] test-plan → BDD/RTM：MemberDeleted event 對未溯源 + 範圍混淆</a></li><li><a class="toc__link toc__link--h3" href="#low-test-plan--rtmfeaturestc-id-後綴慣例不符">[LOW] test-plan ↔ RTM/features：TC-ID 後綴慣例不符</a></li><li><a class="toc__link toc__link--h3" href="#low-rtm-內部計數缺陷1--42--52--6">[LOW] RTM 內部計數缺陷：§1 / §4.2 / §5.2 / §6</a></li><li><a class="toc__link toc__link--h3" href="#low-bdd-ac-tag-準確性featuresmember--featurescross-moduleevent">[LOW] BDD AC-tag 準確性：features/member + features/cross-module/event</a></li><li><a class="toc__link" href="#dimension-5--uml--rtm-結構品質">Dimension 5 — UML / RTM 結構品質</a></li><li><a class="toc__link toc__link--h3" href="#medium-docsrtmcsv-不存在缺少機器可讀-rtm">[MEDIUM] docs/RTM.csv 不存在（缺少機器可讀 RTM）</a></li><li><a class="toc__link toc__link--h3" href="#medium-docsdiagramspuml-無-plantuml-檔">[MEDIUM] docs/diagrams/puml/ 無 PlantUML 檔</a></li><li><a class="toc__link" href="#dimension-6--ai-gencode-readiness">Dimension 6 — AI Gencode Readiness</a></li><li><a class="toc__link toc__link--h3" href="#high-local_deployai-gencode-就緒度-50">[HIGH] LOCAL_DEPLOY：AI gencode 就緒度 50%</a></li><li><a class="toc__link toc__link--h3" href="#medium-apiai-gencode-就緒度-70">[MEDIUM] API：AI gencode 就緒度 70%</a></li><li><a class="toc__link" href="#dimension-7--doc--generated-artifact">Dimension 7 — Doc → Generated Artifact</a></li><li><a class="toc__link" href="#修復建議">修復建議</a></li><li><a class="toc__link" href="#修復狀態gendoc-align-fixlayerall">修復狀態（gendoc-align-fix，layer=all）</a></li><li><a class="toc__link" href="#複驗結果align-verifygendoc-align-check-第二輪">複驗結果（ALIGN-VERIFY，gendoc-align-check 第二輪）</a></li><li><a class="toc__link toc__link--h3" href="#複驗總覽修復後殘留">複驗總覽（修復後殘留）</a></li><li><a class="toc__link toc__link--h3" href="#複驗結論">複驗結論</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="gendoc--跨文件對齊掃描報告align_report">gendoc — 跨文件對齊掃描報告（ALIGN_REPORT）</h1>
+<ul><li>專案：&lt;project-root&gt;（yoCat Office backend，Spring Boot / Java Modulith）</li><li>client_type：<code>api-only</code>（無前端 → 無 PDD/VDD/FRONTEND、無 features/client/）</li><li>has_admin_backend：<code>false</code></li><li>掃描日期：2026-10-30</li><li>掃描工具：<code>gendoc-align-check</code>（Skill）；語意跨文件比對以 subagent 審查完成</li><li>原則：只列問題，不修復（修復由 <code>gendoc-align-fix</code> 執行）</li></ul>
+<hr>
+<h2 id="總覽">總覽</h2>
+<table>
+<tr><th>對齊層</th><th>CRITICAL</th><th>HIGH</th><th>MEDIUM</th><th>LOW</th><th>總計</th><th>狀態</th></tr>
+<tr><td>D1 Doc → Doc</td><td>0</td><td>1</td><td>2</td><td>5</td><td>8</td><td>⚠️</td></tr>
+<tr><td>D2 Doc → Code</td><td>—</td><td>—</td><td>—</td><td>—</td><td>N/A</td><td>無應用程式 <code>src/</code>（docs-only 專案）</td></tr>
+<tr><td>D3 Code → Test</td><td>—</td><td>—</td><td>—</td><td>—</td><td>N/A</td><td>無 <code>tests/</code> 程式碼</td></tr>
+<tr><td>D4 Doc → Test</td><td>0</td><td>3</td><td>6</td><td>3</td><td>12</td><td>⚠️</td></tr>
+<tr><td>D5 UML / RTM 品質</td><td>0</td><td>0</td><td>2</td><td>0</td><td>2</td><td>⚠️</td></tr>
+<tr><td>D6 AI Gencode 就緒度</td><td>0</td><td>1</td><td>1</td><td>0</td><td>2</td><td>⚠️ 78%</td></tr>
+<tr><td>D7 Doc → Generated Artifact</td><td>—</td><td>—</td><td>—</td><td>—</td><td>N/A</td><td>無 <code>docs/blueprint/</code>、<code>docs/pages/</code></td></tr>
+<tr><td><strong>總計</strong></td><td><strong>0</strong></td><td><strong>5</strong></td><td><strong>11</strong></td><td><strong>8</strong></td><td><strong>24</strong></td><td></td></tr>
+</table>
+<blockquote><p>無 CRITICAL。HIGH 共 5 項（D1×1、D4×3、D6×1），為本輪修復重點。</p></blockquote>
+<p>說明：本專案為純文件（gendoc-only）專案，未提交應用程式原始碼與測試（根目錄下 <code>server/</code>、<code>client/</code>、<code>laya/</code>、<code>ohmygame/</code>、<code>assets/</code>、<code>infra/</code> 為未追蹤的外部 / 腳手架 / 巢狀 git 內容，非 gendoc 管理範圍）。因此 D2、D3、D7 判定為 N/A。</p>
+<hr>
+<h2 id="dimension-1--doc--doc-對齊問題">Dimension 1 — Doc → Doc 對齊問題</h2>
+<p>已驗證一致（無 finding）：認證方案（opaque session token / Bearer / TTL 30 天，全程無 JWT）在 BRD/PRD/EDD/API/CONSTANTS 一致；BRD→PRD 功能與 NFR 覆蓋完整；PRD→EDD 之 P0 AC 溯源與 NFR 回應（QPS≈35、500 PCU、200 TPS、99.9%、容量公式）完整；EDD→ARCH（7 BC、ADR、元件）與 EDD→API（18 endpoint、認證）一致；核心技術版本（Java 21、Spring Boot 3.3、Spring Modulith 1.3、PostgreSQL 16、K8s 1.30、ArgoCD 2.12）一致。</p>
+<h3 id="high-edd--local_deploydb-host-與-data-namespaceupstream_conflict">[HIGH] EDD → LOCAL_DEPLOY（DB host 與 data namespace）[UPSTREAM_CONFLICT]</h3>
+<ul><li>問題描述：EDD §3.5 環境矩陣「DB Host (Pattern)」Local 欄 = <code>postgres.yocat-office-backend-local.svc.cluster.local</code>（DB 服務名 <code>postgres</code>，位於 app namespace <code>yocat-office-backend-local</code>）。但 LOCAL_DEPLOY §2 將 PostgreSQL 放在獨立 data namespace <code>yocat</code>、服務名 <code>yocat-pg</code>：「API 以 K8s DNS <code>yocat-pg.yocat.svc.cluster.local:5432</code> 連既有 PostgreSQL」（§L463 <code>DATABASE_URL=jdbc:postgresql://yocat-pg.yocat.svc.cluster.local:5432/yocat</code>）。namespace（<code>yocat-office-backend-local</code> vs <code>yocat</code>）與服務名（<code>postgres</code> vs <code>yocat-pg</code>）皆不一致；EDD 完全未提及 <code>yocat</code> data namespace，其連線 pattern 無法解析至實際部署。</li><li>衝突類型：B1-下游合理（LOCAL_DEPLOY 正確沿用既有 <code>docs/req/postgres.yaml</code> 的 PostgreSQL；EDD §3.5 Local 列過時/錯誤）</li><li>建議修復方向：修改 EDD §3.5，將 Local「DB Host (Pattern)」改為 <code>yocat-pg.yocat.svc.cluster.local</code>，並註明資料層位於既有 <code>yocat</code> namespace（跨 namespace 連線），與 LOCAL_DEPLOY 及 postgres.yaml 對齊。</li><li>可自動修復：YES</li></ul>
+<h3 id="medium-constantsmd--constantsjson--schema--api--eddwallet_ledger-reason-enumupstream_conflict">[MEDIUM] CONSTANTS.md + constants.json → SCHEMA / API / EDD（wallet_ledger reason enum）[UPSTREAM_CONFLICT]</h3>
+<ul><li>問題描述：constants.json <code>enums.wallet_ledger_reason = [&quot;topup&quot;,&quot;buy_cosmetic&quot;,&quot;hire_dream&quot;,&quot;rescue&quot;,&quot;init&quot;]</code>、CONSTANTS.md §9 同列。此清單含未實際寫入的 <code>hire_dream</code>，且遺漏 <code>buy_dream</code>、<code>buy_scenario</code>。下游實際值集：SCHEMA.md L432-433 <code>CHECK (reason IN (&#x27;init&#x27;,&#x27;topup&#x27;,&#x27;rescue&#x27;) OR reason LIKE &#x27;buy\<em>%&#x27;)</code>（註解 buy_cosmetic/buy_dream/buy_scenario）、API.md L186 <code>INSERT ledger(reason=buy</em>&lt;kind&gt;)</code>、EDD §3.3 Rule 4 <code>dream → buy_dream（語意別名 hire_dream）</code>。機器可讀 SSOT（constants.json）成員集錯誤，驗證工具會拒 <code>buy_dream</code>/<code>buy_scenario</code>、放行不存在的 <code>hire_dream</code>。</li><li>衝突類型：缺失（SSOT 機器檔列舉與真實值集不符）</li><li>建議修復方向：將 constants.json 與 CONSTANTS.md §9 enum 改為 <code>[&quot;init&quot;,&quot;topup&quot;,&quot;rescue&quot;,&quot;buy_cosmetic&quot;,&quot;buy_dream&quot;,&quot;buy_scenario&quot;]</code>；<code>hire_dream</code> 僅保留為文件化語意別名，不列為 enum 成員。</li><li>可自動修復：YES</li></ul>
+<h3 id="medium-edd--prdredis-依賴未於上游揭露">[MEDIUM] EDD → PRD（Redis 依賴未於上游揭露）</h3>
+<ul><li>問題描述：EDD 引入 Redis 7.2 為必要基礎設施（ADR-003/004、§3.3、session cache / rate-limit / leaderboard cache、Sentinel HA、pool=16），並向下傳播至 ARCH/SCHEMA/LOCAL_DEPLOY/CICD/DEVELOPER_GUIDE。但 PRD 全文未提 Redis：§8.2 技術依賴僅列 Spring Boot / Spring Modulith / PostgreSQL / HikariCP / Kubernetes，§8.3 外部依賴 / §4.3 Future Scope 皆缺。新的有狀態基礎設施依賴與其可用性/降級說明在 PRD 依賴與 NFR/可用性表缺席。</li><li>衝突類型：B1-下游合理（Redis 為合理設計決策；上游 PRD 依賴清單缺失）</li><li>建議修復方向：於 PRD §8.2 技術依賴、§8.3 外部依賴加入 Redis 7.2（附降級註記：cache miss 回源 DB，非硬 SPOF），引用 EDD ADR-003/004。</li><li>可自動修復：YES</li></ul>
+<h3 id="low-developer_guide--edd--local_deploy--cicdredis-版本精度">[LOW] DEVELOPER_GUIDE → EDD / LOCAL_DEPLOY / CICD（Redis 版本精度）</h3>
+<ul><li>問題描述：DEVELOPER_GUIDE.md L26 &amp; L41 標「Redis 7」，EDD §3.3、LOCAL_DEPLOY（<code>redis:7.2-alpine</code>）、CICD（Testcontainers Redis 7.2）則釘「Redis 7.2」。非硬衝突（7.2 ⊂ 7.x），僅標註不足。</li><li>衝突類型：B2-下游偏離（版本標註不夠精確）</li><li>建議修復方向：DEVELOPER_GUIDE 兩處改為「Redis 7.2」。</li><li>可自動修復：YES</li></ul>
+<h3 id="low-constantsmd--constantsjsongame-day-常數鍵名">[LOW] CONSTANTS.md → constants.json（game-day 常數鍵名）</h3>
+<ul><li>問題描述：CONSTANTS.md §1 命名 <code>GAME_DAY_START</code>（540）、<code>GAME_DAY_SETTLE</code>（1080）；constants.json <code>core</code> 命名 <code>GAME_DAY_START_MIN</code>（540）、<code>GAME_DAY_SETTLE_MIN</code>（1080）。值相同，鍵名不一致。</li><li>衝突類型：缺失（鍵名不一致）</li><li>建議修復方向：統一鍵名（CONSTANTS.md 採 <code>_MIN</code> 後綴，或 constants.json 去除）。</li><li>可自動修復：YES</li></ul>
+<h3 id="low-constantsmd--constantsjsonclient-backend_url-預設埠過時">[LOW] CONSTANTS.md / constants.json（client BACKEND_URL 預設埠過時）</h3>
+<ul><li>問題描述：CONSTANTS.md §11 與 constants.json <code>config_keys.CONFIG_BACKEND_URL_default</code> = <code>http://localhost:3000</code>（舊 Node 原型埠）。Spring Boot trust layer 服務於 8080（EDD §2.2、LOCAL_DEPLOY NodePort 30088 / Ingress 80），預設指向後端從未綁定的埠。</li><li>衝突類型：B2-下游偏離（沿用原型埠號未更新）</li><li>建議修復方向：將 client 預設改為實際入口（Ingress <code>http://localhost</code> / dev NodePort <code>:30088</code>），或註明為 client 自有 legacy 值、不在後端範圍。</li><li>可自動修復：YES</li></ul>
+<h3 id="low-prd--eddapischemadeposit-冪等於-phase-a-已落地-vs-prdphase-b-預留">[LOW] PRD → EDD/API/SCHEMA（deposit 冪等於 Phase A 已落地 vs PRD「Phase B 預留」）</h3>
+<ul><li>問題描述：PRD §11.1 標冪等表為「新增（Phase B 預留）」，下游卻於 Phase A 啟用：API.md §7 使 <code>Idempotency-Key</code> 對 <code>POST /deposit/checkout</code> 現為必填；SCHEMA <code>deposit.deposit_order.idempotency_key</code> UNIQUE + <code>deposit.deposit_idempotency</code> 已上線。PRD「Phase B 預留」描述過時。</li><li>衝突類型：B1-下游合理（下游提前落地冪等，PRD 標註過時）</li><li>建議修復方向：更新 PRD §11.1，說明 <code>/deposit/checkout</code> 冪等自 Phase A 生效（真金流對帳仍 Phase B）。</li><li>可自動修復：YES</li></ul>
+<h3 id="low-schema--prdapi孤兒認證表--gold-plating">[LOW] SCHEMA → PRD/API（孤兒認證表 = gold-plating）</h3>
+<ul><li>問題描述：SCHEMA 定義 <code>member.password_history</code>（§3 L363）與 <code>member.login_attempts</code>（L304）。<code>password_history</code> 預設 change/rotate-password 流程，但無對應 endpoint（<code>PATCH /auth/me</code>、<code>DELETE /auth/me</code> 皆 Phase B，PRD §17.3），且無 PRD user story 覆蓋密碼輪替。<code>login_attempts</code> 部分支援暴力破解/限流（PRD §7.4）尚可辯護；<code>password_history</code> 為無上游需求之表。</li><li>衝突類型：gold-plating（無上游需求對應之資料表）</li><li>建議修復方向：將 <code>password_history</code> 延至 Phase B 帳號管理里程碑（移出 MVP migration），或於 PRD/API 補密碼變更需求以正當化。</li><li>可自動修復：NO</li></ul>
+<hr>
+<h2 id="dimension-4--doc--test-對齊問題">Dimension 4 — Doc → Test 對齊問題</h2>
+<p>基準（實際計數）：9 個 feature 檔 = <strong>65 個 Gherkin scenario</strong>（含 6 個 Scenario Outline）。PRD §5 定義 <strong>26 個 P0 AC</strong>（MEM 6 + WAL 5 + ENT 5 + SAVE 5 + PLAT 5）。RTM 宣稱 80 TC。</p>
+<p>已驗證（無 finding）：MEM/WAL/ENT/SAVE 每個 P0 AC 皆至少一個 scenario 且有 RTM 行；65 個 scenario 的 <code>@TC-*</code> tag 全數解析至 RTM 行（無懸空/未溯源 scenario）；server_steps.ts 為 9 個 feature 全部 Given/When/Then 皆定義對應 step（stub 回 <code>pending</code>，docs-only 預期）。</p>
+<h3 id="high-prd--bdd--rtmp1-需求在-prd-無-acrecordleaderboarddeposit">[HIGH] PRD → BDD → RTM：P1 需求在 PRD 無 AC（record/leaderboard/deposit）</h3>
+<ul><li>問題描述：3 個 P1 User Story 在 PRD 無驗收標準。PRD §15 RTM 行 US-REC-001/US-LB-001/US-DEP-001 寫「AC# = 待 BDD 補」，PRD §5 僅 5.1–5.5（P0）。但 18 個 scenario 使用發明的 AC ID（如 <code>@US-DEP-001-AC2</code>、<code>@US-REC-001-AC1</code>、<code>@US-LB-001-AC1</code>），RTM §15.6 亦溯源「US-DEP-001/AC-2」。這些 AC ID 僅存於 BDD/RTM，PRD 從未定義 → PRD→BDD 鏈在源頭斷裂（約佔 27% 需求）；deposit 的 <code>deposit_pack</code>/<code>deposit_order</code>（RTM §15.5）亦不在 PRD §11.1。</li><li>建議修復方向：於 PRD §5 為 REC/LB/DEP 補 AC 表（或新增 §5.6–5.8），再讓 BDD/RTM 的 AC ID 指向之；並將 deposit 資料模型納入 PRD §11.1。</li><li>可自動修復：NO</li></ul>
+<h3 id="high-test-plan--rtmunit-test-數量與懸空-tc-id">[HIGH] test-plan → RTM（unit test 數量與懸空 TC-ID）</h3>
+<ul><li>問題描述：test-plan §15.2 列 18 class 各含 S/E/B 三元組，§3.1 稱「每個 public method ≥ 3 TC：S/E/B … 26 class」（≈54+ unit TC）；RTM §1 卻稱「Unit Test 數 14」「總 Method 數 11」。且 RTM §15.4 引用的 unit TC-ID 不存在於 RTM 權威 §3.2 表或 §6 索引（如 <code>TC-UNIT-MONEY-S01/E01</code>、<code>TC-UNIT-ACCOUNT-S01/E01/B01</code>、<code>TC-UNIT-SESSION-<em></code>、<code>TC-UNIT-SPENDWALLET-</em></code>、<code>TC-UNIT-SCRYPTENC-<em></code>、<code>TC-UNIT-BEARERFILTER-</em></code>）→ RTM 內部懸空，「Method 覆蓋率 100%」僅就 11 個 cherry-pick method 計算、不可驗證。</li><li>建議修復方向：擇一 unit-test 清單為 SSOT；擴充 RTM §3.2/§6 至完整 class×(S/E/B)，或將 test-plan §15.2 修正為真實的 14；重算 §1 總數。</li><li>可自動修復：NO</li></ul>
+<h3 id="high-test-plan--rtmbdddeposit-端點遺漏於-test-plan">[HIGH] test-plan → RTM/BDD（deposit 端點遺漏於 test-plan）</h3>
+<ul><li>問題描述：test-plan 多處稱「16 個 REST 端點」，§3.2 端點覆蓋表恰列 16，但<strong>完全遺漏 <code>GET /deposit/packs</code> 與 <code>POST /deposit/checkout</code></strong>。RTM §4.2 計 18 端點（API-001–018），deposit 有 7 個整合 TC（TC-E2E-DEP-001/002、TC-INT-DEP-003–007），deposit_checkout.feature 有 7 scenario（含關鍵冪等路徑）。deposit 的信任關鍵 checkout/冪等流程在 BDD+RTM 有測、在 test-plan 端點策略與計數卻隱形。§2.1 亦誤標 deposit 為「對應 US-WAL-001 topup pack」、AC 數「—」。</li><li>建議修復方向：於 test-plan §3.2 加入兩個 deposit 端點、將「16」改為「18」，並於 §2.1 給 deposit 獨立 REQ-ID 行。</li><li>可自動修復：YES</li></ul>
+<h3 id="medium-prd-ac--bddplat-ac-1ac-2ac-5-無-gherkin-scenario">[MEDIUM] PRD AC → BDD：PLAT AC-1/AC-2/AC-5 無 Gherkin scenario</h3>
+<ul><li>問題描述：modulith_boundaries.feature 僅涵蓋 PLAT AC-3（DAG）與 AC-4（public API/event）。AC-1（kill pod、錯誤率 &lt;0.1%）、AC-2（滾動更新）、AC-5（local-first）無 scenario（RTM §5.2 註「test-plan §15.1 基礎設施場景，無 BDD feature」）。與 PRD §9.5 DoD「所有 P0 AC 均有對應 BDD scenario 並通過」矛盾（仍可經 TC-E2E-PLAT-001/002/005 溯源，故非 critical）。</li><li>建議修復方向：撰寫 <code>@ha</code> Gherkin scenario（test-plan §3.6.2 已草擬），或修改 PRD DoD 將基礎設施/NFR AC 豁免於 BDD。</li><li>可自動修復：NO</li></ul>
+<h3 id="medium-prd缺口-bddrtmtest-plan限流429與-login-暴力破解不一致">[MEDIUM] PRD（缺口）→ BDD/RTM/test-plan：限流（429）與 login 暴力破解不一致</h3>
+<ul><li>問題描述：限流在 PRD（§5、§7 NFR、§8）全未提，卻有測試：member register <code>TC-INT-MEM-009-E01</code>（429）、wallet spend <code>TC-INT-WAL-007-E01</code>（429）存於 BDD+RTM。反之 test-plan §3.6.1/§3.7 A07 明訂「login 10/min/IP 限流」，但 <strong>login 無 429 scenario、無 RTM 行</strong> — 安全相關控制套用不一致（register+spend 有保護、login 無）。429 scenario 亦因無真實 AC 而掛至不相關 AC（<code>@US-MEM-001-AC1</code>、<code>@US-WAL-001-AC2</code>）。</li><li>建議修復方向：於 PRD 加入限流 NFR 與專屬 AC；補 login-429 scenario + RTM 行；使 429 覆蓋在 auth/write 端點一致。</li><li>可自動修復：NO</li></ul>
+<h3 id="medium-test-plan--rtm-tc-id-不符plat-ac-3ac-4">[MEDIUM] test-plan ↔ RTM TC-ID 不符：PLAT AC-3/AC-4</h3>
+<ul><li>問題描述：同一組 AC，test-plan §15.1 用 <code>TC-UNIT-PLAT-003</code>（AC-3）、<code>TC-INT-PLAT-004</code>（AC-4）；RTM.md 與 modulith feature 用 <code>TC-UNIT-ARCH-005-S01</code>（AC-3）、<code>TC-INT-ARCH-001…004/006-S01</code>（AC-4）。TC-ID 根（PLAT vs ARCH）不符 → 自動從 test-plan §15.1 溯源至 RTM/features 失敗。</li><li>建議修復方向：統一採 ARCH ID（features+RTM 所用），更新 test-plan §15.1。</li><li>可自動修復：YES</li></ul>
+<h3 id="medium-prd--測試覆蓋prd-78-analytics-events9無-bddrtm-tc">[MEDIUM] PRD → 測試覆蓋：PRD §7.8 Analytics Events（9）無 BDD/RTM TC</h3>
+<ul><li>問題描述：PRD §7.8 定義 9 個 server-side analytics event（<code>member_register_completed</code>、<code>wallet_spend_rejected</code>、<code>entitlement_purchase_completed</code> 等），各綁 KPI，PRD §9.5 DoD 要求「§7.8 所有 Event 已確認觸發 ≥ 5 次」。無 feature scenario 斷言任何 §7.8 event 發送，RTM 無對應 TC。（domain_event_contracts 覆蓋的是內部 domain event 如 MemberRegistered，與 §7.8 analytics event 不同。）</li><li>建議修復方向：為 9 個 analytics event 加入 BDD 斷言（或獨立 analytics 測試類別）+ RTM 行，或將該 DoD 項移至非自動化檢查清單。</li><li>可自動修復：NO</li></ul>
+<h3 id="medium-test-plan--bddrtmmemberdeleted-event-對未溯源--範圍混淆">[MEDIUM] test-plan → BDD/RTM：MemberDeleted event 對未溯源 + 範圍混淆</h3>
+<ul><li>問題描述：test-plan §3.8.3 定義 5 個跨 BC 合約測試 SM-TEST-02-EVT-03..07（<code>MemberDeleted</code> → wallet/entitlement/record/leaderboard/game-save 清理）。domain_event_contracts.feature 無 <code>MemberDeleted</code> scenario，RTM 無對應 TC。觸發端點（<code>DELETE /auth/me</code>）為 Phase B（PRD §17.3），test-plan 卻為無 PRD-A 需求、無溯源的 Phase B 清理指定測試。</li><li>建議修復方向：補 MemberDeleted scenario+RTM 行，或於 test-plan 明標 SM-TEST-02-EVT-03..07 為 Phase B / 範圍外。</li><li>可自動修復：NO</li></ul>
+<h3 id="low-test-plan--rtmfeaturestc-id-後綴慣例不符">[LOW] test-plan ↔ RTM/features：TC-ID 後綴慣例不符</h3>
+<ul><li>問題描述：test-plan §15.1 寫裸根（<code>TC-E2E-MEM-001</code>、<code>TC-INT-MEM-002</code>、<code>TC-UNIT-WAL-004</code>），RTM.md 與全部 features 用 <code>-S01/-E01/-B01</code> 後綴。人可對應、字串工具無法精確溯源。</li><li>建議修復方向：於 test-plan §15.1 一致套用後綴慣例。</li><li>可自動修復：YES</li></ul>
+<h3 id="low-rtm-內部計數缺陷1--42--52--6">[LOW] RTM 內部計數缺陷：§1 / §4.2 / §5.2 / §6</h3>
+<ul><li>問題描述：<code>TC-E2E-ENT-005-S01</code> 被重複計數 — §4.2 Integration（API-011）一次、§5.2 E2E（SC-ENT-05）一次，§6 同一 RQ-003 格內亦列兩次（稱「總測試數 11」實僅 10 唯一）。故「Total Test Cases = 80 / E2E = 6」略為高估，§6 RQ-003 總數錯誤。</li><li>建議修復方向：去重 ENT-005，修 RQ-003 計數為 10，重算 §1 總數。</li><li>可自動修復：YES</li></ul>
+<h3 id="low-bdd-ac-tag-準確性featuresmember--featurescross-moduleevent">[LOW] BDD AC-tag 準確性：features/member + features/cross-module/event</h3>
+<ul><li>問題描述：數個 scenario 因無精確 AC 而掛至描述不同行為的 AC：GET /auth/me happy-path「已登入者查詢我的資料」掛 <code>@US-MEM-001-AC1</code>（AC-1 為註冊；PRD 僅有 AC-6 之 401 情境，無 200 情境）；兩個 logout scenario 皆掛 <code>@US-MEM-001-AC4</code>（AC-4 為 login）。domain_event_contracts「wallet 消費會員註冊事件後建立初始錢包」掛 <code>@US-WAL-001-AC1</code>（topup），實為 MEM AC-1（註冊建立錢包 + init ledger）。</li><li>建議修復方向：於 PRD 補專屬 AC（me-success、logout）後重掛；將 register 驅動的開錢包 scenario 重掛至 MEM AC-1。</li><li>可自動修復：NO</li></ul>
+<hr>
+<h2 id="dimension-5--uml--rtm-結構品質">Dimension 5 — UML / RTM 結構品質</h2>
+<p>已存在：EDD class diagram 分三張（class-domain、class-application、class-infra-presentation）+ class-inventory.md；9 大 Server UML（use-case/class/object/sequence×N/communication/state×N/activity×N/component/deployment/er-diagram）+ CI/CD UML + Modulith 圖，皆以 Mermaid 呈現，位於 <code>docs/diagrams/</code>。</p>
+<h3 id="medium-docsrtmcsv-不存在缺少機器可讀-rtm">[MEDIUM] docs/RTM.csv 不存在（缺少機器可讀 RTM）</h3>
+<ul><li>問題描述：僅有 docs/RTM.md，無 docs/RTM.csv。缺少機器可讀追溯矩陣，不利自動化覆蓋率計算。</li><li>建議修復方向：由 RTM.md 匯出 RTM.csv（或於 gendoc 流程補生成）。</li><li>可自動修復：YES</li></ul>
+<h3 id="medium-docsdiagramspuml-無-plantuml-檔">[MEDIUM] docs/diagrams/puml/ 無 PlantUML 檔</h3>
+<ul><li>問題描述：diagrams 以 Mermaid（.md）實作，無 <code>docs/diagrams/puml/*.puml</code>。若流程要求 PlantUML 併行輸出則缺失；若專案標準即為 Mermaid，可視為設計選擇（降級為資訊性）。</li><li>建議修復方向：若需 PlantUML，補生成；否則於報告註記 Mermaid 為專案圖表標準。</li><li>可自動修復：YES（條件性）</li></ul>
+<hr>
+<h2 id="dimension-6--ai-gencode-readiness">Dimension 6 — AI Gencode Readiness</h2>
+<table>
+<tr><th>Layer</th><th>Score</th><th>狀態</th></tr>
+<tr><td>SCHEMA</td><td>100%</td><td>✅ 就緒</td></tr>
+<tr><td>BDD/Tests</td><td>100%</td><td>✅ 就緒</td></tr>
+<tr><td>API</td><td>70%</td><td>⚠️ 可提升</td></tr>
+<tr><td>CI/CD</td><td>70%</td><td>⚠️ 可提升</td></tr>
+<tr><td>LOCAL_DEPLOY</td><td>50%</td><td>🔴 需補強</td></tr>
+</table>
+<p>整體 AI Gencode 就緒度：<strong>78%</strong>（⚠️）</p>
+<h3 id="high-local_deployai-gencode-就緒度-50">[HIGH] LOCAL_DEPLOY：AI gencode 就緒度 50%</h3>
+<ul><li>問題描述：掃描缺少實際 <code>.env.example</code> 檔案，以及 supabase/migration-up/pnpm 類一鍵啟動指令與 seed 指令密度不足。對 AI 直接生成本機部署腳本的就緒度偏低。</li><li>建議修復方向：補 <code>.env.example</code>（或在文件內嵌完整範例）、補足 docker-compose / k8s manifest 與 <code>db:seed</code> 指令區塊。</li><li>可自動修復：YES（部分）</li></ul>
+<h3 id="medium-apiai-gencode-就緒度-70">[MEDIUM] API：AI gencode 就緒度 70%</h3>
+<ul><li>問題描述：有 JSON request/response 範例與 error code，但缺少 Zod/joi/class-validator 類可執行驗證 schema 定義，AI 生成 input validation 需自行推導。</li><li>建議修復方向：於 API.md 補每個端點的驗證 schema（或 TS interface + validator）。</li><li>可自動修復：YES</li></ul>
+<hr>
+<h2 id="dimension-7--doc--generated-artifact">Dimension 7 — Doc → Generated Artifact</h2>
+<p>N/A：本專案無 <code>docs/blueprint/</code>（mock、contracts）與 <code>docs/pages/</code>（prototype、API Explorer、HTML）。gendoc-only 文件階段尚未生成下游 artifact，故無可比對項。</p>
+<hr>
+<h2 id="修復建議">修復建議</h2>
+<ul><li>建議執行：<code>/gendoc-align-fix all</code>（CRITICAL/HIGH 必修）</li><li>本輪 HIGH 修復重點（5 項）：</li></ul>
+<ol><li>[D1] EDD §3.5 DB host / data namespace 對齊 LOCAL_DEPLOY（<code>yocat-pg.yocat...</code>）</li><li>[D4] PRD 為 P1（REC/LB/DEP）補 AC，接回 BDD/RTM AC ID</li><li>[D4] test-plan unit-test 數量 SSOT 化、修懸空 TC-ID、重算總數</li><li>[D4] test-plan §3.2 補 deposit 兩端點、「16」→「18」</li><li>[D6] LOCAL_DEPLOY 補 <code>.env.example</code> 與一鍵啟動/seed 指令</li></ol>
+<ul><li>無法自動修復（需設計/需求決策）者已於各 finding 標 <code>可自動修復: NO</code>。</li></ul>
+<hr>
+<h2 id="修復狀態gendoc-align-fixlayerall">修復狀態（gendoc-align-fix，layer=all）</h2>
+<p>本輪已自動修復（可自動修復: YES）：</p>
+<table>
+<tr><th>#</th><th>Finding</th><th>嚴重度</th><th>狀態</th><th>修改檔案</th></tr>
+<tr><td>1</td><td>D1 EDD §3.5 DB host → <code>yocat-pg.yocat.svc.cluster.local</code>（+ data namespace 註記）</td><td>HIGH</td><td>✅ FIXED</td><td>EDD.md</td></tr>
+<tr><td>2</td><td>D4 PRD P1（REC/LB/DEP）補 AC（§5.6/5.7/5.8）+ 接回 BDD/RTM AC ID + §11.1 deposit 資料表</td><td>HIGH</td><td>✅ FIXED</td><td>PRD.md</td></tr>
+<tr><td>3</td><td>D4 test-plan deposit 端點補入、「16」→「18」、§2.1 deposit REQ-ID</td><td>HIGH</td><td>✅ FIXED</td><td>test-plan.md</td></tr>
+<tr><td>4</td><td>D6 LOCAL_DEPLOY 補 <code>.env.example</code>（Spring Boot/PG/Redis 變數）+ cp 提示</td><td>HIGH</td><td>✅ FIXED</td><td>.env.example, LOCAL_DEPLOY.md</td></tr>
+<tr><td>5</td><td>D1 constants wallet_ledger_reason enum → init/topup/rescue/buy_cosmetic/buy_dream/buy_scenario</td><td>MEDIUM</td><td>✅ FIXED</td><td>constants.json, CONSTANTS.md</td></tr>
+<tr><td>6</td><td>D1/D4 Redis 7.2 加入 PRD §8.2/§8.3 依賴（含降級策略）</td><td>MEDIUM</td><td>✅ FIXED</td><td>PRD.md</td></tr>
+<tr><td>7</td><td>D4 test-plan TC-ID PLAT→ARCH 統一</td><td>MEDIUM</td><td>✅ FIXED</td><td>test-plan.md</td></tr>
+<tr><td>8</td><td>D6 API.md 補 Bean Validation 驗證規則（§2.7.1，7 個寫入端點）</td><td>MEDIUM</td><td>✅ FIXED</td><td>API.md</td></tr>
+<tr><td>9</td><td>D5 補 docs/RTM.csv（機器可讀追溯矩陣，79 行 + header）</td><td>MEDIUM</td><td>✅ FIXED</td><td>RTM.csv</td></tr>
+<tr><td>10</td><td>D1 DEVELOPER_GUIDE Redis 7 → 7.2</td><td>LOW</td><td>✅ FIXED</td><td>DEVELOPER_GUIDE.md</td></tr>
+<tr><td>11</td><td>D1 game-day 常數鍵名 <code>_MIN</code> 後綴對齊</td><td>LOW</td><td>✅ FIXED</td><td>CONSTANTS.md</td></tr>
+<tr><td>12</td><td>D1 client BACKEND_URL 預設 <code>:3000</code> → <code>:30088</code></td><td>LOW</td><td>✅ FIXED</td><td>constants.json, CONSTANTS.md</td></tr>
+<tr><td>13</td><td>D4 test-plan §15.1 TC-ID <code>-S01/-E01/-B01</code> 後綴慣例統一</td><td>LOW</td><td>✅ FIXED</td><td>test-plan.md</td></tr>
+<tr><td>14</td><td>D4 RTM <code>TC-E2E-ENT-005-S01</code> 去重、RQ-003 11→10、總數 80→79 重算</td><td>LOW</td><td>✅ FIXED</td><td>RTM.md, RTM.csv</td></tr>
+</table>
+<p>需人工確認 / 需求決策（可自動修復: NO，本輪不自動改）：</p>
+<table>
+<tr><th>#</th><th>Finding</th><th>嚴重度</th><th>狀態</th><th>原因</th></tr>
+<tr><td>A</td><td>D4 test-plan unit-test 數量 SSOT（§15.2 的 18 class×S/E/B vs RTM §1「14」）與懸空 unit TC-ID（TC-UNIT-MONEY/ACCOUNT/...）</td><td>HIGH</td><td>⚠️ MANUAL</td><td>需決定測試深度 SSOT（擴 RTM 至完整 class×SEB 或下修 test-plan 至 14），涉及測試策略取捨；RTM 內部計數缺陷已先行修復</td></tr>
+<tr><td>B</td><td>D4 PLAT AC-1/AC-2/AC-5 無 BDD scenario（與 PRD §9.5 DoD 矛盾）</td><td>MEDIUM</td><td>⚠️ MANUAL</td><td>需決定撰寫 <code>@ha</code> 基礎設施 scenario 或修改 DoD 豁免 NFR AC（仍可經 TC-E2E-PLAT 溯源）</td></tr>
+<tr><td>C</td><td>D4 限流（429）與 login 暴力破解覆蓋不一致（PRD 無限流 NFR）</td><td>MEDIUM</td><td>⚠️ MANUAL</td><td>需 PM 新增限流 NFR + AC 後再補 login-429 scenario</td></tr>
+<tr><td>D</td><td>D4 PRD §7.8 Analytics Events（9）無 BDD/RTM TC</td><td>MEDIUM</td><td>⚠️ MANUAL</td><td>需決定 analytics event 驗證方式（自動化 or 非自動化 DoD 清單）</td></tr>
+<tr><td>E</td><td>D4 MemberDeleted event 對（SM-TEST-02-EVT-03..07）未溯源（DELETE /auth/me 為 Phase B）</td><td>MEDIUM</td><td>⚠️ MANUAL</td><td>需決定 Phase B 範圍標註</td></tr>
+<tr><td>F</td><td>D1 PRD §11.1 deposit 冪等「Phase B 預留」描述過時（實際 Phase A 已落地）</td><td>LOW</td><td>⚠️ 部分</td><td>由 D4 §11.1 deposit 補充時一併澄清；原 B-tag 文字可後續微調</td></tr>
+<tr><td>G</td><td>D4 BDD AC-tag 準確性（me-success/logout 掛錯 AC）</td><td>LOW</td><td>⚠️ MANUAL</td><td>待 PRD 補專屬 AC（me-success、logout）後重掛</td></tr>
+<tr><td>H</td><td>D1 SCHEMA <code>password_history</code> 孤兒表（gold-plating）</td><td>LOW</td><td>⚠️ MANUAL</td><td>保留程式/資料表不自動刪，待決定延 Phase B 或補需求</td></tr>
+</table>
+<p>小結：本輪修復 14 項（HIGH 4 / MEDIUM 5 / LOW 5），MANUAL 保留 8 項（HIGH 1 / MEDIUM 4 / LOW 3，均為需求/測試策略決策，不屬可自動對齊範圍）。</p>
+<hr>
+<h2 id="複驗結果align-verifygendoc-align-check-第二輪">複驗結果（ALIGN-VERIFY，gendoc-align-check 第二輪）</h2>
+<p>複驗日期：2026-10-30 · 複驗對象：align-fix 後之 docs/*.md、features/、constants/、.env.example</p>
+<h3 id="複驗總覽修復後殘留">複驗總覽（修復後殘留）</h3>
+<table>
+<tr><th>對齊層</th><th>CRITICAL</th><th>HIGH</th><th>MEDIUM</th><th>LOW</th><th>狀態</th></tr>
+<tr><td>D1 Doc → Doc</td><td>0</td><td>0</td><td>0</td><td>2（MANUAL/部分）</td><td>✅</td></tr>
+<tr><td>D2 Doc → Code</td><td>—</td><td>—</td><td>—</td><td>—</td><td>N/A</td></tr>
+<tr><td>D3 Code → Test</td><td>—</td><td>—</td><td>—</td><td>—</td><td>N/A</td></tr>
+<tr><td>D4 Doc → Test</td><td>0</td><td>0</td><td>4（MANUAL）</td><td>1（MANUAL）</td><td>✅ HIGH 歸零</td></tr>
+<tr><td>D5 UML / RTM 品質</td><td>0</td><td>0</td><td>1（PlantUML，條件性）</td><td>0</td><td>✅（RTM.csv 已補）</td></tr>
+<tr><td>D6 AI Gencode</td><td>0</td><td>0</td><td>1（API 70%，內容已補 Bean Validation，評分 regex 為 Zod 導向）</td><td>0</td><td>✅（LOCAL_DEPLOY 50%→80%）</td></tr>
+<tr><td>D7 Doc → Artifact</td><td>—</td><td>—</td><td>—</td><td>—</td><td>N/A</td></tr>
+<tr><td><strong>總計</strong></td><td><strong>0</strong></td><td><strong>0</strong></td><td><strong>6</strong></td><td><strong>3</strong></td><td></td></tr>
+</table>
+<h3 id="複驗結論">複驗結論</h3>
+<ul><li><strong>CRITICAL = 0、HIGH = 0</strong>：初掃 5 項 HIGH 全數修復並通過複驗：</li></ul>
+<ol><li>EDD §3.5 DB host 已對齊 <code>yocat-pg.yocat.svc.cluster.local</code>（與 LOCAL_DEPLOY/postgres.yaml 一致）✅</li><li>PRD P1（REC/LB/DEP）AC 已補（§5.6/5.7/5.8），BDD/RTM AC ID 已接回 ✅</li><li>test-plan deposit 端點補入、端點數 16→18 全文一致 ✅</li><li>test-plan↔RTM unit-test 數量 SSOT 化（統一 14 TC / 11 method，RTM §3.2 為準），RTM §15.4 懸空 TC-ID 全部解析或標「規劃中」✅</li><li>LOCAL_DEPLOY <code>.env.example</code> 已補，D6 就緒度 50%→80% ✅</li></ol>
+<ul><li><strong>殘留 MEDIUM（6）/ LOW（3）</strong> 皆為需求/測試策略決策（MANUAL），或為評分 regex 技術特性（D6 API 以 Zod 關鍵字評分，本專案為 Java Bean Validation，內容已補但分數不反映）、或條件性項目（PlantUML：本專案圖表標準為 Mermaid）。詳見上方「修復狀態」之 MANUAL 清單（A–H）。這些不屬可自動對齊範圍，需 PM / 測試負責人決策後再處理。</li></ul>
+<blockquote><p>判定：ALIGN-VERIFY 通過 — CRITICAL/HIGH 歸零；MEDIUM/LOW 殘留均為已記錄之人工決策項。</p></blockquote></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

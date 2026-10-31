@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/ErrorResponse",
+  "title": "ErrorResponse",
+  "description": "通用錯誤回應（402 時附 wallet）",
+  "type": "object",
+  "properties": {
+    "error": {
+      "type": "string",
+      "description": "人類可讀錯誤訊息（zh-TW）"
+    },
+    "wallet": {
+      "$ref": "WalletView.schema.json"
+    }
+  },
+  "required": [
+    "error"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ErrorDTO>>"
+}

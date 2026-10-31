@@ -1,0 +1,51 @@
+{
+  "consumer": { "name": "member-bc" },
+  "provider": { "name": "wallet-bc" },
+  "interactions": [
+    {
+      "description": "MemberRegistered domain event provisions wallet + init ledger (Outbox async)",
+      "providerState": "no wallet exists for the newly registered account",
+      "request": {
+        "method": "POST",
+        "path": "/internal/events/MemberRegistered",
+        "headers": { "Content-Type": "application/json" },
+        "body": { "eventId": "e-7781", "accountId": "1024", "email": "boss@yocat.example" },
+        "matchingRules": {
+          "$.body.eventId": { "match": "type" },
+          "$.body.accountId": { "match": "type" },
+          "$.body.email": { "match": "regex", "regex": "^[^@]+@[^@]+$" }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "ok": true, "wallet": { "cash": 0, "gems": 0 } },
+        "matchingRules": {
+          "$.body.wallet.cash": { "match": "integer" },
+          "$.body.wallet.gems": { "match": "integer" }
+        }
+      }
+    },
+    {
+      "description": "MemberRegistered redelivery is idempotent (event_id dedup, wallet already provisioned)",
+      "providerState": "wallet already exists for account 1024 (event previously consumed)",
+      "request": {
+        "method": "POST",
+        "path": "/internal/events/MemberRegistered",
+        "headers": { "Content-Type": "application/json" },
+        "body": { "eventId": "e-7781", "accountId": "1024", "email": "boss@yocat.example" }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "ok": true, "wallet": { "cash": 0, "gems": 0 } }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "x-source": "docs/EDD.md §3.4 / §4.6.1 (member → wallet, Customer/Supplier Event) + docs/API.md POST /auth/register",
+    "x-integration": "async domain event via Spring Modulith Event Publication Registry (JDBC Outbox), up to 5 retries, event_id idempotent",
+    "x-generated-by": "gendoc-gen-contracts"
+  }
+}

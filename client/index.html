@@ -1,0 +1,2216 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>yoCat Office — 電商公司辦公室模擬</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A2%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A2%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#161b29; --panel:#212839; --ink:#eef2ff; --muted:#9aa6c8; --line:#333c55;
+    --chan:#4a90d9; --xiao:#f5a623; --ren:#5cc26a; --fa:#9a6cf0; --cai:#e0506a; --boss:#f3c43a;
+    --floor1:#2a3150; --floor2:#262d49;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI","Microsoft JhengHei",system-ui,sans-serif;overflow:hidden}
+  #app{display:flex;height:100%}
+  #stage{flex:1;position:relative;background:radial-gradient(120% 90% at 50% 30%,#1d2336,#121624)}
+  canvas{display:block;width:100%;height:100%}
+  #hud{position:absolute;top:0;left:0;right:0;display:flex;gap:12px;align-items:center;
+    padding:10px 16px;background:linear-gradient(#000a,transparent);pointer-events:none}
+  #hud .stat{background:#0006;border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:13px}
+  #hud .stat b{color:#fff}
+  #clock{font-size:19px;font-weight:700;letter-spacing:1px;background:#0006;border:1px solid var(--line);
+    border-radius:10px;padding:5px 12px}
+  #side{width:300px;background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;padding:14px;gap:10px;overflow:auto}
+  h1{font-size:16px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:6px}
+  .btn{display:block;width:100%;text-align:left;border:1px solid var(--line);background:#2b3350;
+    color:var(--ink);padding:10px 12px;border-radius:10px;cursor:pointer;font-size:14px;transition:.15s}
+  .btn:hover{background:#34406a}
+  .btn.active{background:#3a5bd0;border-color:#5b7bf0}
+  .btn small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+  .legend{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+  .dept{display:flex;align-items:center;gap:5px;font-size:12px;background:#0004;padding:3px 8px;border-radius:20px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  #inspect{background:#0004;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;min-height:60px}
+  #inspect .nm{font-weight:700;font-size:15px}
+  #inspect .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;color:#111;margin-left:6px}
+  #log{flex:1;min-height:80px;background:#0006;border:1px solid var(--line);border-radius:10px;
+    padding:8px;font-size:12px;color:var(--muted);overflow:auto}
+  #log div{margin-bottom:3px;line-height:1.35}
+  .hint{color:var(--muted);font-size:11px}
+  .modeband{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+    background:#3a5bd0;color:#fff;padding:7px 16px;border-radius:30px;font-size:13px;display:none}
+  #scen-hud{position:absolute;top:52px;left:50%;transform:translateX(-50%);display:none;z-index:4;
+    background:linear-gradient(135deg,#7a4dd0,#3a5bd0);color:#fff;padding:5px 14px;border-radius:24px;
+    font-size:12.5px;white-space:nowrap;box-shadow:0 4px 14px #0006;max-width:92%;overflow:hidden;text-overflow:ellipsis}
+  #scen-hud b{color:#ffe08a} #scen-hud .sh-left{opacity:.85;margin-left:4px}
+  @media(max-width:640px){ #scen-hud{top:46px;font-size:11px;padding:4px 10px} }
+  #danger{position:absolute;bottom:50px;left:50%;transform:translateX(-50%);display:none;z-index:4;
+    background:linear-gradient(135deg,#8a2a2a,#c0392b);color:#fff;padding:5px 15px;border-radius:24px;
+    font-size:12.5px;white-space:nowrap;box-shadow:0 4px 16px #0008;animation:dgpulse 1.4s ease-in-out infinite}
+  #danger.show{display:block} @keyframes dgpulse{0%,100%{opacity:1}50%{opacity:.6}}
+  .reqcard{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:340px;max-width:86%;
+    background:#1b2440;border:1px solid #3a5bd0;border-radius:14px;padding:13px 15px;box-shadow:0 10px 30px #0008;display:none;z-index:5}
+  .reqcard .rq-who{font-weight:700;color:#ffd166;font-size:14px;margin-bottom:5px}
+  .reqcard .rq-msg{color:#eef2ff;font-size:14px;line-height:1.45;margin-bottom:11px}
+  .reqcard .rq-btns{display:flex;gap:9px}
+  .reqcard button{flex:1;border:none;border-radius:9px;padding:9px;font-size:14px;cursor:pointer;font-weight:600}
+  .reqcard .yes{background:#3a7bd0;color:#fff} .reqcard .yes:hover{background:#4b8be0}
+  .reqcard .no{background:#39405a;color:#cdd6f0} .reqcard .no:hover{background:#464e6e}
+  #req-badge{position:absolute;top:60px;right:14px;background:#e0506a;color:#fff;border-radius:16px;
+    padding:4px 11px;font-size:12px;font-weight:700;display:none;cursor:pointer;z-index:5}
+  /* 選單收合鈕（小螢幕才顯示）*/
+  #menu-toggle{display:none;position:absolute;top:10px;right:12px;z-index:31;width:44px;height:44px;
+    border-radius:11px;background:#2b3350dd;border:1px solid var(--line);color:#fff;font-size:21px;
+    align-items:center;justify-content:center;cursor:pointer;pointer-events:auto}
+  #menu-backdrop{display:none;position:fixed;inset:0;background:#0007;z-index:20}
+  /* 通用選單彈窗（招募/公告/派任務/解職/對談都用選的）*/
+  #picker{display:none;position:fixed;inset:0;background:#000a;z-index:40;align-items:center;justify-content:center;padding:18px}
+  #picker.show{display:flex}
+  .picker-box{background:#1b2440;border:1px solid #3a5bd0;border-radius:16px;width:min(420px,94vw);
+    max-height:82vh;display:flex;flex-direction:column;box-shadow:0 16px 44px #000b}
+  .picker-title{font-weight:700;font-size:15px;color:#ffd166;padding:14px 16px 8px}
+  .picker-opts{overflow:auto;padding:4px 12px 8px;display:flex;flex-direction:column;gap:7px}
+  .picker-opt{text-align:left;border:1px solid var(--line);background:#283255;color:var(--ink);
+    padding:11px 13px;border-radius:10px;cursor:pointer;font-size:14px;line-height:1.4}
+  .picker-opt:hover{background:#34406a;border-color:#5b7bf0}
+  .picker-opt small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+  .picker-cancel{margin:4px 12px 14px;border:none;background:#39405a;color:#cdd6f0;border-radius:10px;padding:10px;font-size:14px;cursor:pointer}
+  .picker-cancel:hover{background:#464e6e}
+  /* 里程碑/成就慶祝橫幅 */
+  #celebrate{position:absolute;top:84px;left:50%;transform:translateX(-50%) translateY(-18px);z-index:35;
+    background:linear-gradient(135deg,#ffcf5e,#ff9d4d);color:#3a2600;border-radius:14px;padding:10px 22px;text-align:center;
+    box-shadow:0 10px 30px #0007;opacity:0;pointer-events:none;transition:.35s;max-width:90%}
+  #celebrate.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #celebrate .cel-t{font-weight:800;font-size:16px}
+  #celebrate .cel-s{font-size:12px;opacity:.85;margin-top:2px}
+  /* 公司大事記/分享 */
+  #digest{display:none;position:fixed;inset:0;background:#000a;z-index:42;align-items:center;justify-content:center;padding:18px}
+  #digest.show{display:flex}
+  .dg-box{background:#141b30;border:1px solid #3a5bd0;border-radius:16px;width:min(460px,94vw);max-height:86vh;display:flex;flex-direction:column;box-shadow:0 16px 44px #000b}
+  .dg-head{padding:14px 16px 8px;font-weight:800;font-size:16px;color:#ffd166}
+  .dg-sub{padding:0 16px 6px;font-size:12px;color:var(--muted)}
+  .dg-list{overflow:auto;padding:6px 14px;display:flex;flex-direction:column;gap:6px}
+  .dg-item{display:flex;gap:9px;align-items:flex-start;background:#0004;border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-size:13px}
+  .dg-item .dg-d{color:var(--muted);font-size:11px;white-space:nowrap;margin-top:1px}
+  .dg-btns{display:flex;gap:9px;padding:10px 14px 14px}
+  .dg-btns button{flex:1;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:600;cursor:pointer}
+  .dg-share{background:#3a7bd0;color:#fff} .dg-share:hover{background:#4b8be0}
+  .dg-drama{background:#c04a86;color:#fff} .dg-drama:hover{background:#d85a9a}
+  .dg-close{background:#39405a;color:#cdd6f0} .dg-close:hover{background:#464e6e}
+  #scen-modal{position:fixed;inset:0;background:#000a;display:none;z-index:40;align-items:center;justify-content:center;padding:18px}
+  #scen-modal.show{display:flex}
+  .sm-box{background:linear-gradient(160deg,#232a44,#1a2036);border:1px solid #3a4568;border-radius:18px;max-width:420px;width:100%;padding:22px 22px 18px;box-shadow:0 20px 60px #000b;text-align:center}
+  .sm-title{font-size:21px;font-weight:800;color:#ffe08a;margin-bottom:12px}
+  .sm-body{color:#d6ddf2;font-size:14.5px;line-height:1.7;text-align:left}
+  .sm-narr{background:#00000030;border-left:3px solid #7a4dd0;border-radius:8px;padding:11px 13px;margin:2px 0 4px;font-style:italic;color:#cfe0ff}
+  .sm-grade{font-size:62px;font-weight:900;text-align:center;line-height:1.1;margin:4px 0}
+  .sm-grade.S{color:#ffd166} .sm-grade.A{color:#7ee787} .sm-grade.B{color:#79c0ff} .sm-grade.C{color:#f0a868} .sm-grade.X{color:#ff7b72;font-size:40px}
+  .sm-cmt{text-align:center;font-weight:600;color:#fff;margin-bottom:12px}
+  .sm-stats{background:#00000028;border-radius:10px;padding:10px 14px;font-size:13.5px}
+  .sm-stats div{display:flex;justify-content:space-between;padding:3px 0;color:#c2cbe6} .sm-stats b{color:#fff}
+  .sm-go{margin-top:10px;width:100%;border:none;border-radius:11px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;
+    background:linear-gradient(135deg,#7a4dd0,#3a5bd0);color:#fff} .sm-go:hover{filter:brightness(1.12)}
+  .sm-share{margin-top:16px;width:100%;border:none;border-radius:11px;padding:11px;font-size:14px;font-weight:600;cursor:pointer;
+    background:#2f3658;color:#cdd6f0;display:none} .sm-share:hover{background:#3a4268} .sm-share.on{display:block}
+  /* 新手引導 */
+  #welcome{display:none;position:fixed;inset:0;background:#000b;z-index:50;align-items:center;justify-content:center;padding:18px}
+  #welcome.show{display:flex}
+  #account{display:none;position:fixed;inset:0;background:#000d;z-index:60;align-items:center;justify-content:center;padding:18px}
+  #account.show{display:flex}
+  .ac-in{padding:10px 12px;border-radius:9px;border:1px solid #39435c;background:#0f1522;color:#e8edf6;font-size:15px;width:100%;box-sizing:border-box}
+  .ac-in:focus{outline:none;border-color:#3a5bd0}
+  .wc-box{background:linear-gradient(160deg,#1b2440,#131a2c);border:1px solid #3a5bd0;border-radius:18px;width:min(460px,94vw);
+    max-height:88vh;overflow:auto;padding:22px 22px 18px;box-shadow:0 18px 50px #000c}
+  .wc-box h2{margin:0 0 4px;font-size:21px}
+  .wc-box .wc-tag{color:var(--muted);font-size:13px;margin-bottom:14px}
+  .wc-row{display:flex;gap:11px;align-items:flex-start;margin:11px 0}
+  .wc-row .ic{font-size:22px;line-height:1.1}
+  .wc-row .tx{font-size:13.5px;line-height:1.5}
+  .wc-row .tx b{color:#ffd166}
+  .wc-go{width:100%;margin-top:16px;border:none;border-radius:11px;padding:13px;font-size:15px;font-weight:700;
+    background:linear-gradient(135deg,#4b8be0,#6a5bd0);color:#fff;cursor:pointer}
+  .wc-go:hover{filter:brightness(1.08)}
+  /* ===== 手機／小螢幕自適應 ===== */
+  @media (max-width:760px){
+    #hud{gap:6px;padding:8px 52px 8px 10px;flex-wrap:wrap}
+    #hud .stat{padding:4px 8px;font-size:11px}
+    #clock{font-size:16px;padding:4px 9px}
+    #menu-toggle{display:flex}
+    #side{position:fixed;top:0;right:0;height:100%;width:86%;max-width:340px;z-index:30;
+      transform:translateX(100%);transition:transform .25s ease;box-shadow:-10px 0 34px #0009}
+    #app.menu-open #side{transform:translateX(0)}
+    #app.menu-open #menu-backdrop{display:block}
+    .reqcard{width:300px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="hud">
+      <div id="clock">09:00</div>
+      <div class="stat">第 <b id="s-day">1</b> 天</div>
+      <div class="stat">💰 現金 <b id="s-cash">20,000</b></div>
+      <div class="stat">📈 估值 <b id="s-val">0</b></div>
+      <div class="stat">今日營收 <b id="s-rev">0</b></div>
+      <div class="stat">士氣 <b id="s-mor">70</b></div>
+      <div class="stat">訂單 <b id="s-ord">0</b></div>
+      <div class="stat">員工 <b id="s-emp">0</b></div>
+    </div>
+    <div class="modeband" id="modeband"></div>
+    <div id="scen-hud"></div>
+    <div id="danger"></div>
+    <div id="celebrate"></div>
+    <button id="menu-toggle" aria-label="選單">☰</button>
+    <div id="req-badge"></div>
+    <div id="picker"><div class="picker-box"><div class="picker-title" id="picker-title"></div>
+      <div class="picker-opts" id="picker-opts"></div><button class="picker-cancel" id="picker-cancel">取消</button></div></div>
+    <div id="digest"><div class="dg-box"><div class="dg-head" id="dg-head">📰 公司大事記</div><div class="dg-sub" id="dg-sub"></div>
+      <div class="dg-list" id="dg-list"></div>
+      <div class="dg-btns"><button class="dg-share" id="dg-share">📷 分享圖</button><button class="dg-drama" id="dg-drama">🎭 八點檔海報</button><button class="dg-close" id="dg-close">關閉</button></div></div></div>
+    <div id="scen-modal"><div class="sm-box">
+      <div class="sm-title" id="sm-title"></div>
+      <div class="sm-body" id="sm-body"></div>
+      <button class="sm-share" id="sm-share">📷 存成成績分享圖</button>
+      <button class="sm-go" id="sm-go">開始經營 →</button>
+    </div></div>
+    <div class="reqcard" id="reqcard">
+      <div class="rq-who" id="req-who"></div>
+      <div class="rq-msg" id="req-msg"></div>
+      <div class="rq-btns"><button class="yes" id="req-yes">答應</button><button class="no" id="req-no">婉拒</button></div>
+    </div>
+  </div>
+  <div id="side">
+    <div>
+      <h1>🏢 yoCat Office</h1>
+      <div class="sub">電商公司・2.5D 辦公室模擬（Phase 1 原型）</div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <button class="btn" id="acct-btn" style="background:#243447">👤 <span id="acct-label">訪客（點此登入）</span> <small>你的辦公室・存檔・儲值都綁定帳號</small></button>
+    <button class="btn" id="autopilot-btn" style="background:#2a3550">🤖 AI 代管：關 <small>開啟後由 AI 自動幫你管理</small></button>
+    <button class="btn" data-act="hire">➕ 招募 <small>選部門（上限 8 位）</small></button>
+    <button class="btn" data-act="fire">➖ 解職 <small>名單選員工（至少留 1 位）</small></button>
+    <button class="btn" data-act="task">📋 派任務 <small>選員工再選任務</small></button>
+    <button class="btn" data-act="announce">📣 貼老闆公告 <small>從選項挑一則</small></button>
+    <button class="btn" id="digest-btn">📰 公司大事記 <small>回顧精華・存成分享圖</small></button>
+    <button class="btn" id="goals-btn">🎯 目標與成就 <small>里程碑、成就、公司估值</small></button>
+    <button class="btn" id="scen-btn">📜 劇本挑戰 <small>限時目標挑戰・含付費劇本</small></button>
+    <button class="btn" id="sound-btn">🔊 音效與音樂 <small>開關音效・背景音樂</small></button>
+    <button class="btn" id="gem-btn">💰 資本 / 儲值 <small>注資：現金↑且資本↑・外觀用現金</small></button>
+    <button class="btn" id="shop-btn">🛍️ 主題商店 <small>用現金換辦公室外觀</small></button>
+    <div id="inspect"><span class="hint">點任一員工可查看／對話</span></div>
+    <div class="sub" style="margin:2px 0 -4px">公司動態</div>
+    <div id="log"></div>
+    <div class="hint" id="conn">LLM：離線（內建行為）</div>
+  </div>
+  <div id="menu-backdrop"></div>
+  <div id="welcome"><div class="wc-box">
+    <h2>🏢 歡迎來到 yoCat Office</h2>
+    <div class="wc-tag">你是老闆，但公司是「活的」——員工全由 AI 即時驅動</div>
+    <div class="wc-row"><div class="ic">🧠</div><div class="tx">每個員工都有<b>個性、口頭禪、記憶</b>，會自己<b>聊天、八卦、談戀愛、鬧脾氣、離職</b>。沒有兩局一樣。</div></div>
+    <div class="wc-row"><div class="ic">🎛️</div><div class="tx">你的四個權力在右側：<b>招募 / 解職 / 派任務 / 貼公告</b>；點任何員工還能<b>跟他聊天、看他的故事</b>。</div></div>
+    <div class="wc-row"><div class="ic">🤖</div><div class="tx"><b>AI 代管已預設開啟</b>——它會自動幫你經營，你可以先<b>看戲</b>，想自己來隨時關掉。</div></div>
+    <div class="wc-row"><div class="ic">🎯</div><div class="tx">目標：養大<b>公司估值</b>、達成<b>里程碑</b>、解鎖<b>成就</b>；還能在<b>📰 大事記</b>回顧並分享你的辦公室故事。</div></div>
+    <button class="wc-go" id="wc-go">開始經營！</button>
+  </div></div>
+  <div id="account"><div class="wc-box">
+    <h2>🏢 你的辦公室</h2>
+    <div class="wc-tag" id="ac-tag">登入以保存你的辦公室、儲值與經營記錄，並跨裝置同步；或先用訪客試玩。</div>
+    <div style="display:flex;flex-direction:column;gap:9px;margin-top:4px">
+      <input id="ac-email" class="ac-in" type="email" placeholder="email" autocomplete="username">
+      <input id="ac-name" class="ac-in" type="text" placeholder="公司／老闆名（註冊用，1–24 字）" maxlength="24">
+      <input id="ac-pw" class="ac-in" type="password" placeholder="密碼（至少 6 碼）" autocomplete="current-password">
+      <div id="ac-msg" style="min-height:18px;font-size:13px;color:#ff9f9f"></div>
+      <div style="display:flex;gap:8px">
+        <button class="wc-go" id="ac-login" style="margin-top:0;flex:1">登入</button>
+        <button class="wc-go" id="ac-register" style="margin-top:0;flex:1;background:linear-gradient(90deg,#2f8f5f,#2f6f4f)">建立辦公室</button>
+      </div>
+      <button class="btn" id="ac-guest" style="margin-top:2px">👀 先用訪客試玩（之後可註冊保留進度）</button>
+    </div>
+  </div></div>
+</div>
+<script src="../assets/webllm.js"></script>
+<script>
+// ===== 設定：角色大腦後端（Node→本地 vLLM）。離線時用內建行為。 =====
+// 用 HTTP 開啟(http://localhost:3000)→同源相對路徑；用 file:// 直接開→指向本機後端
+const CONFIG = { BACKEND_URL: location.protocol==='file:' ? 'http://localhost:3000' : '', USE_BACKEND: true };
+// 生成來源(C 瀏覽器 WebLLM 並行)：auto=有後端用後端,否則用瀏覽器內模型 / backend / browser
+const GEN = { mode:'auto', backendOK:null };
+async function checkBackend(){ if(!CONFIG.USE_BACKEND){ GEN.backendOK=false; return false; }
+  try{ const r=await fetch(CONFIG.BACKEND_URL+'/health',{signal:AbortSignal.timeout(2500)}); GEN.backendOK=r.ok; return r.ok; }
+  catch(e){ GEN.backendOK=false; return false; } }
+function useBrowserGen(){ return typeof WLLM!=='undefined' && (GEN.mode==='browser' || (GEN.mode==='auto' && GEN.backendOK===false)); }
+// ── 瀏覽器模型「真·品質閘」：判斷一段輸出是否為可用的繁中（非亂碼/非重複/無特殊 token）──
+// 用途：決定「連走不走由 LLM 判斷」。WebGPU 數值異常的硬體（如部分 Blackwell GPU）上小模型會吐亂碼，
+// 一律過不了此閘 → 不切換，維持後端 vLLM；WebGPU 正常的玩家機器才會切到瀏覽器引擎省伺服器算力。
+function llmOutputOK(t){
+  t = String(t==null?'':t).trim();
+  if(/<\|[^]*?\|>/.test(t)) return false;                           // 特殊 token 洩漏（<|im_start|> 等）
+  const s = t.replace(/\s+/g,'');
+  if(s.length < 2) return false;
+  const cjk   = (s.match(/[一-鿿]/g)||[]).length;           // 中日韓統一表意（繁中主體）
+  const latin = (s.match(/[A-Za-z]/g)||[]).length;                  // 英文字母
+  const digit = (s.match(/[0-9]/g)||[]).length;                     // 數字
+  const kana  = (s.match(/[぀-ヿ]/g)||[]).length;           // 日文假名
+  const alien = (s.match(/[֐-ۿЀ-ӿ฀-๿]/g)||[]).length; // 希伯來/阿拉伯/西里爾/泰文
+  if(kana>0 || alien>0) return false;                               // 混他國文字 → 壞
+  if(cjk < s.length*0.6) return false;                              // 中文須佔 6 成以上
+  if(latin > s.length*0.2) return false;                            // 英文字母過多 → 壞
+  if(digit > s.length*0.3) return false;                            // 數字噴發 → 壞
+  if(/(.)\1{4,}/.test(s)) return false;                             // 同一字連續 5 次以上
+  const bg={}; for(let i=0;i<s.length-1;i++){ const g=s.slice(i,i+2); bg[g]=(bg[g]||0)+1; }
+  if(Math.max(0,...Object.values(bg)) >= 4) return false;          // 同一 2-gram 重複 4 次以上（重複迴圈）
+  return true;
+}
+const ROAM = location.search.includes('roam'); // debug：讓角色持續走動以檢視行走動畫
+
+// ===== 會員系統 client：帳號 / 伺服器權威錢包 / 記錄 / 存檔上雲 =====
+// 設計：算力留本地（LLM/模擬），信任上雲端（身分/錢包/權益/記錄/排行/跨裝置存檔）。
+const ACCT = {
+  token:null, account:null, wallet:{cash:0,gems:0}, ents:[], _saveTimer:null,
+  base(){ return CONFIG.BACKEND_URL; },
+  loggedIn(){ return !!this.account; },
+  async req(method, path, body){
+    const h={ 'Content-Type':'application/json' };
+    if(this.token) h.Authorization='Bearer '+this.token;
+    let r;
+    try{ r=await fetch(this.base()+path,{ method, headers:h, body: body?JSON.stringify(body):undefined, signal:AbortSignal.timeout(8000) }); }
+    catch(e){ return { ok:false, status:0, d:{ error:'連不上伺服器' } }; }
+    let d=null; try{ d=await r.json(); }catch(e){}
+    return { ok:r.ok, status:r.status, d:d||{} };
+  },
+  saveToken(t){ this.token=t||null; try{ t?localStorage.setItem('yocat_token',t):localStorage.removeItem('yocat_token'); }catch(e){} },
+  async register(email,password,displayName){ const r=await this.req('POST','/auth/register',{email,password,displayName});
+    if(r.ok){ this.saveToken(r.d.token); this.account=r.d.account; this.wallet=r.d.wallet||this.wallet; } return r; },
+  async login(email,password){ const r=await this.req('POST','/auth/login',{email,password});
+    if(r.ok){ this.saveToken(r.d.token); this.account=r.d.account; this.wallet=r.d.wallet||this.wallet; } return r; },
+  async logout(){ await this.req('POST','/auth/logout'); this.saveToken(null); this.account=null; this.wallet={cash:0,gems:0}; this.ents=[]; },
+  async refreshMe(){ const r=await this.req('GET','/auth/me'); if(r.ok){ this.account=r.d.account; this.wallet=r.d.wallet; this.ents=r.d.entitlements||[]; return true; } return false; },
+  async topupGems(amount){ const r=await this.req('POST','/wallet/topup',{currency:'gems',amount}); if(r.ok) this.wallet=r.d.wallet; return r; },
+  async spendGems(amount,reason,meta){ const r=await this.req('POST','/wallet/spend',{currency:'gems',amount,reason,meta}); if(r.ok) this.wallet=r.d.wallet; return r; },
+  async pullSave(){ const r=await this.req('GET','/save?slot=main'); return r.ok ? (r.d.save&&r.d.save.data||null) : null; },
+  async pushSave(){ if(!this.loggedIn()) return; try{ await this.req('PUT','/save',{slot:'main',data:serialize()}); }catch(e){} },
+  pushSaveDebounced(){ if(!this.loggedIn()) return; clearTimeout(this._saveTimer); this._saveTimer=setTimeout(()=>this.pushSave(),4000); },
+  async addRecord(type,payload){ if(!this.loggedIn()) return; try{ await this.req('POST','/records',{type,payload}); }catch(e){} },
+  async pushLeaderboard(){ if(!this.loggedIn()||!W.runId) return; try{ await this.req('POST','/leaderboard',{runId:W.runId,mode:modeLabel(),score:valuation(),detail:{day:W.day}}); }catch(e){} },
+};
+// 登入/註冊成功後：載入該帳號的辦公室與錢包
+async function afterAuthLoad(isNew){
+  W.gems = ACCT.wallet.gems||0;
+  let serverSave=null; try{ serverSave=await ACCT.pullSave(); }catch(e){}
+  if(serverSave && Array.isArray(serverSave.chars) && serverSave.chars.length){
+    hotResetWorld(); applySave(serverSave); log('👤 已載入你的辦公室（雲端存檔）');
+  } else {
+    saveGame(); try{ await ACCT.pushSave(); }catch(e){}   // 目前這間辦公室收歸此帳號
+    log('👤 這間辦公室已綁定你的帳號');
+  }
+  saveGame();
+}
+function hotResetWorld(){ W.chars.length=0; try{ reqQueue.length=0; }catch(e){} try{ activeReq=null; updateReqBadge(); }catch(e){}
+  W._bankruptShown=false; const rc=document.getElementById('reqcard'); if(rc) rc.style.display='none'; }
+function showAccount(){ const el=document.getElementById('account'); if(el) el.classList.add('show'); }
+function hideAccount(){ const el=document.getElementById('account'); if(el) el.classList.remove('show'); }
+function maybeWelcome(){ try{ if(!localStorage.getItem('yocat_onboarded') && !DEBUG_MODE) document.getElementById('welcome').classList.add('show'); }catch(e){} }
+function updateAccountUI(){ const l=document.getElementById('acct-label'); if(l) l.textContent = ACCT.loggedIn()? ACCT.account.display_name : '訪客（點此登入）'; }
+
+function getCSS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+// ===== 部門（全名；單字鍵給程式用）=====
+const DEPTS = {
+  '總':{name:'總經理辦公室', color:getCSS('--boss')},
+  '產':{name:'產品部',       color:getCSS('--chan')},
+  '銷':{name:'銷售部',       color:getCSS('--xiao')},
+  '人':{name:'人事部',       color:getCSS('--ren')},
+  '發':{name:'研發部',       color:getCSS('--fa')},
+  '財':{name:'財務部',       color:getCSS('--cai')},
+};
+const HIRABLE = ['產','銷','人','發','財'];
+
+const NAMES=['小明','阿華','怡君','志豪','美玲','建宏','淑芬','家豪','雅婷','俊傑','欣怡','冠廷','雅琪','宗翰'];
+const MALE_NAMES=['志豪','建宏','家豪','俊傑','冠廷','宗翰','志明','俊宏','承翰','柏翰','彥廷','宇軒'];
+const FEMALE_NAMES=['怡君','美玲','淑芬','雅婷','欣怡','雅琪','佳穎','詩涵','郁婷','宜蓁','思妤','曉彤'];
+const PERSONA=['積極','摸魚','完美主義','社牛','i人','樂天','龜毛','熱心','冷靜','急性子'];
+// 口頭禪（約 40% 的人沒有）＋ 說話風格，讓角色講話更有辨識度（餵進 LLM prompt）
+const CATCHPHRASES=['說真的','老實說','坦白講','基本上','我跟你講','認真說','不是我在講','講白一點','其實喔','總之','我覺得啦','說穿了','欸對','是這樣的','怎麼說呢','拜託','講真的','嗯這個嘛','重點是','老話一句','你知道嗎','怎麼講'];
+const SPEAK_STYLES=[
+  {k:'台味', d:'講話很台、愛用「啦、喔、齁、捏」等語尾'},
+  {k:'文青', d:'用詞文雅、偶爾比喻、有點文謅謅'},
+  {k:'直球', d:'講話簡短直接、不囉嗦'},
+  {k:'囉嗦', d:'話很多、愛補充一堆細節'},
+  {k:'可愛', d:'愛用疊字和波浪號~、語氣軟萌'},
+  {k:'冷淡', d:'講話簡短、常用句點、有點冷'},
+  {k:'熱情', d:'驚嘆號很多、語氣誇張有活力'},
+  {k:'正經', d:'用詞正式、像在寫工作報告'},
+  {k:'',     d:''},   // 無特殊風格（平實）
+];
+function styleHint(c){ const parts=[];
+  const st=SPEAK_STYLES.find(s=>s.k===c.speakStyle); if(st&&st.d) parts.push(st.d);
+  if(c.catchphrase) parts.push(`常把「${c.catchphrase}」掛在嘴邊`);
+  return parts.join('；'); }
+// 招募上下限（不含總經理）：太多 LLM 吃不消、太少忙不過來
+const MAX_WORKERS=8, MIN_WORKERS=1, BANKRUPT_CASH=-15000;
+const workerCount=()=>W.chars.filter(c=>c.dept!=='總').length;
+// 人力吃緊程度：5 人以上從容(0)、1 人時爆滿(1)
+const overloadFactor=()=>Math.max(0,Math.min(1,(5-workerCount())/4));
+// 選項池：公告（老闆的話，拉出來隨機 10 個）
+const ANNOUNCE_POOL=['本月衝刺雙十一，全力以赴！','這季目標翻倍，達標獎金加碼！','大家辛苦了，今天準時下班！','下週有大客戶來訪，環境請整潔。','表現優異者本月發特別獎金。','公司即將推出新產品線，加油！','最近訂單暴增，拜託大家撐住！','午茶時間延長十分鐘，放鬆一下。','節省成本，非必要支出先暫緩。','歡迎新同事，請大家多照顧。','客訴當天就要回覆，別讓客人等。','業績達標，請全員喝手搖！','請準時交付，別讓上市 delay。','提案獎勵上線，點子換獎金！','下個月團建活動，敬請期待。','保持微笑，服務品質擺第一。','加班有加班費，但身體更重要。','部門多協作，別單打獨鬥。','這月主打促銷，銷售部衝一波！','財務報表下週截止，請配合。','新的一天，衝業績！','謝謝大家的付出，繼續加油！','客戶滿意度就是我們的招牌。','導入新系統，有問題找研發部。','請假記得提前申請喔。','維持辦公室安靜，專心工作。','成本控管，大家一起努力。','這週每個部門回報進度。','公司營運穩健，謝謝各位。','年底衝一波，獎金看表現！'];
+// 選項池：派任務
+const TASK_POOL=['整理本週訂單並回報','分析上月銷售數據','跟進大客戶報價','優化商品上架流程','處理客訴並回覆','盤點庫存','規劃下季行銷活動','撰寫產品企劃書','對帳與請款','整理競品資料','測試新系統功能','準備下週提案簡報'];
+// 選項池：跟員工對談（玩家要說的話）
+const CHAT_POOL=['最近工作還順利嗎？','你辛苦了，有需要幫忙的嗎？','跟同事相處得如何？','對公司有什麼建議嗎？','最近心情還好嗎？','手上的任務還順手嗎？','有沒有想挑戰的新工作？','你的表現我很肯定，繼續加油！','最近有什麼煩惱都能跟我說。','你覺得公司哪裡可以更好？'];
+function sample(arr,n){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a.slice(0,n); }
+// 所有心聲／對話內容一律由本地 LLM 生成（無內建短句）；載入中以「…」佔位。
+
+// ===== 等角投影（未套用相機，座標以 0,0 為基準，render 時以 cam 變換）=====
+const TILE_W=84, TILE_H=42, GRID_W=16, GRID_H=13;
+function iso(x,y){ return { x:(x-y)*TILE_W/2, y:(x+y)*TILE_H/2 }; }
+
+// ===== 辦公室樓層：六間部門房 + 會議室 + 茶水間，房間之間留走道 =====
+const ZONES={
+  '總':{x:1,y:1,w:4,h:3}, '財':{x:6,y:1,w:4,h:3}, '發':{x:11,y:1,w:4,h:3},
+  '人':{x:1,y:6,w:4,h:3}, '銷':{x:6,y:6,w:4,h:3}, '產':{x:11,y:6,w:4,h:3},
+  '會議室':{x:1,y:10,w:6,h:2}, '茶水間':{x:9,y:10,w:6,h:2},
+};
+const WORK_ZONES = Object.entries(ZONES).filter(([k])=>DEPTS[k]);
+function seatsFor(z){ const s=[]; const xs=[z.x+1.0, z.x+z.w-1.1]; const ys=[z.y+0.9, z.y+z.h-1.1];
+  for(const y of ys) for(const x of xs) s.push({x,y}); return s; }
+for(const [,z] of WORK_ZONES){ z.seats=seatsFor(z); }
+function takeSeat(dept){
+  if(dept==='總'){ const z=ZONES['總']; return { x:z.x+z.w/2, y:z.y+0.75 }; }   // 總經理坐大辦公桌後方
+  const z=ZONES[dept];
+  const taken=W.chars.filter(c=>c.dept===dept&&c.seat).map(c=>c.seat);           // 目前實際占用（解職會釋出）
+  for(const s of z.seats){ if(!taken.some(t=>Math.hypot(t.x-s.x,t.y-s.y)<0.3)) return {x:s.x,y:s.y}; }  // 第一個空位
+  const base=z.seats[taken.length % z.seats.length], over=Math.floor(taken.length/z.seats.length);      // 全滿才溢位（渲染會跟著補桌）
+  return { x:base.x+over*0.3, y:base.y+over*0.3 }; }
+function zoneSpot(k){ const Z=ZONES[k]; return { x:Z.x+0.6+Math.random()*(Z.w-1.2), y:Z.y+0.5+Math.random()*(Z.h-1) }; }
+
+// ===== 導航：隔間牆＝邊阻擋，角色走格子路避開（BFS）=====
+const navTop={}, navLeft={};   // navTop["x,y"]=上緣有牆(擋 (x,y-1)<->(x,y))；navLeft["x,y"]=左緣有牆(擋 (x-1,y)<->(x,y))
+for(const z of Object.values(ZONES)){
+  for(let x=z.x;x<z.x+z.w;x++) navTop[x+','+z.y]=true;        // 房間上緣牆
+  for(let y=z.y;y<z.y+z.h;y++) navLeft[z.x+','+y]=true;       // 房間左緣牆
+}
+function canStep(x,y,nx,ny){
+  if(nx<0||ny<0||nx>=GRID_W||ny>=GRID_H) return false;
+  if(nx===x&&ny===y-1) return !navTop[x+','+y];               // 往上：本格上緣
+  if(nx===x&&ny===y+1) return !navTop[x+','+ny];              // 往下：下格上緣
+  if(nx===x-1&&ny===y) return !navLeft[x+','+y];              // 往左：本格左緣
+  if(nx===x+1&&ny===y) return !navLeft[nx+','+y];             // 往右：右格左緣
+  return false;
+}
+const clampCell=(v,m)=>Math.max(0,Math.min(m-1,Math.round(v)));
+function findPath(sxf,syf,txf,tyf){
+  const sx=clampCell(sxf,GRID_W), sy=clampCell(syf,GRID_H), tx=clampCell(txf,GRID_W), ty=clampCell(tyf,GRID_H);
+  if(sx===tx&&sy===ty) return [];
+  const k=(x,y)=>x+','+y, prev={[k(sx,sy)]:null}, q=[[sx,sy]], D=[[0,-1],[0,1],[-1,0],[1,0]];
+  while(q.length){ const [x,y]=q.shift(); if(x===tx&&y===ty) break;
+    for(const [ex,ey] of D){ const nx=x+ex,ny=y+ey; if(canStep(x,y,nx,ny)&&!(k(nx,ny) in prev)){ prev[k(nx,ny)]=[x,y]; q.push([nx,ny]); } } }
+  if(!(k(tx,ty) in prev)) return [];   // 走不到就不給路徑（退回直走）
+  const path=[]; let cur=[tx,ty];
+  while(cur){ path.unshift({x:cur[0],y:cur[1]}); cur=prev[k(cur[0],cur[1])]; }
+  path.shift();                        // 去掉起點格
+  return path;
+}
+
+// ===== 世界狀態 =====
+const W={ tick:0, minutes:9*60, day:1, chars:[], rev:0, cash:20000, morale:70, orders:0,
+  todayRev:0, todayOrders:0, reported:false, announce:null, mode:null, rel:{}, events:[], crush:{}, autopilot:false,
+  theme:'default', ownedThemes:['default'],
+  milestones:[], achv:[], stat:{ fired:0, raises:0, hired:0, proposals:0, breakups:0, profitStreak:0, everProfit:false, bestVal:0 },
+  highlights:[], scenario:null, bestScores:{}, runId:null, alumni:[], hiredDreams:[], gems:0 };
+// 公司大事記：收集值得回顧/分享的精華時刻
+function pushHighlight(icon, text){ W.highlights.push({ day:W.day, icon, text }); if(W.highlights.length>60) W.highlights.shift(); }
+// ===== 🔊 音效 / BGM（Web Audio 程序化合成：零依賴、離線、自有、無縫）=====
+const SOUND=(()=>{
+  let ctx=null, master=null, bgmGain=null, bgmTimer=null, started=false;
+  let pref={ sfx:true, bgm:false };
+  try{ const s=JSON.parse(localStorage.getItem('yocat_sound')||'null'); if(s) pref=Object.assign(pref,s); }catch(e){}
+  let bgmFilter=null;
+  function ensure(){ if(ctx) return ctx; try{ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null;
+    ctx=new AC(); master=ctx.createGain(); master.gain.value=0.5; master.connect(ctx.destination);
+    bgmGain=ctx.createGain(); bgmGain.gain.value=0;
+    bgmFilter=ctx.createBiquadFilter(); bgmFilter.type='lowpass'; bgmFilter.frequency.value=1300; bgmFilter.Q.value=0.6;
+    bgmGain.connect(bgmFilter); bgmFilter.connect(master); }catch(e){ ctx=null; } return ctx; }
+  function tone(freq,t0,dur,type,gain,glideTo){ const o=ctx.createOscillator(),g=ctx.createGain(); o.type=type||'sine';
+    o.frequency.setValueAtTime(freq,t0); if(glideTo) o.frequency.exponentialRampToValueAtTime(glideTo,t0+dur);
+    g.gain.setValueAtTime(0.0001,t0); g.gain.linearRampToValueAtTime(gain,t0+0.012); g.gain.exponentialRampToValueAtTime(0.0008,t0+dur);
+    o.connect(g); g.connect(master); o.start(t0); o.stop(t0+dur+0.03); }
+  const CUES={
+    good:    t=>[523.25,659.25,783.99].forEach((f,i)=>tone(f,t+i*0.09,0.22,'triangle',0.22)),
+    levelup: t=>{ [523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,t+i*0.10,0.30,'triangle',0.24)); tone(1318.5,t+0.42,0.5,'sine',0.14); },
+    cash:    t=>{ tone(1318.5,t,0.08,'square',0.15); tone(1760,t+0.07,0.17,'square',0.15); },
+    bad:     t=>{ tone(311.13,t,0.18,'sawtooth',0.13,174.61); tone(155.56,t+0.14,0.3,'sawtooth',0.11,110); },
+    coin:    t=>{ tone(987.77,t,0.07,'square',0.14); tone(1318.5,t+0.06,0.18,'square',0.14); },
+  };
+  function sfx(name){ if(!pref.sfx||!ensure()) return; if(ctx.state==='suspended') ctx.resume&&ctx.resume();
+    try{ (CUES[name]||CUES.good)(ctx.currentTime+0.01); }catch(e){} }
+  // 生成式 BGM：lo-fi 和弦進行（Cmaj7→Am7→Fmaj7→G7）＋柔和貝斯＋輕旋律（無縫、不需音檔）
+  const CHORDS=[
+    [261.63,329.63,392.00,493.88],  // Cmaj7
+    [220.00,261.63,329.63,392.00],  // Am7
+    [174.61,220.00,261.63,329.63],  // Fmaj7
+    [196.00,246.94,293.66,349.23],  // G7
+  ];
+  let bgmStep=0;
+  function pad(freq,t,dur,gain,type,atk){ const o=ctx.createOscillator(),g=ctx.createGain(); o.type=type||'triangle'; o.frequency.value=freq;
+    const a=atk||0.7; g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(gain,t+a); g.gain.setValueAtTime(gain,t+dur*0.6);
+    g.gain.exponentialRampToValueAtTime(0.0008,t+dur); o.connect(g); g.connect(bgmGain); o.start(t); o.stop(t+dur+0.05); }
+  const BAR=4.2;
+  function bgmBar(){ if(!ctx) return; const t=ctx.currentTime, ch=CHORDS[bgmStep%CHORDS.length];
+    ch.forEach(f=>pad(f,t,BAR+0.4,0.045,'triangle'));            // 和弦音墊
+    pad(ch[0]/2,t,BAR,0.085,'sine',0.25);                        // 根音貝斯
+    pad(ch[(Math.random()*ch.length)|0]*2,t+0.6,1.4,0.06,'sine',0.15);   // 旋律 1
+    if(Math.random()<0.65) pad(ch[(Math.random()*ch.length)|0]*2,t+2.3,1.3,0.05,'sine',0.15); // 旋律 2
+    bgmStep++; }
+  function startBGM(){ if(!ensure()||bgmTimer) return; ctx.resume&&ctx.resume();
+    bgmGain.gain.cancelScheduledValues(ctx.currentTime); bgmGain.gain.linearRampToValueAtTime(0.5,ctx.currentTime+2.5);
+    bgmBar(); bgmTimer=setInterval(bgmBar,BAR*1000); }
+  function stopBGM(){ if(bgmTimer){ clearInterval(bgmTimer); bgmTimer=null; } if(bgmGain&&ctx) bgmGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.6); }
+  function save(){ try{ localStorage.setItem('yocat_sound',JSON.stringify(pref)); }catch(e){} }
+  function setSfx(v){ pref.sfx=!!v; save(); if(v) sfx('coin'); }
+  function setBgm(v){ pref.bgm=!!v; save(); v?startBGM():stopBGM(); }
+  function unlock(){ if(started) return; started=true; if(!ensure()) return; ctx.resume&&ctx.resume(); if(pref.bgm) startBGM(); }
+  return { sfx, setSfx, setBgm, unlock, pref:()=>({...pref}) };
+})();
+// ===== 隨機事件/危機（給經營變化與張力）=====
+function eventBanner(title,sub){ celebrate(title,sub); }
+const EVENTS=[
+  {id:'surge', w:3, run:()=>{ W._surge=performance.now()+32000; eventBanner('🔥 訂單暴增','接下來一段時間營收大增'); log('🔥 訂單暴增！營收短時間大幅提升'); pushHighlight('🔥','遇到訂單暴增，營收大爆發'); SOUND.sfx('cash'); }},
+  {id:'crash', w:2, run:()=>{ W._crash=performance.now()+22000; eventBanner('💻 系統當機','生產力暫時下降'); log('💻 系統當機，生產力暫時下降'); pushHighlight('💻','系統當機了一陣子'); SOUND.sfx('bad'); }},
+  {id:'complaint', w:2, run:()=>{ W.morale=Math.max(0,W.morale-8); W.chars.forEach(c=>c.mood=Math.max(0,c.mood-5)); eventBanner('😠 客訴風波','全公司士氣受挫'); log('😠 接到大客訴，士氣受挫'); pushHighlight('😠','爆發客訴風波'); SOUND.sfx('bad'); }},
+  {id:'media', w:2, run:()=>{ W.morale=Math.min(100,W.morale+8); W.cash+=1500; eventBanner('📰 媒體報導','士氣與現金提升'); log('📰 公司上了新聞，士氣與現金提升（+$1,500）'); pushHighlight('📰','上了媒體版面'); SOUND.sfx('good'); }},
+  {id:'party', w:2, run:()=>{ W.chars.forEach(c=>{c.mood=Math.min(100,c.mood+8);c.energy=Math.min(100,c.energy+10);}); eventBanner('🎉 慶功宴','全員士氣大振'); log('🎉 老闆請客慶功，全員士氣與精力大振'); pushHighlight('🎉','辦了一場慶功宴'); SOUND.sfx('good'); }},
+  {id:'investor', w:2, cond:()=>valuation()>=120000, run:()=>{ const bns=Math.round(valuation()*0.04); W.cash+=bns; eventBanner('🤝 投資人注資',`注資 $${bns.toLocaleString()}`); log(`🤝 投資人看好公司，注資 $${bns.toLocaleString()}`); pushHighlight('🤝','獲得投資人注資'); SOUND.sfx('cash'); }},
+  {id:'poach', w:3, cond:()=>W.chars.some(c=>c.dept!=='總'&&c.skill>55), run:()=>eventPoach()},
+];
+function eventPoach(){
+  let cands=W.chars.filter(c=>c.dept!=='總'&&c.skill>55); if(!cands.length) return;
+  cands.sort((a,b)=>(a.bond||0)-(b.bond||0));                    // 低羈絆的先被盯上
+  const pool=cands.slice(0, Math.max(1,Math.ceil(cands.length/2)));
+  const c=pick(pool); const cost=Math.round(c.salary*0.18);
+  log(`🎣 競爭對手想挖角 ${c.name}（技能 ${Math.round(c.skill)}）`); pushHighlight('🎣',`${c.name} 被競爭對手挖角`);
+  SOUND.sfx('bad');
+  if((c.bond||0)>=75){ c.mood=Math.min(100,c.mood+5); bondAdd(c,2); log(`💪 ${c.name} 不為所動，婉拒了挖角（對你忠誠）`); pushMem(c,'有人來挖角，但我選擇留下'); pushHighlight('💪',`${c.name} 婉拒挖角，選擇留下`); return; }
+  const keep=()=>{ c.salary=Math.round(c.salary*1.18); c.mood=Math.min(100,c.mood+15); bondAdd(c,8); log(`💰 加薪留住 ${c.name}（月薪 +$${cost}）`); pushMem(c,'被挖角，老闆加薪把我留下'); };
+  const leave=()=>{ clearPartnerOf(c); toAlumnus(c); W.chars=W.chars.filter(x=>x!==c); W.morale=Math.max(0,W.morale-4); log(`👋 ${c.name} 跳槽離開了`); pushEvent(`${c.name}被挖角離開`); pushHighlight('👋',`${c.name} 跳槽離開了（已進校友庫，可重金招回）`); };
+  if(W.autopilot){ (c.skill>60 && W.cash>3000) ? keep() : leave(); return; }
+  openPicker(`🎣 ${c.name} 被挖角了！`, [
+    {label:`加薪留人（月薪 +$${cost}）`, sub:'留住人才、成本增加', value:'keep'},
+    {label:'放他走', sub:'省下薪水、少一名戰力', value:'let'},
+  ], v=>{ v==='keep'?keep():leave(); });
+}
+function triggerEvent(){
+  const pool=EVENTS.filter(e=>!e.cond||e.cond()); if(!pool.length) return;
+  let tot=pool.reduce((s,e)=>s+e.w,0), r=Math.random()*tot;
+  for(const e of pool){ r-=e.w; if(r<=0){ e.run(); return; } }
+}
+// ===== 外觀主題（商業化：換皮商店。floor=地板雙色、bg=背景漸層、wallShade=牆色偏移）=====
+const THEMES={
+  default:{ name:'預設 夜色',   price:0,    floor1:'#2a3150', floor2:'#262d49', bg:['#1d2336','#121624'], wallShade:0 },
+  wood:   { name:'暖木 日光',   price:600,  floor1:'#7c6a4c', floor2:'#6f5f45', bg:['#3a3228','#241e16'], wallShade:0.06 },
+  mono:   { name:'簡約 純白',   price:900,  floor1:'#c9ccd6', floor2:'#bcc0cc', bg:['#dfe3ee','#c3c8d6'], wallShade:0.1 },
+  forest: { name:'森林 綠意',   price:1200, floor1:'#2c4a38', floor2:'#264030', bg:['#1a2a20','#0f1a12'], wallShade:0.04 },
+  cyber:  { name:'賽博 霓虹',   price:2500, floor1:'#16213e', floor2:'#121c3a', bg:['#0b0b22','#05050f'], wallShade:-0.05 },
+  sakura: { name:'和風 櫻',     price:1800, floor1:'#caa7ad', floor2:'#bd98a0', bg:['#2a2024','#1a1216'], wallShade:0.08 },
+  xmas:   { name:'聖誕 佳節',   price:1500, floor1:'#3a4a44', floor2:'#334039', bg:['#1d2a24','#12180f'], wallShade:0.05 },
+};
+const TIME_SCALE=20;   // 1 現實秒 ≈ 20 遊戲分；一天約 72 秒
+let idc=1;
+
+// ===== 角色動畫（Blender 3D 渲染的 8 格精靈，依狀態播放）=====
+const DEPT_FOLDER={'總':'boss','產':'product','銷':'sales','人':'hr','發':'rnd','財':'finance'};
+const ANIM_CLIPS=['idle','sit','walk','talk'];   // 初始多半 idle/sit，先載
+const ANIM_N=8, ANIM_MS=110, ANIM_V=4;  // 每格 110ms；每部門 4 變體
+const ANIM={};                          // dept -> [variant] -> clip -> [Image x8]
+// 用到才載（lazy）：只載實際在場角色真正用到的 dept/變體/動作，避免一次下 960 張約 96MB（手機/遠端會卡成幽靈人）
+function framesOf(dept, v, clip){
+  if(!ANIM[dept]) ANIM[dept]=[];
+  if(!ANIM[dept][v]) ANIM[dept][v]={};
+  if(!ANIM[dept][v][clip]){
+    const arr=new Array(ANIM_N); const fileClip = clip==='walk_back'?'walk':clip;
+    for(let i=0;i<ANIM_N;i++){ const img=new Image();
+      img.src=`../assets/anim/${dept}/v${v}/${clip}/${fileClip}_${String(i).padStart(2,'0')}.png`; arr[i]=img; }
+    ANIM[dept][v][clip]=arr;
+  }
+  return ANIM[dept][v][clip];
+}
+// 角色一出現就先把常用動作(sit/idle/walk)排進載入，減少幽靈人時間
+function prefetchChar(c){ const d=DEPT_FOLDER[c.dept]||'product', v=c.variant||0;
+  for(const clip of ['sit','idle','walk']) framesOf(d,v,clip); }
+// 角色當前狀態對應的動畫 clip
+function animOf(c){
+  if(c.moving) return 'walk';
+  if(c.state==='work') return 'sit';                    // 在座位上永遠坐著（講話也坐著，不站起來飄浮）
+  if(c.say && c.sayMode==='talk') return 'talk';        // 站著互動才用講話動作
+  return 'idle';
+}
+
+function uniqueName(gender){
+  const used=new Set(W.chars.map(c=>c.name));
+  const pool = gender==='f'?FEMALE_NAMES : gender==='m'?MALE_NAMES : NAMES;
+  const avail=pool.filter(n=>!used.has(n));
+  if(avail.length) return pick(avail);
+  let base=pick(pool), n=base, i=2; while(used.has(n)){ n=base+i; i++; } return n;
+}
+// ===== 💖 最愛角色依附迴圈（羈絆 + 個人故事線）=====
+const ARC_THRESH=[20,45,70,90];   // 推進到 stage 1/2/3/達成 所需的羈絆值
+const ARCS=[
+  { id:'lead',  title:'獨當一面', dream:'想主導一個自己的專案',
+    beats:['最近常留下來加班，好像在偷偷準備什麼。','私下跟你說，他夢想有一天能主導一個專案。','他鼓起勇氣，提出了自己的專案構想。'],
+    thinks:['總有一天，我要證明自己…','要是有機會獨當一面就好了…','這個案子，讓我來吧！'],
+    done:{ text:'在你的支持下，他成功主導專案、一戰成名！', think:'謝謝老闆願意相信我。', reward:{skill:8,mood:20} } },
+  { id:'shy',   title:'走出內向', dream:'想克服怯場、在會議上發光',
+    beats:['開會時他總是低著頭，不太敢說話。','他坦白自己其實很怕在人前講話。','他第一次在會議上完整報告了想法。'],
+    thinks:['好緊張，不敢舉手…','我是不是該勇敢一點…','這次，我要說出來！'],
+    done:{ text:'他克服了怯場，成了團隊裡最可靠的聲音。', think:'原來我也做得到。', reward:{skill:5,mood:20} } },
+  { id:'family',title:'家庭與工作', dream:'想在拚事業與陪家人間找到平衡',
+    beats:['最近接電話時，他的神色有點疲憊。','他說家裡需要他，但也放不下工作。','他重新安排了生活，狀態好多了。'],
+    thinks:['家人還好嗎…','工作跟家庭，好難兼顧…','我想通了，兩邊都要顧好。'],
+    done:{ text:'他找到了屬於自己的節奏，笑容變多了。', think:'謝謝你讓我喘口氣。', reward:{mood:25,energy:20} } },
+  { id:'rival', title:'超越宿敵', dream:'想超越那個總是贏過他的同行',
+    beats:['他盯著對手公司的新聞，若有所思。','他說有個一直壓著他的對手，很不甘心。','他埋頭苦練，想一舉超車。'],
+    thinks:['這次不會再輸了…','我一定要超過他…','看我的！'],
+    done:{ text:'他終於超越了宿敵，意氣風發。', think:'這份成就，有你一半。', reward:{skill:10,mood:15} } },
+  { id:'startup',title:'創業夢', dream:'偷偷懷抱著有天自己當老闆的夢',
+    beats:['午休時，他在筆記本上寫寫畫畫。','他小聲說，其實夢想有天能自己創業。','他決定先跟你把公司做大，再追夢。'],
+    thinks:['有一天，我也要…','我的夢想，會不會太大了…','先把這裡做好，再說！'],
+    done:{ text:'他決定把這間公司當成自己的事業，全力以赴。', think:'跟著你，我學到好多。', reward:{skill:6,mood:18} } },
+];
+const arcDef=c=>ARCS.find(a=>a.id===(c.arc&&c.arc.id));
+function bondAdd(c,amt){ if(!c||c.dept==='總') return; c.bond=Math.max(0,Math.min(100,(c.bond||0)+amt)); c._lastBondDay=W.day; if(amt>0) checkArc(c); }
+function checkArc(c){
+  const a=arcDef(c); if(!a||!c.arc) return; const st=c.arc.stage||0; if(st>=4) return;
+  if((c.bond||0) < ARC_THRESH[st]) return;
+  c.arc.stage=st+1;
+  if(st<3){ const beat=a.beats[st], think=a.thinks[st];
+    log(`📖 ${c.name}：${beat}`); pushMem(c,beat);
+    c.say=think; c.sayMode='think'; c.sayT=performance.now()+6000;
+    if(c.fav){ celebrate(`📖 ${c.name} 的故事`, beat); pushHighlight('📖',`${c.name}：${beat}`); SOUND.sfx('good'); }
+  } else { const d=a.done;
+    c.skill=Math.min(100,c.skill+(d.reward.skill||0)); c.mood=Math.min(100,c.mood+(d.reward.mood||0));
+    if(d.reward.energy) c.energy=Math.min(100,c.energy+d.reward.energy);
+    log(`🌈 ${c.name} 實現了夢想：${d.text}`); pushMem(c,`實現了夢想：${a.dream}`);
+    pushHighlight('🌈',`${c.name} 實現了夢想——${a.title}！`);
+    c.say=d.think; c.sayMode='talk'; c.sayT=performance.now()+6000;
+    celebrate(`🌈 ${c.name} 實現了夢想！`, d.text); SOUND.sfx('levelup');
+  }
+}
+function setFavorite(c){ const was=c.fav; W.chars.forEach(x=>x.fav=false); c.fav=!was;
+  if(c.fav){ log(`⭐ ${c.name} 成為你最在乎的員工`); pushHighlight('⭐',`${c.name} 成為老闆最在乎的員工`); SOUND.sfx('good'); }
+  else log(`☆ 取消了 ${c.name} 的最愛標記`); }
+function bondLabel(b){ b=b||0; return b>=90?'生死之交':b>=70?'心腹':b>=45?'信任':b>=20?'熟稔':'還在熟悉'; }
+
+function addChar(dept, spec, gender){
+  const seat=takeSeat(dept);
+  // 先定性別 → 變體奇偶對應貼圖(男 v0/v2、女 v1/v3) → 名字對應性別，三者一致
+  const g = spec ? (spec.gender || (spec.variant%2===1?'f':'m')) : (gender || (Math.random()<0.5?'m':'f'));
+  const vr = (g==='f'?1:0) + 2*Math.floor(Math.random()*(ANIM_V/2));   // 女→1/3、男→0/2
+  const c={ id:idc++, name:uniqueName(g), dept, gender:g,
+    title: dept==='總'?'總經理':'專員',
+    persona:[pick(PERSONA),pick(PERSONA)], color:DEPTS[dept].color,
+    pos:{...seat}, seat, target:{...seat}, state:'work', until:0,
+    mood:60+Math.random()*30, energy:70+Math.random()*30,
+    skill:38+Math.random()*34, salary: dept==='總'?1500: 480+Math.floor(Math.random()*280), taskT:0,
+    varScale:0.94+Math.random()*0.18, faceDir:Math.random()<0.5?1:-1, animOff:Math.floor(Math.random()*ANIM_N),
+    variant:vr,
+    task:null, say:null, sayT:0, moving:false, memory:[], partner:null, dream:null,
+    bond: dept==='總'?0:8, fav:false, arc:{ id:pick(ARCS).id, stage:0 }, acc:null,   // 💖 羈絆 + 故事線 + 專屬外觀
+    catchphrase: Math.random()<0.6 ? pick(CATCHPHRASES) : null,   // 約 40% 沒有口頭禪
+    speakStyle: pick(SPEAK_STYLES).k,
+    spawnT: spec ? 0 : performance.now() };   // 新角色材質化登場；還原的直接實心
+  if(spec){
+    // 還原：以名字為準校正性別，並讓貼圖奇偶(變體)對上性別，修舊存檔女生配男名等不一致
+    const g2 = genderFromName(spec.name) || spec.gender || (spec.variant%2===1?'f':'m');
+    const sv = spec.variant||0;
+    const variant = (g2==='f') ? (sv|1) : (sv & ~1);
+    Object.assign(c,{ id:spec.id, name:spec.name, skill:spec.skill, salary:spec.salary,
+    mood:spec.mood, energy:spec.energy, variant, varScale:spec.varScale,
+    faceDir:spec.faceDir||c.faceDir, persona:spec.persona||c.persona, gender:g2,
+    memory:Array.isArray(spec.memory)?spec.memory:[], partner:spec.partner??null,
+    task:spec.task||null, taskT:spec.taskT||0,
+    catchphrase:spec.catchphrase!==undefined?spec.catchphrase:c.catchphrase, speakStyle:spec.speakStyle!==undefined?spec.speakStyle:c.speakStyle,
+    dream:spec.dream||null, title:spec.title||c.title,
+    bond:spec.bond||0, fav:!!spec.fav, arc:(spec.arc&&spec.arc.id)?spec.arc:c.arc, acc:spec.acc||null });
+    // 讀檔一律貼齊「目前版面」的座位（舊存檔部門位置換過，保留舊座標會坐錯位）
+    c.pos={...seat}; c.target={...seat}; c.state='work';
+    if(spec.id>=idc) idc=spec.id+1; }
+  W.chars.push(c); prefetchChar(c); if(!spec){ log(`🟢 ${c.name} 加入 ${DEPTS[dept].name}`); pushMem(c, W.day>1?`第${W.day}天加入公司`:'公司創始成員'); } return c;
+}
+const genLabel = g => g==='f'?'女':'男';
+// 由名字判定性別（修舊存檔名字/貼圖不一致）
+function genderFromName(name){ const base=String(name||'').replace(/\d+$/,'');
+  if(MALE_NAMES.includes(base)) return 'm'; if(FEMALE_NAMES.includes(base)) return 'f'; return null; }
+// 個人記憶：記錄員工的重要經歷（存檔、顯示、餵進 LLM）
+function pushMem(c, t){ if(!c) return; (c.memory||(c.memory=[])).push(`第${W.day}天・${t}`); if(c.memory.length>12) c.memory.shift(); }
+function recentMem(c, n){ return (c.memory||[]).slice(-n).map(m=>m.replace(/^第\d+天・/,'')); }
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+
+// ===== 關係網 + 個性相容性 + 公司事件 =====
+const BOND=[['社牛','社牛'],['社牛','熱心'],['樂天','摸魚'],['完美主義','積極'],['完美主義','完美主義'],['熱心','樂天'],['冷靜','龜毛'],['積極','積極']];
+const CLASH=[['龜毛','摸魚'],['完美主義','摸魚'],['積極','摸魚'],['急性子','i人'],['急性子','冷靜'],['社牛','i人'],['龜毛','急性子']];
+function hasPair(L,pa,pb){ return L.some(([x,y])=>(x===pa&&y===pb)||(x===pb&&y===pa)); }
+function compat(a,b){ let s=0; for(const pa of a.persona) for(const pb of b.persona){ if(hasPair(BOND,pa,pb))s+=2; if(hasPair(CLASH,pa,pb))s-=2; } return s; }
+function pairKey(a,b){ return a.id<b.id ? a.id+'-'+b.id : b.id+'-'+a.id; }
+function relOf(a,b){ const k=pairKey(a,b); if(W.rel[k]==null) W.rel[k]=(a.dept===b.dept?8:0)+compat(a,b)*2+Math.round(Math.random()*6-3); return W.rel[k]; }
+function relAdd(a,b,d){ const k=pairKey(a,b); W.rel[k]=Math.max(-100,Math.min(100,relOf(a,b)+d)); }
+function relLabel(s){ return s>=45?'好朋友':s>=18?'處得來':s<=-45?'死對頭':s<=-18?'不太對盤':'普通同事'; }
+function pushEvent(t){ W.events.unshift(t); if(W.events.length>8) W.events.pop(); }
+function charById(id){ return W.chars.find(c=>c.id===id)||null; }
+function partnerOf(c){ return c.partner!=null ? charById(c.partner) : null; }
+// ===== 員工社交連動：好友網 + 情緒漣漪 + 最愛放大 =====
+function closeFriends(c){ return W.chars.filter(o=>o!==c && o.id!==c.partner && (W.rel[pairKey(c,o)]||0)>=25); }
+function socialRipple(cs, delta, memFn){                 // 把情緒波及到當事人的好友圈
+  const set=new Set(); (Array.isArray(cs)?cs:[cs]).forEach(c=>closeFriends(c).forEach(o=>set.add(o)));
+  set.forEach(o=>{ if(cs.includes&&cs.includes(o)) return; o.mood=Math.max(0,Math.min(100,o.mood+delta)); if(memFn) pushMem(o,memFn(o)); });
+}
+function favInvolved(...cs){ return cs.some(c=>c&&c.fav); }   // 最愛牽涉其中→放大玩家感受
+function clearPartnerOf(c){ if(c.partner==null) return; const p=charById(c.partner); c.partner=null; if(p){ p.partner=null; p.mood=Math.max(0,p.mood-15); pushMem(p,`另一半${c.name}離開了公司，很難過`); pushEvent(`${p.name}的另一半離開了公司`); } }
+
+// ===== 辦公室戀情（曖昧→告白→交往→可能分手，全程 LLM 對白）=====
+function crushOf(a,b){ return W.crush[pairKey(a,b)]||0; }
+function crushAdd(a,b,d){ const k=pairKey(a,b); W.crush[k]=Math.max(0,Math.min(100,(W.crush[k]||0)+d)); return W.crush[k]; }
+function single(c){ return c && c.partner==null; }
+// 可發展戀情：異性、非總經理、都單身、彼此不討厭
+function canRomance(a,b){ return a!==b && a.gender!==b.gender && a.dept!=='總' && b.dept!=='總' && single(a) && single(b) && relOf(a,b)>-18; }
+let romanceBusy=false;
+async function romanceLine(c, type, target){
+  const body={name:c.name,dept:c.dept,persona:c.persona,type,target:target?target.name:'',style:styleHint(c)};
+  if(useBrowserGen()){ try{ return await WLLM.romance(body); }catch(e){ return ''; } }
+  if(!CONFIG.USE_BACKEND) return '';
+  try{ const r=await fetch(CONFIG.BACKEND_URL+'/character/romance',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)});
+    return (await r.json()).msg||''; }catch(e){ return ''; }
+}
+function sayBubble(c,text,mode,ms){ if(!text) return; c.say=text; c.sayMode=mode||'talk'; c.sayT=performance.now()+(ms||4200); }
+async function confess(a,b){   // a 向 b 告白
+  romanceBusy=true;
+  const line=await romanceLine(a,'confess',b); sayBubble(a, line||'我…我喜歡你！', 'talk', 4600);
+  log(`💗 ${a.name} 向 ${b.name} 告白了…`);
+  const receptive = crushOf(a,b)>=38 || relOf(a,b)>=40;   // b 是否也有意思
+  await new Promise(r=>setTimeout(r,1600));
+  if(!W.chars.includes(a)||!W.chars.includes(b)){ romanceBusy=false; return; }
+  if(receptive){
+    const acc=await romanceLine(b,'accept',a); sayBubble(b, acc||'嗯…我也是！', 'talk', 4600);
+    a.partner=b.id; b.partner=a.id; a.mood=Math.min(100,a.mood+25); b.mood=Math.min(100,b.mood+25);
+    relAdd(a,b,30); log(`💞 ${a.name} 和 ${b.name} 在一起了！`); pushEvent(`${a.name}和${b.name}交往了`); pushHighlight('💞',`${a.name} 和 ${b.name} 在一起了`);
+    pushMem(a,`跟${b.name}告白成功，在一起了`); pushMem(b,`接受了${a.name}的告白，在一起了`);
+    W.morale=Math.min(100,W.morale+3);                                    // 喜事提振全公司士氣
+    socialRipple([a,b],3,o=>`為${a.name}和${b.name}在一起感到開心`);       // 好友替他們高興
+    if(favInvolved(a,b)){ W.morale=Math.min(100,W.morale+3); SOUND.sfx('good');
+      celebrate('💞 你在乎的人戀愛了！', `${a.name} 和 ${b.name} 在一起了`); }
+  } else {
+    const rej=await romanceLine(b,'reject',a); sayBubble(b, rej||'抱歉，我們還是同事就好…', 'talk', 4600);
+    a.mood=Math.max(0,a.mood-18); W.crush[pairKey(a,b)]=0; relAdd(a,b,-6);
+    log(`💔 ${b.name} 婉拒了 ${a.name}`); pushEvent(`${a.name}跟${b.name}告白被拒`);
+    pushMem(a,`跟${b.name}告白被婉拒，有點受傷`); pushMem(b,`婉拒了${a.name}的告白`);
+  }
+  romanceBusy=false;
+}
+async function coupleSweet(a,b){  // 情侶放閃
+  romanceBusy=true;
+  const la=await romanceLine(a,'sweet',b); sayBubble(a, la||'今天也辛苦了♥', 'talk', 4000);
+  a.mood=Math.min(100,a.mood+3); b.mood=Math.min(100,b.mood+3);
+  setTimeout(async()=>{ if(W.chars.includes(b)){ const lb=await romanceLine(b,'sweet',a); sayBubble(b, lb||'下班一起走吧♥','talk',4000);} romanceBusy=false; },1400);
+}
+async function breakup(a,b){
+  romanceBusy=true;
+  const line=await romanceLine(a,'breakup',b); sayBubble(a, line||'我們…是不是不太適合…', 'talk', 4600);
+  a.partner=null; b.partner=null; a.mood=Math.max(0,a.mood-20); b.mood=Math.max(0,b.mood-20); W.stat.breakups++;
+  relAdd(a,b,-24); W.crush[pairKey(a,b)]=0;
+  log(`💔 ${a.name} 和 ${b.name} 分手了`); pushEvent(`${a.name}和${b.name}分手了`); pushHighlight('💔',`${a.name} 和 ${b.name} 分手了`);
+  pushMem(a,`跟${b.name}分手了，心情低落`); pushMem(b,`跟${a.name}分手了，有點難過`);
+  W.morale=Math.max(0,W.morale-3);                                         // 分手讓辦公室氣氛凝重
+  socialRipple([a,b],-4,o=>`${a.name}和${b.name}分手了，辦公室氣氛有點尷尬`);  // 好友也受影響
+  if(favInvolved(a,b)){ W.morale=Math.max(0,W.morale-3); SOUND.sfx('bad');
+    celebrate('💔 你在乎的人分手了', `${a.name} 和 ${b.name} 分手了`); pushHighlight('💔',`你最在乎的員工分手了…`); }
+  romanceBusy=false;
+}
+// 戀情世界推進：成長暗戀、觸發告白/放閃/分手
+function romanceTick(){
+  if(romanceBusy) return;
+  const near=(a,b)=>Math.hypot(a.pos.x-b.pos.x,a.pos.y-b.pos.y)<2.2;
+  // 1) 既有情侶：放閃或分手判定
+  for(const c of W.chars){ const p=partnerOf(c); if(!p||c.id>p.id) continue;   // 每對只處理一次
+    const rs=relOf(c,p);
+    if((c.mood<25||p.mood<25||rs<=-30) && Math.random()<0.5){ breakup(c,p); return; }
+    if(near(c,p) && Math.random()<0.5){ coupleSweet(c,p); return; }
+  }
+  // 2) 單身異性：成長好感，夠高就告白
+  const singles=W.chars.filter(c=>single(c)&&c.dept!=='總');
+  for(const a of singles){ for(const b of singles){ if(a.id>=b.id) continue; if(!canRomance(a,b)) continue;
+    const base=relOf(a,b);
+    if(base>=12){ const grow=(near(a,b)?2.2:0.6)+compat(a,b)*0.4; crushAdd(a,b,Math.max(0.3,grow)); }
+    const cr=crushOf(a,b);
+    if(cr>=60 && base>=20){   // 告白：好感高且關係好，由 a 發動
+      if(cr>=40 && base>=25){ pushMem(a,`偷偷喜歡上${b.name}`); }
+      confess(a,b); return;
+    }
+  } }
+}
+
+// ===== 員工主動事件（加薪/請假/抱怨/提案/離職）=====
+const REQ_CFG={ raise:{yes:'加薪',no:'拒絕'}, dayoff:{yes:'准假',no:'拒絕'}, complaint:{yes:'改善',no:'忽略'}, proposal:{yes:'採納',no:'否決'}, quit:{yes:'加薪慰留',no:'放他走'} };
+const REQ_FALLBACK={ raise:'老闆，我表現不錯，能不能加薪？', dayoff:'最近好累，想請個假…', complaint:'工作量真的太大了！', proposal:'我有個能幫公司賺錢的點子！', quit:'我做得不太開心，在考慮離職…' };
+let reqQueue=[], activeReq=null;
+async function genRequest(c,type){
+  if(c._reqPending || reqQueue.length>=3) return; c._reqPending=true;
+  let msg=null; const body={name:c.name,dept:c.dept,persona:c.persona,type,style:styleHint(c)};
+  if(useBrowserGen()){ try{ msg=await WLLM.request(body); }catch(e){} }
+  else if(CONFIG.USE_BACKEND){ try{ const r=await fetch(CONFIG.BACKEND_URL+'/character/request',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)}); msg=(await r.json()).msg; }catch(e){} }
+  reqQueue.push({c,type,msg:msg||REQ_FALLBACK[type]}); updateReqBadge();
+}
+function updateReqBadge(){ const b=document.getElementById('req-badge');
+  if(reqQueue.length>0 && !activeReq){ b.style.display='block'; b.textContent=`📨 ${reqQueue.length} 件員工請求`; } else b.style.display='none'; }
+function showNextRequest(){
+  if(activeReq || !reqQueue.length) return;
+  activeReq=reqQueue.shift(); activeReq.showT=performance.now(); const {c,type,msg}=activeReq; const cfg=REQ_CFG[type];
+  document.getElementById('req-who').textContent=`${c.name}（${DEPTS[c.dept].name}）`;
+  document.getElementById('req-msg').textContent=msg;
+  document.getElementById('req-yes').textContent=cfg.yes;
+  document.getElementById('req-no').textContent=cfg.no;
+  document.getElementById('reqcard').style.display='block'; updateReqBadge();
+}
+function resolveRequest(yes){
+  if(!activeReq) return; const {c,type}=activeReq; const alive=W.chars.includes(c);
+  if(alive){
+    if(type==='raise'){ if(yes){ c.salary=Math.round(c.salary*1.18); c.mood=Math.min(100,c.mood+15); W.stat.raises++; log(`💰 ${c.name} 加薪，月薪 $${c.salary}`); pushMem(c,'跟老闆爭取到加薪');} else { c.mood=Math.max(0,c.mood-15); log(`🙅 婉拒 ${c.name} 的加薪`); pushMem(c,'要求加薪被老闆婉拒，有點失落');} }
+    else if(type==='dayoff'){ if(yes){ c.energy=100; c.mood=Math.min(100,c.mood+10); c.state='break'; c.target=zoneSpot('茶水間'); c.until=performance.now()+6000; log(`🌴 准 ${c.name} 休息`); pushMem(c,'累壞了，老闆准了假');} else { c.mood=Math.max(0,c.mood-10); pushMem(c,'想請假被打回票');} }
+    else if(type==='complaint'){ if(yes){ c.mood=Math.min(100,c.mood+10); c.task=null; log(`🤝 改善了 ${c.name} 的狀況`); pushMem(c,'跟老闆抱怨後狀況有改善');} else { c.mood=Math.max(0,c.mood-5); pushMem(c,'抱怨工作量卻被忽略');} }
+    else if(type==='proposal'){ if(yes){ const g=Math.round(1500+c.skill*22); W.cash+=g; W.todayRev+=g; c.mood=Math.min(100,c.mood+12); c.skill=Math.min(100,c.skill+4); W.stat.proposals++; log(`💡 採納 ${c.name} 的提案（+$${g}）`); pushEvent(`${c.name}的提案被採納`); pushMem(c,`提案被老闆採納，幫公司賺了一筆`);} else { c.mood=Math.max(0,c.mood-8); pushMem(c,'辛苦想的點子被否決');} }
+    else if(type==='quit'){ if(yes){ c.salary=Math.round(c.salary*1.18); c.mood=Math.min(100,c.mood+20); bondAdd(c,8); log(`🙏 加薪慰留 ${c.name}`); pushMem(c,'本來想走，老闆加薪把我留下了');} else { clearPartnerOf(c); toAlumnus(c); W.chars=W.chars.filter(x=>x!==c); log(`👋 ${c.name} 離職了（已進校友庫，可再招回）`); pushEvent(`${c.name}自己離職了`); pushHighlight('👋',`${c.name} 自己離職了`); W.chars.forEach(o=>{const s=W.rel[pairKey(c,o)]; if(s>=18){o.mood=Math.max(0,o.mood-8); pushMem(o,`好同事${c.name}離職了，有點難過`);} }); } }
+    if(type!=='quit') bondAdd(c, yes?4:-3);   // 答應請求加深羈絆、拒絕則受損
+    c._reqPending=false;
+  }
+  activeReq=null; document.getElementById('reqcard').style.display='none'; updateReqBadge();
+  setTimeout(showNextRequest,400);
+}
+
+// ===== 🤖 AI 代管：一鍵讓 AI 自動處理玩家能操作的事 =====
+function setAutopilot(on){
+  W.autopilot=on;
+  const btn=document.getElementById('autopilot-btn');
+  btn.innerHTML=`🤖 AI 代管：${on?'開':'關'} <small>${on?'AI 正在自動幫你管理':'開啟後由 AI 自動幫你管理'}</small>`;
+  btn.style.background=on?'#2e7d5b':'#2a3550';
+  if(on){ log('🤖 已開啟 AI 代管，接下來由 AI 自動處理。'); W.nextAutoT=performance.now()+2000; }
+  else log('🤖 已關閉 AI 代管，改回手動。');
+}
+// 員工請求：代管用合理策略自動決定
+function autoDecideRequest(type,c){
+  if(type==='raise')    return W.cash>5000 && c.skill>52;        // 有錢又有能力才加
+  if(type==='dayoff')   return c.energy<58;                       // 累了就准
+  if(type==='complaint')return true;                             // 盡量改善
+  if(type==='proposal') return true;                             // 提案通常會賺
+  if(type==='quit')     return c.skill>48 && W.cash>3000;        // 有價值就慰留
+  return true;
+}
+// 代管的日常經營：缺人招募 / 嚴重虧損精簡 / 指派任務
+function autoManage(){
+  if(!W.chars.some(c=>c.dept==='總')){ const nc=addChar('總'); log(`🤖 代管：招募新總經理 ${nc.name}`); pushEvent(`${nc.name}接任總經理`); return; }
+  const workers=W.chars.filter(c=>c.dept!=='總');
+  const payroll=workers.reduce((s,c)=>s+c.salary,0);
+  // 1) 缺人且財務健康 → 招募到最少人的部門（遵守上限）
+  if(workers.length<MAX_WORKERS && workers.length<6 && W.cash>8000){
+    const cnt={}; for(const d of HIRABLE) cnt[d]=0; for(const c of workers) if(cnt[c.dept]!=null) cnt[c.dept]++;
+    const d=HIRABLE.reduce((a,b)=>cnt[a]<=cnt[b]?a:b);
+    const nc=addChar(d); pushEvent(`${nc.name}新加入${DEPTS[d].name}`); log(`🤖 代管：招募 ${nc.name} 進 ${DEPTS[d].name}`); return;
+  }
+  // 2) 嚴重虧損且人數偏多 → 精簡生產力最低者（遵守下限、含代價）
+  if((W.cash<-2000 || payroll>Math.max(W.todayRev,W.rev/Math.max(1,W.day))*1.5) && workers.length>Math.max(MIN_WORKERS,4)){
+    let worst=null,wv=1e9; for(const c of workers){ const v=prod(c)*deptWeight(c); if(v<wv){wv=v;worst=c;} }
+    if(worst){ log(`🤖 代管：財務吃緊，精簡人力`); fireChar(worst); return; }
+  }
+  // 3) 指派任務給閒置且有精力的人
+  const idle=workers.filter(c=>!c.task && c.energy>55);
+  if(idle.length && Math.random()<0.55){ const c=pick(idle); c.task='處理主管交辦事項'; c.taskT=0;
+    pushMem(c,'被指派處理主管交辦事項'); log(`🤖 代管：派任務給 ${c.name}`); think(c); }
+}
+// 代管主迴圈推進（放在主迴圈呼叫）
+function autopilotTick(){
+  if(!W.autopilot) return;
+  // 自動回應員工請求卡片（顯示約 1.5 秒讓你看得到，再處理）
+  if(activeReq){ if(performance.now() > (activeReq.showT||0)+1500){ const {c,type}=activeReq; resolveRequest(autoDecideRequest(type,c)); }
+    return; }
+  if(reqQueue.length){ showNextRequest(); return; }
+  // 日常經營（每 9~15 秒一次）
+  if(performance.now() > (W.nextAutoT||0)){ W.nextAutoT=performance.now()+9000+Math.random()*6000; autoManage(); }
+}
+
+// ===== P2：存檔 + 離線進度（「您不在時發生了什麼」）=====
+const SAVE_BASE='yocat_save_v2';
+// 存檔以帳號命名空間：登入者各有各的本機存檔（雲端為跨裝置真相）；訪客用 base key
+function saveKey(){ return (typeof ACCT!=='undefined' && ACCT.account) ? SAVE_BASE+'__'+ACCT.account.id : SAVE_BASE; }
+const MAX_OFFLINE_DAYS=5;
+const RESUME_SEC=300;   // 離開 5 分鐘內的 reload＝原地無縫接上，不推進時間、不跳離線報告
+function serialize(){
+  return { v:3, savedAt:Date.now(), idc,
+    day:W.day, minutes:W.minutes, cash:W.cash, morale:W.morale,
+    rev:W.rev, orders:W.orders, todayRev:W.todayRev, todayOrders:W.todayOrders, reported:W.reported,
+    announce:W.announce, autopilot:W.autopilot, theme:W.theme, ownedThemes:W.ownedThemes.slice(),
+    milestones:W.milestones.slice(), achv:W.achv.slice(), stat:{...W.stat}, highlights:W.highlights.slice(-60), scenario:W.scenario, bestScores:W.bestScores, runId:W.runId,
+    alumni:(W.alumni||[]).slice(-40), hiredDreams:(W.hiredDreams||[]).slice(), gems:W.gems||0,
+    events:W.events.slice(), rel:{...W.rel}, crush:{...W.crush},
+    chars:W.chars.map(c=>({ id:c.id, name:c.name, dept:c.dept, skill:c.skill, salary:c.salary,
+      mood:c.mood, energy:c.energy, variant:c.variant, varScale:c.varScale, faceDir:c.faceDir,
+      persona:c.persona, memory:(c.memory||[]).slice(-12), gender:c.gender, partner:c.partner??null,
+      task:c.task||null, taskT:c.taskT||0, pos:{x:c.pos.x,y:c.pos.y},
+      catchphrase:c.catchphrase??null, speakStyle:c.speakStyle||'', dream:c.dream||null, title:c.title||null,
+      bond:c.bond||0, fav:!!c.fav, arc:c.arc||null, acc:c.acc||null })) };
+}
+function saveGame(){ try{ localStorage.setItem(saveKey(), JSON.stringify(serialize())); }catch(e){}
+  if(typeof ACCT!=='undefined') ACCT.pushSaveDebounced(); }
+function loadGame(){
+  let save; try{ save=JSON.parse(localStorage.getItem(saveKey())||'null'); }catch(e){ save=null; }
+  return applySave(save);
+}
+// 從一份存檔物件還原整個世界（本機讀檔與雲端切帳號共用）
+function applySave(save){
+  if(!save || !Array.isArray(save.chars) || !save.chars.length) return false;
+  // 還原世界
+  W.day=save.day||1; W.minutes=save.minutes||9*60; W.cash=save.cash??20000;
+  W.morale=save.morale||70; W.rev=save.rev||0; W.orders=save.orders||0;
+  W.events=Array.isArray(save.events)?save.events:[]; W.rel=save.rel&&typeof save.rel==='object'?save.rel:{};
+  W.crush=save.crush&&typeof save.crush==='object'?save.crush:{};
+  W.announce=save.announce||null;
+  W.autopilot = save.autopilot!==undefined ? !!save.autopilot : true;   // 舊存檔沒這欄→預設開
+  W.ownedThemes = Array.isArray(save.ownedThemes)&&save.ownedThemes.length ? save.ownedThemes.filter(t=>THEMES[t]) : ['default'];
+  if(!W.ownedThemes.includes('default')) W.ownedThemes.unshift('default');
+  applyTheme(THEMES[save.theme]?save.theme:'default');
+  W.milestones = Array.isArray(save.milestones)?save.milestones:[];
+  W.achv = Array.isArray(save.achv)?save.achv:[];
+  if(save.stat&&typeof save.stat==='object') W.stat=Object.assign({ fired:0,raises:0,hired:0,proposals:0,breakups:0,profitStreak:0,everProfit:false,bestVal:0 }, save.stat);
+  W.highlights = Array.isArray(save.highlights)?save.highlights:[];
+  W.scenario = (save.scenario && typeof save.scenario==='object') ? save.scenario : null;
+  W.bestScores = (save.bestScores && typeof save.bestScores==='object') ? save.bestScores : {};
+  W.runId = save.runId || newRunId();
+  W.alumni = Array.isArray(save.alumni) ? save.alumni : [];
+  W.hiredDreams = Array.isArray(save.hiredDreams) ? save.hiredDreams : [];
+  W.gems = save.gems||0;
+  W.todayRev=save.todayRev||0; W.todayOrders=save.todayOrders||0; W.reported=!!save.reported;
+  for(const sp of save.chars){ if(DEPTS[sp.dept]) addChar(sp.dept, sp); }
+  // 時間接續：短時間 reload＝原封不動接上；離開夠久(>5分現實)才跑離線進度
+  const elapsedSec=Math.max(0,(Date.now()-(save.savedAt||Date.now()))/1000);
+  if(elapsedSec < RESUME_SEC){
+    log('💾 已接續上次進度，歡迎回來。');          // 無縫：保留原本的 day / minutes / 全部狀態
+  } else {
+    const total = W.minutes + elapsedSec*TIME_SCALE;   // 推進世界時鐘
+    const daysCrossed = Math.floor(total/1440);
+    W.minutes = total % 1440;
+    if(daysCrossed>0) runOffline(Math.min(daysCrossed,MAX_OFFLINE_DAYS), daysCrossed, elapsedSec);
+    else log('💾 讀取存檔，繼續營運。');
+    W.reported = W.minutes>=18*60;                      // 過了今天結算點就別重複結算
+  }
+  W.morale = W.chars.length? Math.round(W.chars.reduce((s,c)=>s+c.mood,0)/W.chars.length):70;
+  return true;
+}
+function runOffline(days, rawDays, elapsedSec){
+  let totalRev=0, totalPay=0, totalOrders=0; const mvpCount={};
+  for(let d=0; d<days; d++){
+    let p=0; for(const c of W.chars) p+=prod(c)*deptWeight(c);
+    const rev=Math.round(p*1728), pay=Math.round(W.chars.reduce((s,c)=>s+c.salary,0));
+    const ord=Math.round(p*18);
+    totalRev+=rev; totalPay+=pay; totalOrders+=ord; W.cash+=rev-pay;
+    let top=null,tp=-1; for(const c of W.chars){ const v=prod(c)*deptWeight(c); if(v>tp){tp=v;top=c;} }
+    if(top) mvpCount[top.name]=(mvpCount[top.name]||0)+1;
+    for(const c of W.chars){ c.skill=Math.min(100,c.skill+0.4);
+      c.energy=Math.min(100,c.energy+10);
+      c.mood = W.cash<0 ? Math.max(0,c.mood-3) : Math.min(100,c.mood+1); }
+    W.day++;
+  }
+  const net=totalRev-totalPay;
+  let mvp='—',mc=-1; for(const [n,c] of Object.entries(mvpCount)) if(c>mc){mc=c;mvp=n;}
+  if(mvp!=='—'){ const mc2=W.chars.find(x=>x.name===mvp); if(mc2) pushMem(mc2,`你不在的那幾天，當了 ${mc} 次 MVP`); }
+  // 關係亮點（事實式，非對白）
+  let relLine=null, best=-999, worst=999, bp=null, wp=null;
+  for(const [k,v] of Object.entries(W.rel)){ if(v>best){best=v;bp=k;} if(v<worst){worst=v;wp=k;} }
+  const nameOf=id=>{ const c=W.chars.find(x=>x.id==id); return c?c.name:null; };
+  if(bp && best>=40){ const [a,b]=bp.split('-').map(nameOf); if(a&&b) relLine=`💛 ${a} 和 ${b} 感情越來越好`; }
+  else if(wp && worst<=-40){ const [a,b]=wp.split('-').map(nameOf); if(a&&b) relLine=`⚡ ${a} 和 ${b} 處得不太愉快`; }
+  const realH=elapsedSec/3600;
+  const realStr = realH>=1 ? `約 ${Math.round(realH)} 小時` : `約 ${Math.max(1,Math.round(elapsedSec/60))} 分鐘`;
+  const capNote = rawDays>days ? `（上限結算 ${days} 天）` : '';
+  const lines=[
+    `你離開了${realStr}，公司自己營運了 ${days} 天${capNote}`,
+    `累積營收 $${totalRev.toLocaleString()}　薪資 -$${totalPay.toLocaleString()}`,
+    `淨利 ${net>=0?'+':''}$${net.toLocaleString()}　現金 $${Math.round(W.cash).toLocaleString()}`,
+    `出貨訂單 ${totalOrders} 筆　⭐ 期間 MVP：${mvp}`,
+    relLine,
+    W.cash<0 ? '⚠️ 你不在時公司在燒錢，回來得想辦法了' : (net>=0?'🎉 營運穩健，歡迎回來！':'😓 小虧，再調整一下人力吧')
+  ].filter(Boolean);
+  report(`🌙 歡迎回來，老闆`, lines);
+}
+
+const DEBUG_MODE = location.search.includes('dirtest') || location.search.includes('crowd');
+if(location.search.includes('fresh')){ try{ localStorage.removeItem(saveKey()); }catch(e){} }
+
+// 開局：優先讀存檔（含離線進度），否則新陣容
+let LOADED = DEBUG_MODE ? false : loadGame();
+if(!LOADED){
+  W.runId=newRunId();
+  // 初始陣容：總經理 + 五部門各一；性別均衡(3男3女)讓辦公室戀情有發展空間
+  const gseq=['m','f','m','f','m','f'].sort(()=>Math.random()-0.5);
+  ['總','產','銷','人','發','財'].forEach((d,i)=>addChar(d,null,gseq[i]));
+}
+if(location.search.includes('crowd')){ for(const d of HIRABLE) for(let i=0;i<2;i++) addChar(d); } // debug：同部門多人看變體
+if(location.search.includes('dirtest')){ // debug：4 角色各走一個等角方向，校準朝向
+  W.chars.length=0;
+  const dirs=[{d:[1,0],n:'→SE右下'},{d:[0,1],n:'→SW左下'},{d:[0,-1],n:'→NE右上'},{d:[-1,0],n:'→NW左上'}];
+  dirs.forEach(o=>{ const c=addChar('產'); c.name=o.n; c.pos={x:GRID_W/2,y:GRID_H/2}; c.testDir=o.d.slice(); });
+}
+
+// ===== 角色行為：平時坐在座位工作，偶爾去開會/茶水間再回座 =====
+// 離座總量硬上限：平時 ≥80% 在座（最多 20% 離座，無條件進位到人數），午休放寬到 60% 可離座。
+// leaveState 與「去找總經理約談」共用同一個名額，確保含約談在內也不破 80%。
+function awayCount(){ return W.chars.filter(x=>x.state!=='work').length; }
+function maxAway(){
+  // 上班時段恆定 ≥80% 在座：最多 20% 同時離座（午休略放寬到 25%，仍確保多數在座）。
+  // 不用 Math.max(1,…)：小辦公室寧可全在座，也不破 80% 下限。
+  const lunch = W.minutes>=12*60 && W.minutes<13*60;
+  return Math.floor(W.chars.length * (lunch?0.25:0.2));
+}
+function leaveState(c){
+  if(c.dept==='總') return;                               // 總經理不亂跑
+  const lunch = W.minutes>=12*60 && W.minutes<13*60;
+  // 同時最多 ~20% 的人離開座位，其餘都在工作（平時 ≥80% 坐著；含約談名額一起算）
+  if(awayCount()>=maxAway()) return;
+  const p = lunch?0.0016:0.00022;
+  if(Math.random()<p){
+    if(lunch || Math.random()<0.6){ c.state='goBreak'; c.target=zoneSpot('茶水間'); }
+    else { c.state='goMeet'; c.target=zoneSpot('會議室'); }
+  }
+}
+function onArrive(c){
+  if(c.state==='goMeet'){ c.state='meet'; c.until=performance.now()+6000+Math.random()*8000; }
+  else if(c.state==='goBreak'){ c.state='break'; c.until=performance.now()+5000+Math.random()*7000; }
+  else if(c.state==='goBoss'){ c.state='boss'; c.until=performance.now()+9000; bossMeetingTalk(c); }
+  else if(c.state==='return'){ c.state='work'; }
+}
+// ===== 員工去跟總經理約談／交報告（例如財務報表、招募審核）=====
+const BOSS_TOPIC={ '財':'這個月的財務報表', '人':'新人招募的審核', '產':'產品上架的進度', '銷':'這週的銷售業績', '發':'研發專案的進度' };
+function startBossMeeting(c){ const z=ZONES['總']; c.state='goBoss'; c._bossTopic=BOSS_TOPIC[c.dept]||'工作近況';
+  c.target={ x:z.x+z.w/2, y:z.y+2.2 }; }   // 走到總經理桌前
+async function bossMeetingTalk(c){
+  const boss=W.chars.find(x=>x.dept==='總'); if(!boss) return;
+  log(`📋 ${c.name} 去向總經理報告${c._bossTopic}`); pushEvent(`${c.name}向總經理報告${c._bossTopic}`); pushMem(c,`向總經理報告${c._bossTopic}`);
+  c.say='…'; c.sayMode='talk'; c.sayT=performance.now()+8000;
+  const body={a:{name:c.name,dept:c.dept,persona:c.persona,mem:recentMem(c,2),style:styleHint(c)},
+    b:{name:boss.name,dept:boss.dept,persona:boss.persona,style:styleHint(boss)},rel:'部屬向總經理報告工作',
+    events:[`${c.name}來向總經理報告「${c._bossTopic}」，總經理聽取並簡短回應`], gameTime:fmtClock()};
+  if(!useBrowserGen() && !CONFIG.USE_BACKEND){ c.say=null; return; }
+  try{
+    let j; if(useBrowserGen()) j=await WLLM.converse(body);
+    else { const r=await fetch(CONFIG.BACKEND_URL+'/character/converse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); j=await r.json(); }
+    c.say=j.a||null; c.sayMode='talk'; c.sayT=performance.now()+5000;
+    setTimeout(()=>{ if(W.chars.includes(boss)){ boss.say=j.b||null; boss.sayMode='talk'; boss.sayT=performance.now()+5000; } },1700);
+  }catch(e){ c.say=null; }
+}
+function stepChar(c,dt){
+  if(c.testDir){ // debug：持續往固定等角方向走，驗證朝向
+    const sp=1.3*dt; c.pos.x+=c.testDir[0]*sp; c.pos.y+=c.testDir[1]*sp; c.moving=true;
+    if(c.pos.x<1)c.pos.x=GRID_W-1; else if(c.pos.x>GRID_W-1)c.pos.x=1;
+    if(c.pos.y<1)c.pos.y=GRID_H-1; else if(c.pos.y>GRID_H-1)c.pos.y=1;
+    const sx=c.testDir[0]-c.testDir[1], sy=c.testDir[0]+c.testDir[1];
+    c.away=sy<-0.01; if(Math.abs(sx)>0.01) c.faceDir=sx>0?-1:1; return;
+  }
+  // 目標改變→重算避牆格子路徑（BFS）
+  if(!c._pt || c._pt.x!==c.target.x || c._pt.y!==c.target.y){
+    c._pt={x:c.target.x,y:c.target.y}; c.path=findPath(c.pos.x,c.pos.y,c.target.x,c.target.y);
+  }
+  const wp = (c.path&&c.path.length) ? c.path[0] : c.target;   // 目前走向的點（waypoint 或最終目標）
+  const dx=wp.x-c.pos.x, dy=wp.y-c.pos.y, d=Math.hypot(dx,dy);
+  if(d>0.05){ const sp=1.5*dt; c.pos.x+=dx/d*Math.min(sp,d); c.pos.y+=dy/d*Math.min(sp,d); c.moving=true;
+    const sx=dx-dy, sy=dx+dy;                 // 螢幕方向
+    c.away = sy < -0.01;                        // 往螢幕上＝遠離＝背面
+    if(Math.abs(sx)>0.01) c.faceDir = sx>0 ? -1 : 1; // 右移→鏡像（正/背面同規則）
+    if(c.path&&c.path.length && d<Math.max(sp,0.14)) c.path.shift();   // 接近 waypoint→換下一個
+  }
+  else if(c.path&&c.path.length){ c.path.shift(); }   // 到 waypoint，續走下一段
+  else {
+    c.moving=false;
+    if(ROAM){ c.target={x:1+Math.random()*(GRID_W-2.5), y:1+Math.random()*(GRID_H-2.5)}; return; }
+    if(c.state==='goMeet'||c.state==='goBreak'||c.state==='goBoss'||c.state==='return') onArrive(c);
+    else if(c.state==='meet'||c.state==='break'||c.state==='boss'){ if(performance.now()>c.until){ c.state='return'; c.target={...c.seat}; } }
+    else leaveState(c); // work
+  }
+  // 說話 vs 心聲：獨自一人→心聲泡泡（接 LLM）；旁邊有同事→偶爾互相討論（說話泡泡）
+  if(!c.say && !c.moving){
+    const nb=nearestOther(c);
+    const social=(c.state==='work'||c.state==='meet'||c.state==='break');
+    const chatP=(c.state==='break'||c.state==='meet')?0.016:0.005;   // 茶水間/會議室更愛八卦
+    if(nb.o && nb.d<1.8 && !nb.o.say && social && Math.random()<chatP){
+      startChat(c,nb.o);
+    } else if(c.state==='work' && (!nb.o || nb.d>=1.7) && Math.random()<0.0016){
+      c.say='…'; c.sayMode='think'; c.sayT=performance.now()+5000; think(c);
+    }
+  }
+  if(c.say && performance.now()>c.sayT){ c.say=null; c.sayMode=null; }
+}
+function isSeated(c){ return (c.state==='work') && !c.moving; }
+function nearestOther(c){ let o=null,bd=1e9; for(const x of W.chars){ if(x===c) continue;
+  const d=Math.hypot(x.pos.x-c.pos.x,x.pos.y-c.pos.y); if(d<bd){bd=d;o=x;} } return {o,d:bd}; }
+async function startChat(a,b){
+  a.say='…'; a.sayMode='talk'; a.sayT=performance.now()+6000;
+  b.say='…'; b.sayMode='talk'; b.sayT=performance.now()+6000;
+  // 關係演變：互動→依相容性拉近或推遠；心情依關係變
+  const before=relOf(a,b); relAdd(a,b, compat(a,b)+1);
+  const rs=relOf(a,b), mv = rs>=18?1.2 : rs<=-18?-1.2 : 0.3;
+  a.mood=Math.min(100,Math.max(0,a.mood+mv)); b.mood=Math.min(100,Math.max(0,b.mood+mv));
+  if(before<45 && rs>=45){ pushEvent(`${a.name}跟${b.name}變好朋友了`); pushMem(a,`跟${b.name}變成好朋友`); pushMem(b,`跟${a.name}變成好朋友`); pushHighlight('💛',`${a.name} 和 ${b.name} 變成好朋友`); }
+  if(before>-45 && rs<=-45){ pushEvent(`${a.name}跟${b.name}鬧翻了`); pushMem(a,`跟${b.name}鬧翻了`); pushMem(b,`跟${a.name}鬧翻了`); pushHighlight('⚡',`${a.name} 和 ${b.name} 鬧翻了`); }
+  const body={a:{name:a.name,dept:a.dept,persona:a.persona,mem:recentMem(a,3),style:styleHint(a)},
+    b:{name:b.name,dept:b.dept,persona:b.persona,mem:recentMem(b,3),style:styleHint(b)},gameTime:fmtClock(),announce:W.announce,
+    rel:relLabel(rs), events:W.events.slice(0,4)};
+  if(!useBrowserGen() && !CONFIG.USE_BACKEND){ a.say=null; b.say=null; a.sayMode=b.sayMode=null; return; }
+  try{
+    let j; if(useBrowserGen()) j=await WLLM.converse(body);
+    else { const r=await fetch(CONFIG.BACKEND_URL+'/character/converse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); j=await r.json(); }
+    a.say=j.a||null; a.sayMode='talk'; a.sayT=performance.now()+3800;
+    setTimeout(()=>{ if(W.chars.includes(b)){ b.say=j.b||null; b.sayMode='talk'; b.sayT=performance.now()+3800; } },1300);
+  }catch(e){ a.say=null; b.say=null; a.sayMode=b.sayMode=null; }
+}
+
+// ===== 角色「大腦」：接後端→本地 LLM，離線則內建 =====
+async function think(c){
+  const body={name:c.name,dept:c.dept,persona:c.persona,task:c.task,style:styleHint(c),
+    announce:W.announce,gameTime:fmtClock(),mood:Math.round(c.mood),energy:Math.round(c.energy)};
+  try{
+    let line; if(useBrowserGen()) line=await WLLM.think(body);
+    else { if(!CONFIG.USE_BACKEND) return; const r=await fetch(CONFIG.BACKEND_URL+'/character/think',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); line=(await r.json()).line; }
+    if(line){ c.say=line; c.sayMode='think'; c.sayT=performance.now()+3800; }
+  }catch(e){ /* 生成失敗：維持安靜 */ }
+}
+async function chat(c,msg){
+  const body={name:c.name,dept:c.dept,persona:c.persona,message:msg,memory:recentMem(c,4),style:styleHint(c)};
+  if(useBrowserGen()){ try{ return await WLLM.chat(body); }catch(e){ return '（瀏覽器模型忙碌中）'; } }
+  if(!CONFIG.USE_BACKEND){ return `（離線）我是${c.name}，${c.persona.join('・')}。`; }
+  try{ const r=await fetch(CONFIG.BACKEND_URL+'/character/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return (await r.json()).reply||'…';
+  }catch(e){ return '（後端未連線）'; }
+}
+
+// ===== 玩家四動作 =====
+function setMode(m){
+  W.mode = (W.mode===m)?null:m;
+  document.querySelectorAll('.btn[data-act]').forEach(b=>b.classList.toggle('active',b.dataset.act===W.mode));
+  const band=document.getElementById('modeband');
+  const txt={fire:'🖱️ 點選要解職的員工',task:'🖱️ 點選要派任務的員工'}[W.mode];
+  band.style.display=txt?'block':'none'; band.textContent=txt||'';
+}
+// ===== 通用選單彈窗：所有管理輸入都用「選的」 =====
+const pickerEl=document.getElementById('picker');
+function openPicker(title, opts, onPick){
+  document.getElementById('picker-title').textContent=title;
+  const box=document.getElementById('picker-opts'); box.innerHTML='';
+  opts.forEach(o=>{ const btn=document.createElement('button'); btn.className='picker-opt';
+    btn.innerHTML = o.sub ? `${o.label}<small>${o.sub}</small>` : o.label;
+    btn.onclick=()=>{ closePicker(); onPick(o.value); };
+    box.appendChild(btn); });
+  pickerEl.classList.add('show'); appEl.classList.remove('menu-open');
+}
+function closePicker(){ pickerEl.classList.remove('show'); }
+document.getElementById('picker-cancel').onclick=closePicker;
+pickerEl.onclick=e=>{ if(e.target===pickerEl) closePicker(); };
+function toast(msg){ const band=document.getElementById('modeband'); band.textContent=msg; band.style.display='block';
+  clearTimeout(toast._t); toast._t=setTimeout(()=>band.style.display='none',2400); }
+
+// 招募（選部門；有上限）
+// 外觀主題：套用 + 商店
+function applyTheme(id){ const t=THEMES[id]||THEMES.default; W.theme=THEMES[id]?id:'default';
+  const st=document.getElementById('stage'); if(st) st.style.background=`radial-gradient(120% 90% at 50% 30%,${t.bg[0]},${t.bg[1]})`; }
+function openShop(){
+  const opts=Object.entries(THEMES).map(([id,t])=>{
+    const owned=W.ownedThemes.includes(id), eq=W.theme===id;
+    return { label:`${t.name}${eq?'　✓ 使用中':owned?'　(已擁有)':`　💰 $${t.price}`}`,
+      sub: owned?(eq?'目前使用中':'點擊套用'):`購買需現金 $${t.price}`, value:id };
+  });
+  openPicker('🛍️ 辦公室主題商店', opts, id=>{ const t=THEMES[id];
+    if(W.ownedThemes.includes(id)){ applyTheme(id); log(`🎨 套用主題：${t.name}`); }
+    else if(W.cash>=t.price){ W.cash-=t.price; W.ownedThemes.push(id); applyTheme(id);
+      log(`🛍️ 購買主題「${t.name}」並套用（-$${t.price.toLocaleString()}）`); pushEvent(`老闆把辦公室換成「${t.name}」風格`); }
+    else toast(`現金不足，購買「${t.name}」需要 $${t.price.toLocaleString()}`);
+  });
+}
+// ===== 👔 人才庫（校友庫 + 夢想人才市場 + 再招回）=====
+const DREAM_TALENTS=[
+  { key:'wizard', name:'沈墨', gender:'m', dept:'發', skill:92, salary:1600, title:'傳奇架構師',
+    bio:'曾用三天寫出讓公司估值翻倍的系統；脾氣古怪，深不可測。', persona:['天才型','孤僻'],
+    catchphrase:'這很簡單', speakStyle:'冷淡', price:12000 },
+  { key:'closer', name:'艾莉', gender:'f', dept:'銷', skill:90, salary:1700, title:'金牌業務女王',
+    bio:'沒有她談不下的客戶，走到哪訂單跟到哪。', persona:['自信','熱情'],
+    catchphrase:'包在我身上', speakStyle:'熱情', price:13000 },
+  { key:'cfo', name:'羅文', gender:'m', dept:'財', skill:88, salary:1500, title:'華爾街回流 CFO',
+    bio:'能從一團亂帳裡變出現金流，傳說他算得出明天的股價。', persona:['精明','正經'],
+    catchphrase:'數字會說話', speakStyle:'正經', price:11000 },
+];
+function specForChar(c){ return { id:c.id, name:c.name, dept:c.dept, skill:c.skill, salary:c.salary,
+  mood:c.mood, energy:c.energy, variant:c.variant, varScale:c.varScale, faceDir:c.faceDir,
+  persona:c.persona, memory:(c.memory||[]).slice(-12), gender:c.gender,
+  catchphrase:c.catchphrase??null, speakStyle:c.speakStyle||'', dream:c.dream||null, title:c.title||null,
+  bond:c.bond||0, fav:!!c.fav, arc:c.arc||null, acc:c.acc||null }; }
+function toAlumnus(c){ if(c.dept==='總') return; const s=specForChar(c); s.leftDay=W.day; s.partner=null;
+  W.alumni=(W.alumni||[]).filter(a=>a.id!==s.id); W.alumni.push(s); if(W.alumni.length>40) W.alumni.shift(); }
+const isDreamActive=k=>W.chars.some(c=>c.dream===k);
+const isDreamAlum=k=>(W.alumni||[]).some(a=>a.dream===k);
+const rehireCost=a=>Math.round((a.skill||40)*40 + (a.salary||500)*3);
+
+function doHire(){
+  const noBoss = !W.chars.some(c=>c.dept==='總');
+  if(workerCount()>=MAX_WORKERS && !noBoss){ toast(`員工已達上限 ${MAX_WORKERS} 人，先讓現有的人發揮吧`); return; }
+  const alum=(W.alumni||[]), market=DREAM_TALENTS.filter(t=>!isDreamActive(t.key)&&!isDreamAlum(t.key));
+  openPicker('👔 招募中心', [
+    {label:'🧑‍💼 一般招募', sub:'選部門，隨機新人（免費）', value:'_normal'},
+    {label:`🎓 校友招回（${alum.length}）`, sub: alum.length?'把離開過的人請回來（需現金）':'還沒有人離職過', value:'_alumni'},
+    {label:`🌟 夢想人才市場（${market.length}）`, sub:'招募傳說級的獨特靈魂（需現金）', value:'_dream'},
+  ], v=>{ if(v==='_normal') hireNormal(); else if(v==='_alumni') openAlumni(); else openDreamMarket(); });
+}
+function hireNormal(){
+  const noBoss=!W.chars.some(c=>c.dept==='總'); const opts=[];
+  if(noBoss) opts.push({label:'總經理辦公室', sub:'目前沒有總經理，招募一位', value:'總'});
+  for(const d of HIRABLE) opts.push({label:DEPTS[d].name, sub:`目前 ${W.chars.filter(c=>c.dept===d).length} 人`, value:d});
+  openPicker('要招募到哪個部門？', opts, d=>{
+    if(d!=='總' && workerCount()>=MAX_WORKERS){ toast(`員工已達上限 ${MAX_WORKERS} 人`); return; }
+    const nc=addChar(d); pushEvent(`${nc.name}新加入${DEPTS[d].name}`); SOUND.sfx('coin'); });
+}
+function openAlumni(){
+  const alum=(W.alumni||[]).slice().reverse();
+  if(!alum.length){ toast('還沒有離職過的員工，好好對待現在的人吧'); return; }
+  const opts=alum.map(a=>{ const cost=rehireCost(a);
+    return { label:`${a.dream?'🌟 ':''}${a.name}　💰$${cost.toLocaleString()}`,
+      sub:`${DEPTS[a.dept]?DEPTS[a.dept].name:'—'}・技能 ${Math.round(a.skill)}・第 ${a.leftDay||'?'} 天離開`, value:a.id }; });
+  openPicker(`🎓 校友庫（請回來需現金）`, opts, id=>{ const a=(W.alumni||[]).find(x=>x.id===id); if(a) rehireAlum(a); });
+}
+function rehireAlum(a){
+  if(workerCount()>=MAX_WORKERS){ toast(`員工已達上限 ${MAX_WORKERS} 人`); return; }
+  const cost=rehireCost(a);
+  if(W.cash<cost){ toast(`現金不足，招回 ${a.name} 需要 $${cost.toLocaleString()}`); return; }
+  W.cash-=cost; W.alumni=W.alumni.filter(x=>x!==a);
+  const dept=DEPTS[a.dept]?a.dept:'產'; const c=addChar(dept, a);
+  pushMem(c, '被老闆重新請回公司，受寵若驚'); c.mood=Math.min(100,c.mood+15);
+  log(`🎓 花 $${cost.toLocaleString()} 把 ${a.name} 請回了 ${DEPTS[dept].name}`);
+  pushEvent(`${a.name}回鍋加入${DEPTS[dept].name}`); pushHighlight('🎓',`${a.name} 被老闆請回了公司`); SOUND.sfx('coin');
+}
+function openDreamMarket(){
+  const market=DREAM_TALENTS.filter(t=>!isDreamActive(t.key)&&!isDreamAlum(t.key));
+  if(!market.length){ toast('夢想人才都在你公司裡了（或在校友庫中可招回）'); return; }
+  const opts=market.map(t=>({ label:`🌟 ${t.name}・${t.title}　💎$${t.price.toLocaleString()}`,
+    sub:`${DEPTS[t.dept].name}・技能 ${t.skill}｜${t.bio}`, value:t.key }));
+  openPicker('🌟 夢想人才市場', opts, k=>{ const t=DREAM_TALENTS.find(x=>x.key===k); if(t) hireDream(t); });
+}
+// ===== 💎 資本（premium 貨幣）+ 儲值（真金流遊戲端；可遊戲內賺、可付費購買）=====
+function gainGems(n,why){ W.gems=(W.gems||0)+n; if(n>0){ toast(`💎 +${n} 資本（${why}）`);
+  if(ACCT.loggedIn()) ACCT.topupGems(n).then(r=>{ if(r.ok) W.gems=ACCT.wallet.gems; }); } }
+const GEM_PACKS=[
+  { id:'p1', gems:3000,  price:'NT$90',  tag:'' },
+  { id:'p2', gems:11000, price:'NT$290', tag:'（多送 10%）' },
+  { id:'p3', gems:35000, price:'NT$890', tag:'（最划算・多送 20%）' },
+];
+function openRecharge(){
+  // 會計：投資＝借現金、貸業主資本 → 儲值(注資)同時增加「現金」與「業主資本」，不消耗任一方
+  const opts=[{ label:`💎 業主資本（累積投入）$${(W.gems||0).toLocaleString()}　｜　💰 現金 $${Math.round(W.cash).toLocaleString()}`, sub:'注資＝借現金、貸業主資本：兩者同步↑（補虧損就用進來的現金）', value:'_' }];
+  opts.push({ label:'💵 注資 $1,000（測試）', sub:'現金 +$1,000、業主資本 +$1,000（未接真實金流）', value:'test1000' });
+  GEM_PACKS.forEach(p=>opts.push({ label:`💵 注資 $${p.gems.toLocaleString()}　${p.price}${p.tag}`, sub:'（測試）現金與業主資本同步入帳', value:'buy:'+p.id }));
+  opts.push({ label:'🎁 資本也能免費賺', sub:'達成里程碑 / 解鎖成就 / 劇本通關', value:'_' });
+  openPicker('💰 資本 / 儲值（注資）', opts, v=>{
+    const credit=(amt,msg)=>{
+      const apply=()=>{ W.cash+=amt; log(msg); toast(msg); SOUND.sfx('cash'); saveGame(); openRecharge(); };   // 借：現金↑
+      if(ACCT.loggedIn()){ ACCT.topupGems(amt).then(r=>{ if(r.ok){ W.gems=ACCT.wallet.gems; apply(); } else toast('儲值失敗：'+(r.d.error||'')); }); }   // 貸：業主資本↑（雲端記錄）
+      else { W.gems=(W.gems||0)+amt; apply(); }
+    };
+    if(v==='test1000') credit(1000,'💵 注資 $1,000：現金 +1,000、業主資本 +1,000');
+    else if(v.startsWith('buy:')){ const p=GEM_PACKS.find(x=>x.id===v.slice(4)); if(p) credit(p.gems,`💵 注資 $${p.gems.toLocaleString()}：現金與業主資本同步 +$${p.gems.toLocaleString()}`); }
+  });
+}
+// ===== 角色專屬外觀（為你在乎的人花費；羈絆變現點）=====
+const ACCESSORIES=[
+  { id:'crown', icon:'👑', name:'王者皇冠', cost:8000 },
+  { id:'halo',  icon:'😇', name:'天使光環', cost:6000 },
+  { id:'star',  icon:'🌟', name:'閃耀之星', cost:5000 },
+  { id:'flower',icon:'💐', name:'人氣花束', cost:4000 },
+  { id:'cat',   icon:'🐱', name:'招財貓耳', cost:5000 },
+];
+function openCosmetics(c){
+  const opts=ACCESSORIES.map(a=>({ label:`${a.icon} ${a.name}　$${a.cost.toLocaleString()}`,
+    sub: c.acc===a.id?'使用中（點擊取消）':'幫 '+c.name+' 戴上', value:a.id }));
+  openPicker(`✨ ${c.name} 的專屬外觀（用現金）`, opts, id=>{
+    const a=ACCESSORIES.find(x=>x.id===id); if(!a) return;
+    if(c.acc===id){ c.acc=null; log(`取下了 ${c.name} 的${a.name}`); inspect(c); return; }
+    if(W.cash<a.cost){ toast(`現金不足，${a.name} 需要 $${a.cost.toLocaleString()}`); return; }
+    W.cash-=a.cost; c.acc=id; log(`✨ 幫 ${c.name} 戴上了${a.name}（-$${a.cost.toLocaleString()}）`);   // 外觀用現金購買
+    pushHighlight('✨',`老闆為 ${c.name} 添購了${a.name}`); SOUND.sfx('coin'); saveGame(); inspect(c);
+  });
+}
+function hireDream(t){
+  if(workerCount()>=MAX_WORKERS){ toast(`員工已達上限 ${MAX_WORKERS} 人，先空出位子`); return; }
+  if(W.cash<t.price){ toast(`現金不足，特聘 ${t.name} 需要 $${t.price.toLocaleString()}`); return; }
+  W.cash-=t.price;
+  const spec={ id:idc, name:t.name, dept:t.dept, skill:t.skill, salary:t.salary, mood:78, energy:88,
+    gender:t.gender, persona:t.persona, catchphrase:t.catchphrase, speakStyle:t.speakStyle,
+    memory:[`第${W.day}天・以傳說級人才「${t.title}」身份加入`], dream:t.key };
+  const c=addChar(t.dept, spec); c.title=t.title;
+  if(!W.hiredDreams.includes(t.key)) W.hiredDreams.push(t.key);
+  log(`🌟 花 $${t.price.toLocaleString()} 特聘「${t.title}」${t.name} 加入 ${DEPTS[t.dept].name}！`);
+  pushEvent(`傳說級人才 ${t.name} 加入了公司`); pushHighlight('🌟',`特聘傳奇人才 ${t.name}（${t.title}）`); SOUND.sfx('levelup');
+}
+// 公告（隨機拉 10 則用選的）
+function doAnnounce(){ openPicker('選一則老闆公告', sample(ANNOUNCE_POOL,10).map(t=>({label:t,value:t})), setAnnounce); }
+function setAnnounce(t){ W.announce=t; W.morale=Math.min(100,W.morale+4); log('📣 老闆公告：'+t); pushEvent(`老闆公告：${t}`);
+  W.chars.forEach(c=>{ c.say='…'; c.sayMode='think'; c.sayT=performance.now()+5000; think(c); }); }
+// 解職（名單下拉選；有下限；有代價）
+function doFire(){
+  const workers=W.chars.filter(c=>c.dept!=='總');
+  if(workers.length<=MIN_WORKERS){ toast(`至少要留 ${MIN_WORKERS} 位員工，不能再解職了`); return; }
+  const opts=workers.map(c=>({label:c.name, sub:`${DEPTS[c.dept].name}・技能 ${Math.round(c.skill)}・月薪 $${c.salary}`, value:c.id}));
+  openPicker('選要解職的員工', opts, id=>{ const c=charById(id); if(c) fireChar(c); });
+}
+function fireChar(c){
+  if(c.dept==='總') return;
+  W.stat.fired++;
+  const lover=partnerOf(c);                                   // 開除戀人會讓另一半心碎又記恨
+  clearPartnerOf(c); toAlumnus(c); W.chars=W.chars.filter(x=>x!==c);
+  log(`🔴 ${c.name} 已離職（省下月薪 $${c.salary}）`); pushEvent(`${c.name}被解職了`); pushHighlight('🔴',`${c.name} 離開了公司`);
+  W.chars.forEach(o=>{ const s=W.rel[pairKey(c,o)]; if(s>=18){ o.mood=Math.max(0,o.mood-8); pushMem(o,`好同事${c.name}被老闆解職，心裡不太好受`);} });
+  if(lover){ lover.mood=Math.max(0,lover.mood-12); bondAdd(lover,-8); pushMem(lover,`老闆開除了我的另一半${c.name}，我無法原諒`);
+    log(`💔 ${lover.name} 因為另一半被開除，對老闆心生芥蒂`); pushHighlight('💔',`${lover.name} 的另一半被開除，心碎了`);
+    if(lover.fav){ W.morale=Math.max(0,W.morale-3); celebrate('💔 你傷了最在乎的人','你開除了他的另一半…'); } }
+  W.morale=Math.max(0,W.morale-3);
+  if(workerCount()<4) log('⚠️ 人力吃緊，剩下的人開始忙不過來，交付／上市進度恐 delay');
+}
+// 派任務（先選人、再選任務）
+function doTask(){
+  const workers=W.chars.filter(c=>c.dept!=='總' && !c.task);
+  if(!workers.length){ toast('目前沒有閒置員工可派任務'); return; }
+  const opts=workers.map(c=>({label:c.name, sub:`${DEPTS[c.dept].name}・技能 ${Math.round(c.skill)}`, value:c.id}));
+  openPicker('派任務給誰？', opts, id=>{ const c=charById(id); if(c) pickTaskFor(c); });
+}
+function pickTaskFor(c){
+  openPicker(`派給 ${c.name} 的任務`, sample(TASK_POOL,6).map(t=>({label:t,value:t})), t=>{
+    c.task=t; c.taskT=0; c.mood=Math.max(0,c.mood-5); bondAdd(c,1); log(`📋 ${c.name} ← 任務：${t}`);
+    pushMem(c,`被指派任務：${t}`.slice(0,28)); c.say='…'; c.sayMode='think'; c.sayT=performance.now()+5000; think(c); });
+}
+document.querySelectorAll('.btn[data-act]').forEach(b=>b.onclick=()=>{
+  const a=b.dataset.act;
+  if(a==='hire') doHire(); else if(a==='announce') doAnnounce();
+  else if(a==='fire') doFire(); else if(a==='task') doTask();
+  appEl.classList.remove('menu-open');
+});
+
+// 點擊 canvas：查看／對談該員工
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+cv.addEventListener('click',e=>{ const c=charAt(e.offsetX,e.offsetY); if(!c) return; inspect(c); appEl.classList.add('menu-open'); });
+function charAt(px,py){ const wx=(px-cam.ox)/cam.scale, wy=(py-cam.oy)/cam.scale;
+  let best=null,bd=1e9; for(const c of W.chars){ const s=iso(c.pos.x,c.pos.y);
+    // 命中：以角色為中心的直立框（配合較高的貼圖）
+    const dx=Math.abs(wx-s.x), top=s.y-76, bot=s.y+6;
+    if(dx<26 && wy>top && wy<bot){ const d=Math.abs(wy-(s.y-30))+dx; if(d<bd){bd=d;best=c;} } } return best; }
+
+async function inspect(c){
+  const box=document.getElementById('inspect');
+  // 關係：找最好的朋友與最不對盤的
+  let bf=null,bfs=-1e9, rv=null,rvs=1e9;
+  for(const o of W.chars){ if(o===c) continue; const s=W.rel[pairKey(c,o)]; if(s==null) continue; if(s>bfs){bfs=s;bf=o;} if(s<rvs){rvs=s;rv=o;} }
+  const relParts=[]; if(bf&&bfs>=18) relParts.push(`😊 ${relLabel(bfs)}：${bf.name}`); if(rv&&rvs<=-18) relParts.push(`😤 ${relLabel(rvs)}：${rv.name}`);
+  const relLine = relParts.length? `<div class="hint" style="margin:4px 0">關係　${relParts.join('　')}</div>` : `<div class="hint" style="margin:4px 0">關係　還在熟悉同事中…</div>`;
+  // 戀愛狀態：交往中 / 暗戀對象
+  const pt=partnerOf(c); let loveLine='';
+  if(pt){ loveLine=`<div class="hint" style="margin:4px 0;color:#ff9ec4">💞 交往中：${pt.name}（${DEPTS[pt.dept].name}）</div>`; }
+  else { let cu=null,cs=0; for(const o of W.chars){ if(o===c)continue; const s=crushOf(c,o); if(s>cs){cs=s;cu=o;} }
+    if(cu&&cs>=30) loveLine=`<div class="hint" style="margin:4px 0;color:#ff9ec4">💗 似乎在意：${cu.name}${cs>=55?'（快告白了…）':''}</div>`; }
+  // 💖 羈絆 + 個人故事線（只對員工，不含總經理）
+  const a=arcDef(c), stage=c.arc?(c.arc.stage||0):0, bondPct=Math.round(c.bond||0);
+  const arcLine = a ? `<div class="hint" style="margin:3px 0;color:#ffd79a">🎯 夢想：${a.dream}（${Math.min(stage,4)}/4${stage>=4?'　✅ 已實現！':''}）</div>` : '';
+  const bondBlock = c.dept!=='總' ? `
+    <div style="margin:7px 0 2px;display:flex;align-items:center;gap:6px">
+      <span style="font-size:12px;color:#ff9ec4">💖 與你的羈絆・${bondLabel(c.bond)}</span>
+      <button id="favbtn" class="picker-opt" style="margin-left:auto;padding:3px 10px;font-size:12px;${c.fav?'background:#5a3a5a;color:#ffd166':''}">${c.fav?'⭐ 最愛':'☆ 設為最愛'}</button>
+    </div>
+    <div style="height:8px;background:#2a3150;border-radius:5px;overflow:hidden"><div id="bondbar" style="height:100%;width:${bondPct}%;background:linear-gradient(90deg,#ff7eb6,#ff4d8d);transition:width .3s"></div></div>
+    <div id="bondtxt" class="hint" style="margin:2px 0 3px;font-size:11px">${bondPct}/100（聊天、答應請求、慰留會加深）</div>
+    ${arcLine}
+    <div style="display:flex;gap:6px;margin:6px 0 2px">
+      <button id="cosbtn" class="picker-opt" style="flex:1;padding:6px;font-size:12px">✨ 專屬外觀</button>
+      <button id="deepbtn" class="picker-opt" style="flex:1;padding:6px;font-size:12px;${(c.bond||0)<70?'opacity:.5':''}">💬 深度對談${(c.bond||0)<70?'（羈絆70解鎖）':''}</button>
+    </div>` : '';
+  box.innerHTML=`<div class="nm">${c.fav?'⭐ ':''}${c.name}<span class="tag" style="background:${c.color}">${DEPTS[c.dept].name}・${c.title}</span></div>
+    <div class="hint" style="margin:4px 0">個性：${c.persona.join('・')}　${genLabel(c.gender)}生</div>
+    ${(c.catchphrase||SPEAK_STYLES.find(s=>s.k===c.speakStyle)?.k)?`<div class="hint" style="margin:4px 0">說話：${[c.speakStyle,c.catchphrase?`口頭禪「${c.catchphrase}」`:''].filter(Boolean).join('・')}</div>`:''}
+    <div class="hint" style="margin:4px 0">心情 ${Math.round(c.mood)}　精力 ${Math.round(c.energy)}　技能 ${Math.round(c.skill)}　月薪 $${c.salary}</div>
+    ${bondBlock}${relLine}${loveLine}
+    ${(c.memory&&c.memory.length)?`<div class="hint" style="margin:4px 0">個人經歷<br>${c.memory.slice(-4).reverse().map(m=>'・'+m).join('<br>')}</div>`:''}
+    <div style="margin:4px 0">任務：${c.task||'（無）'}</div>
+    <div class="hint" style="margin:6px 0 4px">跟 ${c.name} 聊聊（點一句話）</div>
+    <div id="chat-opts" style="display:flex;flex-direction:column;gap:5px"></div>
+    <input id="chatin" placeholder="或自己打字…" style="width:100%;margin-top:6px;padding:6px;border-radius:8px;border:1px solid var(--line);background:#141a2b;color:#fff">
+    <div id="chatout" class="hint" style="margin-top:6px"></div>`;
+  const out=()=>document.getElementById('chatout');
+  async function say(m){ out().textContent='…'; bondAdd(c,2); updateBondUI(c); const rep=await chat(c,m);
+    out().textContent='💬 '+rep; c.say=rep.slice(0,24); c.sayMode='talk'; c.sayT=performance.now()+4000; }   // 聊天加深羈絆
+  const copts=document.getElementById('chat-opts');
+  sample(CHAT_POOL,4).forEach(ph=>{ const btn=document.createElement('button'); btn.className='picker-opt';
+    btn.style.cssText='padding:7px 10px;font-size:13px'; btn.textContent=ph; btn.onclick=()=>say(ph); copts.appendChild(btn); });
+  const inp=document.getElementById('chatin');
+  inp.onkeydown=ev=>{ if(ev.key==='Enter'&&inp.value.trim()){ const m=inp.value.trim(); inp.value=''; say(m); } };
+  const fb=document.getElementById('favbtn'); if(fb) fb.onclick=()=>{ setFavorite(c); inspect(c); };
+  const cb=document.getElementById('cosbtn'); if(cb) cb.onclick=()=>openCosmetics(c);
+  const db=document.getElementById('deepbtn'); if(db) db.onclick=()=>deepTalk(c);
+}
+// 💬 羈絆 70+ 解鎖的專屬深度對談（揭露角色內心/秘密，情感回報）
+function deepTalk(c){
+  if((c.bond||0)<70){ toast(`跟 ${c.name} 的羈絆還不夠深（需 70），多陪陪他吧`); return; }
+  const a=arcDef(c); const secret = a ? `其實，${a.dream}——這是我一直沒跟別人說的夢。謝謝你願意聽。` : '能被你這樣信任，我很感動。';
+  const out=document.getElementById('chatout');
+  if(out) out.innerHTML=`<span style="color:#ffd79a">💗 ${c.name} 對你掏心掏肺：</span><br>${secret}`;
+  c.say=secret.slice(0,24); c.sayMode='talk'; c.sayT=performance.now()+6000;
+  c.mood=Math.min(100,c.mood+8); bondAdd(c,3); pushMem(c,'跟老闆深聊，吐露了心底的夢'); updateBondUI(c);
+}
+function updateBondUI(c){ const bar=document.getElementById('bondbar'), txt=document.getElementById('bondtxt');
+  if(bar) bar.style.width=Math.round(c.bond||0)+'%'; if(txt) txt.textContent=Math.round(c.bond||0)+'/100（聊天、答應請求、慰留會加深）'; }
+
+// ===== 相機：自動置中 + 縮放到可視範圍 =====
+let cam={scale:1, ox:0, oy:0};
+function computeCam(){
+  const bw=(GRID_W-1+GRID_H-1)*TILE_W/2;      // 等角總寬
+  const bh=(GRID_W-1+GRID_H-1)*TILE_H/2 + 60; // 等角總高（含家具/人物高度裕度）
+  const narrow=cv.clientWidth<760;
+  const padX=narrow?12:36, padTop=narrow?96:74, padBottom=16;   // 手機縮小邊距→辦公室大一點
+  const availW=cv.clientWidth-padX*2, availH=cv.clientHeight-padTop-padBottom;   // 以 CSS 像素計算
+  cam.scale=Math.min(availW/bw, availH/bh, 1.9);
+  const minWX=-(GRID_H-1)*TILE_W/2;
+  cam.ox = padX + (availW - bw*cam.scale)/2 - minWX*cam.scale;
+  cam.oy = padTop + (availH - bh*cam.scale)/2 + 24;
+}
+let DPR=1;
+function resize(){ DPR=Math.min(window.devicePixelRatio||1, 3);   // 依裝置像素比放大後端解析度，手機才不糊
+  cv.width=Math.round(cv.clientWidth*DPR); cv.height=Math.round(cv.clientHeight*DPR); computeCam(); }
+window.addEventListener('resize',resize); resize();
+
+// ===== 繪圖工具 =====
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath(); }
+function shade(col,p){ let r,g,b;
+  if(col.startsWith('#')){ const n=parseInt(col.slice(1),16); r=n>>16; g=(n>>8)&255; b=n&255; }
+  else { const m=col.match(/\d+/g); r=+m[0];g=+m[1];b=+m[2]; }
+  r=Math.max(0,Math.min(255,r+255*p));g=Math.max(0,Math.min(255,g+255*p));b=Math.max(0,Math.min(255,b+255*p));
+  return `rgb(${r|0},${g|0},${b|0})`; }
+function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
+
+function drawTile(x,y,fill,stroke){ const p=iso(x,y);
+  ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+TILE_W/2,p.y+TILE_H/2);
+  ctx.lineTo(p.x,p.y+TILE_H); ctx.lineTo(p.x-TILE_W/2,p.y+TILE_H/2); ctx.closePath();
+  ctx.fillStyle=fill; ctx.fill(); if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();} }
+
+// 等角方塊（家具）footprint=TILE*scale，高 h；可給頂面色
+function cube(ix,iy,color,h,scale,topCol){ const p=iso(ix,iy), w=TILE_W*scale*0.5, d=TILE_H*scale*0.5;
+  ctx.fillStyle=shade(color,-0.16); ctx.beginPath();
+  ctx.moveTo(p.x,p.y);ctx.lineTo(p.x-w,p.y+d);ctx.lineTo(p.x-w,p.y+d-h);ctx.lineTo(p.x,p.y-h);ctx.closePath();ctx.fill();
+  ctx.fillStyle=shade(color,-0.32); ctx.beginPath();
+  ctx.moveTo(p.x,p.y);ctx.lineTo(p.x+w,p.y+d);ctx.lineTo(p.x+w,p.y+d-h);ctx.lineTo(p.x,p.y-h);ctx.closePath();ctx.fill();
+  ctx.fillStyle=topCol||color; ctx.beginPath();
+  ctx.moveTo(p.x,p.y-h);ctx.lineTo(p.x-w,p.y+d-h);ctx.lineTo(p.x,p.y+2*d-h);ctx.lineTo(p.x+w,p.y+d-h);ctx.closePath();ctx.fill(); }
+
+// 牆（兩點之間的立面）
+function wall(ax,ay,bx,by,h,color){ const a=iso(ax,ay), b=iso(bx,by);
+  ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+  ctx.lineTo(b.x,b.y-h); ctx.lineTo(a.x,a.y-h); ctx.closePath(); ctx.fill(); }
+
+function drawRoom(k,z){
+  const dept=DEPTS[k]; const col=dept?dept.color:'#6b779e';
+  for(let y=z.y;y<z.y+z.h;y++)for(let x=z.x;x<z.x+z.w;x++) drawTile(x,y, hexA(col, dept?0.20:0.13), hexA(col,0.33));
+  // 後方兩面矮牆，營造房間感與部門間隔
+  wall(z.x,z.y, z.x+z.w,z.y, 24, shade(col,-0.02));
+  wall(z.x,z.y, z.x,z.y+z.h, 24, shade(col,-0.22));
+  // 部門標牌：放在左邊短牆中間（避免被坐著的人擋住）
+  const lp=iso(z.x, z.y+z.h/2); const label=dept?dept.name:k;
+  ctx.font='bold 12px "Microsoft JhengHei"'; const tw=ctx.measureText(label).width;
+  ctx.fillStyle='rgba(16,20,34,.85)'; roundRect(lp.x-tw/2-9, lp.y-32, tw+18, 18, 9); ctx.fill();
+  ctx.fillStyle=dept?shade(col,0.25):'#cfd8f5'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(label, lp.x, lp.y-23); ctx.textBaseline='alphabetic';
+}
+
+// ── Blender 渲染的家具道具精靈 ──
+const PROP_IMG={}; for(const n of ['desk','chair','table','cooler','plant','fridge','pantry','tv','bossdesk','sofa']){ const im=new Image(); im.src=`../assets/props/${n}.png`; PROP_IMG[n]=im; }
+const PROP_SCALE=0.19;
+function drawProp(name, ix, iy, opt){ opt=opt||{}; const im=PROP_IMG[name];
+  if(!im||!im.complete||!im.naturalWidth) return;
+  const sc = opt.h ? opt.h/im.height : (opt.scale||PROP_SCALE);   // 指定顯示高度(px)優先
+  const w=im.width*sc, h=im.height*sc, p=iso(ix,iy);
+  const baseY=p.y+(opt.dy!=null?opt.dy:TILE_H*0.5);   // 底部貼在地格
+  if(opt.flip){ ctx.save(); ctx.translate(p.x+(opt.dx||0),0); ctx.scale(-1,1); ctx.drawImage(im,-w/2,baseY-h,w,h); ctx.restore(); }
+  else ctx.drawImage(im, p.x-w/2+(opt.dx||0), baseY-h, w, h); }
+function drawChair(s){ drawProp('chair', s.x, s.y-0.15, {h:44, dy:TILE_H*0.2}); }      // 椅子在人後方（露出椅背）
+function drawDesk(s){ drawProp('desk', s.x, s.y+0.25, {h:50, dy:TILE_H*0.26}); }       // 桌子在人前方、蓋住腰部以下
+function plant(ix,iy){ drawProp('plant', ix, iy, {h:50, dy:TILE_H*0.5}); }
+
+const SPAWN_MS=1500;   // 空氣人→實心 的材質化時間
+// 空氣人輪廓（材質化過程中/貼圖未載入時的半透明人形）
+function ghostFigure(x, footY, h, alpha){
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha=alpha;
+  const bw=h*0.34, bh=h*0.52, hr=h*0.2, topY=footY-h;
+  const grad=ctx.createLinearGradient(0,topY,0,footY);
+  grad.addColorStop(0,'rgba(150,200,255,0.9)'); grad.addColorStop(1,'rgba(120,150,230,0.35)');
+  ctx.fillStyle=grad;
+  ctx.beginPath(); ctx.ellipse(x, footY-bh*0.5, bw*0.5, bh*0.5, 0,0,7); ctx.fill();   // 身
+  ctx.beginPath(); ctx.arc(x, topY+hr*0.9, hr, 0,7); ctx.fill();                        // 頭
+  ctx.restore();
+}
+function drawChar(c){ const p=iso(c.pos.x,c.pos.y); const seated=isSeated(c);
+  const sa = c.spawnT ? Math.min(1,(performance.now()-c.spawnT)/SPAWN_MS) : 1;   // 登場進度(1=完成)
+  // ── 動畫影格：依部門選貼圖組、依狀態播 walk/idle/sit/talk ──
+  const dept=DEPT_FOLDER[c.dept]||'product', v=c.variant||0;
+  let clip=animOf(c);
+  if(clip==='walk' && c.away) clip='walk_back';         // 遠離→背面
+  if(c.state==='boss'){ clip='walk_back';               // 約談：背對我們、面向總經理
+    const boss=W.chars.find(x=>x.dept==='總');
+    if(boss){ const sx=(boss.pos.x-c.pos.x)-(boss.pos.y-c.pos.y); if(Math.abs(sx)>0.01) c.faceDir=sx>0?-1:1; }
+  }
+  let frames=framesOf(dept, v, clip);                    // 用到才載
+  const _ok=x=>x&&x.complete&&x.naturalWidth;
+  const _fi = c.state==='boss' ? 0 : (Math.floor(performance.now()/ANIM_MS)+c.animOff)%ANIM_N;   // 約談時定格站著
+  let img = _ok(frames[_fi]) ? frames[_fi] : (_ok(frames[0]) ? frames[0] : null);
+  if(!img){ for(const cl of ['sit','idle','walk','talk']){ const g=framesOf(dept,v,cl).find(_ok); if(g){ img=g; break; } } } // 退而求其次：同角色任何已載入格
+  if(img){
+    const face = (clip==='sit') ? 1 : (c.faceDir||1);   // 坐著一律正面（不受走路時 faceDir 影響，避免坐成側向）
+    const h=72*(c.varScale||1), w=h*(img.width/img.height);
+    const footY=p.y+2, topY=footY-h;
+    // 落地陰影（只有站/走時畫；坐著不畫，避免看起來飄浮）
+    if(!seated){ ctx.fillStyle=`rgba(0,0,0,${0.22*sa})`;
+      ctx.beginPath(); ctx.ellipse(p.x, footY-2, 14, 6,0,0,7); ctx.fill(); }
+    if(sa<1){   // ── 材質化登場：空氣人淡出 + 地面光環 + 貼圖淡入上浮 ──
+      ghostFigure(p.x, footY, h, (1-sa)*0.6);
+      ctx.save(); ctx.globalAlpha=(1-sa)*0.5; ctx.strokeStyle='rgba(150,200,255,0.9)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.ellipse(p.x, footY-2, 10+sa*18, 4+sa*7, 0,0,7); ctx.stroke(); ctx.restore();
+    }
+    ctx.save();
+    ctx.globalAlpha=sa;                             // 實心度淡入
+    const rise=(1-sa)*10;                           // 登場時從地面微微上浮
+    ctx.translate(p.x,-rise); ctx.scale(face,1);    // 方向翻轉（面向移動方向）
+    ctx.drawImage(img, -w/2, topY, w, h);
+    ctx.restore();
+    if(sa>=0.6){ ctx.save(); ctx.globalAlpha=Math.min(1,(sa-0.6)/0.4);   // 名字永遠在頭頂上方
+      ctx.font='11px "Microsoft JhengHei"'; ctx.textAlign='center';
+      ctx.fillStyle = c.fav ? '#ffd166' : '#eaf0ff';
+      ctx.fillText((c.fav?'⭐ ':'')+c.name, p.x, topY-5);
+      if(c.acc){ const ac=ACCESSORIES.find(a=>a.id===c.acc); if(ac){ ctx.font='15px "Microsoft JhengHei"'; ctx.fillText(ac.icon, p.x, topY-17); } }  // 專屬外觀
+      ctx.restore(); }
+    if(sa>=1){
+      if(c.task){ ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText('📋', p.x+w/2-4, topY+12); }
+      if(c.partner!=null){ ctx.font='13px "Microsoft JhengHei"'; ctx.textAlign='center'; ctx.fillText('💞', p.x-w/2+2, topY+6); }   // 交往中(側邊)
+      if(c.say) bubble(p.x, topY-19, c.say, c.sayMode||'think');   // 泡泡疊在名字之上，不蓋到名字
+    }
+    return;
+  }
+  // ── 貼圖尚未載入：畫半透明「空氣人」佔位，表示有人正在加入這裡 ──
+  const h0=72*(c.varScale||1), footY=p.y+2;
+  const pulse=0.3+0.18*Math.sin(performance.now()/300);
+  ghostFigure(p.x, footY, h0, pulse);
+}
+
+// 泡泡：偏正方圓角、自動換行；mode='talk' 尖角說話泡泡 / 'think' 小圓圈心聲泡泡
+function wrapText(txt,maxW){ const lines=[]; let cur='';
+  for(const ch of txt){ const t=cur+ch; if(ctx.measureText(t).width>maxW && cur){ lines.push(cur); cur=ch; } else cur=t; }
+  if(cur) lines.push(cur); return lines.slice(0,3); }
+function bubble(x,y,txt,mode){
+  ctx.font='12px "Microsoft JhengHei"'; const maxW=92; const lines=wrapText(txt,maxW);
+  let tw=0; for(const l of lines) tw=Math.max(tw,ctx.measureText(l).width);
+  const padX=9,padY=7,lh=15; const bw=Math.min(maxW,tw)+padX*2, bh=lines.length*lh+padY*2;
+  const bx=x-bw/2, by=y-bh-7;
+  const think=mode==='think';
+  const fill = think?'rgba(238,236,255,.98)':'rgba(255,255,255,.98)';
+  const stroke = think?'rgba(120,110,190,.35)':'rgba(0,0,0,.12)';
+  ctx.fillStyle=fill; ctx.strokeStyle=stroke; ctx.lineWidth=1;
+  roundRect(bx,by,bw,bh,think?14:10); ctx.fill(); ctx.stroke();
+  if(think){ // 心聲：遞減小圓圈連到頭上
+    for(const [dx,dy,r] of [[2,4,3.4],[-2,11,2.2],[-5,17,1.4]]){
+      ctx.beginPath(); ctx.arc(x+dx,by+bh+dy,r,0,7); ctx.fill(); ctx.stroke(); }
+  } else { // 說話：尖角
+    ctx.beginPath(); ctx.moveTo(x-5,by+bh-1); ctx.lineTo(x+5,by+bh-1); ctx.lineTo(x,by+bh+7); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle='#1b2030'; ctx.textAlign='center'; ctx.textBaseline='top';
+  lines.forEach((l,i)=>ctx.fillText(l,x,by+padY+i*lh)); ctx.textBaseline='alphabetic';
+}
+
+// ===== 繪製一幀 =====
+function render(){
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.setTransform(cam.scale*DPR,0,0,cam.scale*DPR,cam.ox*DPR,cam.oy*DPR);   // ×DPR 讓高解析手機清晰
+  // 地板（依主題換色）
+  const _th=THEMES[W.theme]||THEMES.default;
+  for(let y=0;y<GRID_H;y++)for(let x=0;x<GRID_W;x++){
+    drawTile(x,y, (x+y)%2===0?_th.floor1:_th.floor2, 'rgba(0,0,0,.10)'); }
+  // 房間（地、牆、標牌）
+  for(const [k,z] of Object.entries(ZONES)) drawRoom(k,z);
+  // 深度排序：家具 + 裝飾 + 人物
+  const items=[];
+  for(const [k,z] of WORK_ZONES){
+    if(k==='總'){   // 總經理室：一張大辦公桌 + 沙發（只有總經理一人）
+      const cx=z.x+z.w/2;
+      items.push({d:cx+z.y+1.0, f:()=>drawProp('bossdesk', cx, z.y+1.0, {h:58, dy:TILE_H*0.28})});
+      // 沙發放桌子前方、與桌子平行、開口朝桌子(我們看到背面)
+      items.push({d:cx+z.y+2.3, f:()=>drawProp('sofa', cx, z.y+2.3, {h:40, dy:TILE_H*0.45})});
+      continue;
+    }
+    // 要擺桌椅的座位＝固定座位 ∪ 每位員工實際座位（含溢位者，確保人人有桌，不飄浮）
+    const seatMap=new Map(); const addS=s=>{ const key=s.x.toFixed(2)+','+s.y.toFixed(2); if(!seatMap.has(key)) seatMap.set(key,{x:s.x,y:s.y}); };
+    z.seats.forEach(addS);
+    for(const c of W.chars){ if(c.dept===k && c.seat) addS(c.seat); }
+    seatMap.forEach(s=>{
+      items.push({d:s.x+s.y-0.3, f:()=>drawChair(s)});
+      items.push({d:s.x+s.y+0.45, f:()=>drawDesk(s)}); });
+  }
+  // 會議室：電視在左端(面向桌子短邊) + 會議桌(橫向，置中)
+  { const z=ZONES['會議室']; const cx=z.x+z.w/2, cy=z.y+z.h/2;
+    items.push({d:z.x+0.8+cy, f:()=>drawProp('tv', z.x+1.0, cy-0.1, {h:64})});
+    items.push({d:cx+0.3+cy, f:()=>drawProp('table', cx+0.5, cy-0.05, {h:50, dy:TILE_H*0.35})}); }
+  // 茶水間：冰箱(比人高) + 茶水檯(洗手台+微波) + 飲水機 + 盆栽
+  { const z=ZONES['茶水間'];
+    items.push({d:z.x+0.7+z.y+0.6, f:()=>drawProp('fridge', z.x+0.7, z.y+0.6, {h:86})});
+    items.push({d:z.x+2.5+z.y+0.6, f:()=>drawProp('pantry', z.x+2.6, z.y+0.6, {h:46})});
+    items.push({d:z.x+4.4+z.y+0.6, f:()=>drawProp('cooler', z.x+4.5, z.y+0.6, {h:56})});
+    items.push({d:z.x+z.w-0.8+z.y+1.3, f:()=>plant(z.x+z.w-0.8,z.y+1.3)}); }
+  // 角落盆栽
+  items.push({d:0.5+0.5, f:()=>plant(0.5,0.5)});
+  items.push({d:GRID_W-1.5+0.5, f:()=>plant(GRID_W-1.5,0.5)});
+  // 人物
+  for(const c of W.chars) items.push({d:c.pos.x+c.pos.y, f:()=>drawChar(c)});
+  items.sort((a,b)=>a.d-b.d); for(const it of items) it.f();
+  ctx.setTransform(1,0,0,1,0,0);
+}
+
+// ===== 經濟 =====
+function prod(c){ return (c.skill/100) * (0.4+0.6*c.mood/100) * (0.35+0.65*c.energy/100) * (0.92+0.16*(c.bond||0)/100) * (c.partner!=null?1.05:1); } // 技能×心情×精力×羈絆×情侶綜效(有伴更安定)
+function deptWeight(c){ return c.dept==='銷'?1.5 : c.dept==='產'?1.15 : c.dept==='總'?1.3 : 1.0; }
+function newDay(){ W.chars.forEach(c=>{ c.energy=Math.min(100,c.energy+40); c.mood=Math.min(100,c.mood+5);
+  if(c.dept!=='總' && (W.day-(c._lastBondDay||0))>=1 && (c.bond||0)>0) c.bond=Math.max(0,c.bond-1);  // 疏於互動，羈絆微退
+}); log(`🌅 第 ${W.day} 天開始`); }
+function report(title,lines){ const el=document.getElementById('log'); const d=document.createElement('div');
+  d.style.cssText='background:#10203a;border:1px solid #2c4068;border-radius:8px;padding:7px 9px;margin:4px 0;color:#cfe0ff';
+  d.innerHTML=`<div style="font-weight:700;color:#ffd166;margin-bottom:3px">${title}</div>`+lines.map(l=>`<div>${l}</div>`).join('');
+  el.prepend(d); while(el.children.length>40) el.lastChild.remove(); }
+function endOfDay(){
+  const payroll=Math.round(W.chars.reduce((s,c)=>s+c.salary,0));
+  const rev=Math.round(W.todayRev), net=rev-payroll; W.cash+=net;
+  if(net>0){ W.stat.everProfit=true; W.stat.profitStreak=(W.stat.profitStreak||0)+1; } else W.stat.profitStreak=0;   // 連續獲利
+  let top=null,tp=-1; for(const c of W.chars){ const v=prod(c)*deptWeight(c); if(v>tp){tp=v;top=c;} }
+  report(`📊 第 ${W.day} 天結算`,[
+    `今日營收 $${rev.toLocaleString()}　薪資 -$${payroll.toLocaleString()}`,
+    `淨利 ${net>=0?'+':''}$${net.toLocaleString()}　現金 $${Math.round(W.cash).toLocaleString()}`,
+    `訂單 ${W.todayOrders}　士氣 ${W.morale}　⭐MVP：${top?top.name:'—'}`,
+    W.cash<0?'⚠️ 現金為負！再虧就要倒閉了':''
+  ].filter(Boolean));
+  if(top) pushMem(top,`當上第${W.day}天的 MVP`);
+  W.todayRev=0; W.todayOrders=0;
+}
+// ===== 主迴圈 =====
+let last=performance.now();
+function loop(now){ const dt=Math.min(0.05,(now-last)/1000); last=now; W.tick++;
+  W.minutes+=dt*TIME_SCALE;
+  if(W.minutes>=1440){ W.minutes-=1440; W.day++; W.reported=false; newDay(); }
+  const workHours=W.minutes>=9*60 && W.minutes<18*60;
+  const ov=W.overload=overloadFactor();   // 人力吃緊程度 0~1（人越少越忙）
+  W.chars.forEach(c=>stepChar(c,dt));
+  if(workHours){
+    let p=0; for(const c of W.chars) if(c.state==='work') p+=prod(c)*deptWeight(c);
+    let eff=1-ov*0.4;                       // 忙不過來→產出打折
+    const nowt=performance.now();
+    if(W._surge && nowt<W._surge) eff*=1.9;     // 訂單暴增
+    if(W._crash && nowt<W._crash) eff*=0.4;     // 系統當機
+    const inc=p*dt*TIME_SCALE*3.2*eff; W.todayRev+=inc; W.rev+=inc;
+    if(Math.random()<p*dt*0.5*eff){ W.todayOrders++; W.orders++; }
+    for(const c of W.chars) if(c.state==='work') c.skill=Math.min(100,c.skill+dt*(c.task?0.05:0.015));
+  }
+  // 任務自動完成（人力吃緊→完成更慢＝交付/上市 delay）
+  const taskGoal=12*(1+ov*0.9);
+  for(const c of W.chars){ if(c.task){ c.taskT+=dt;
+    if(c.taskT>taskGoal){ const bonus=Math.round(300+c.skill*8); W.todayRev+=bonus;
+      log(`✅ ${c.name} 完成任務（+$${bonus}）`); pushEvent(`${c.name}完成任務立了功`); pushMem(c,'完成老闆派的任務，立了功'); c.mood=Math.min(100,c.mood+6); c.task=null; c.taskT=0; } } }
+  // 能量/心情（人力吃緊→更累、心情更差）
+  W.chars.forEach(c=>{ if(c.state==='break'){ c.energy=Math.min(100,c.energy+dt*4); c.mood=Math.min(100,c.mood+dt*1.5); }
+    else { c.energy=Math.max(0,c.energy-dt*(c.task?1.1:0.7)*(1+ov*1.1)); if(c.energy<20) c.mood=Math.max(0,c.mood-dt*0.8);
+      if(ov>0.25) c.mood=Math.max(0,c.mood-dt*ov*0.9); }
+    if(c.partner!=null) c.mood=Math.min(100,c.mood+dt*0.3); });   // 情侶綜效：有伴心情更穩
+  // 人力吃緊警示（每約 25 秒提醒一次）
+  if(workHours && ov>0.3 && performance.now()>(W.nextOvWarn||0)){ W.nextOvWarn=performance.now()+25000;
+    log('⚠️ 人力吃緊，大家忙不過來，業績與交付進度都受影響'); }
+  W.morale = W.chars.length? Math.round(W.chars.reduce((s,c)=>s+c.mood,0)/W.chars.length):70;
+  if(!W.reported && W.minutes>=18*60){ W.reported=true; endOfDay(); }
+  // 員工主動事件（每 15~37 秒嘗試一次，依狀態挑類型）
+  if(workHours && performance.now()>(W.nextReqT||0)){
+    W.nextReqT=performance.now()+15000+Math.random()*22000;
+    const cands=W.chars.filter(c=>!c._reqPending && c.dept!=='總');   // 總經理不向老闆遞請求(不會離職)
+    const c=cands[Math.floor(Math.random()*cands.length)];
+    if(c){ let type=null;
+      if(c.mood<28) type=(c.bond||0)>=55?'complaint':'quit';   // 羈絆深→只抱怨不離職（忠誠）
+      else if(c.energy<22) type='dayoff';
+      else if(c.mood<45 && c.energy<48) type='complaint';
+      else if(c.skill>62 && c.mood>55 && W.day>=2) type='raise';
+      else if(c.mood>72 && c.skill>48) type='proposal';
+      if(type) genRequest(c,type);
+    }
+  }
+  showNextRequest();
+  autopilotTick();   // 🤖 AI 代管自動處理
+  // 辦公室戀情推進（每 12~25 秒一次）
+  if(workHours && performance.now()>(W.nextRomT||6000)){
+    W.nextRomT=performance.now()+12000+Math.random()*13000; romanceTick();
+  }
+  // 隨機事件/危機（每 50~95 秒一次）
+  if(workHours && performance.now()>(W.nextEvtT||45000)){
+    W.nextEvtT=performance.now()+50000+Math.random()*45000; triggerEvent();
+  }
+  // 員工去跟總經理約談/交報告（每 22~45 秒一人，單一進行）
+  if(workHours && performance.now()>(W.nextBossT||10000)){
+    W.nextBossT=performance.now()+22000+Math.random()*23000;
+    const boss=W.chars.find(x=>x.dept==='總');
+    const busy=W.chars.some(x=>x.state==='goBoss'||x.state==='boss');
+    // 約談也吃同一個離座名額：在座率已逼近 80% 下限時就不再抽人去約談
+    if(boss && !busy && awayCount()<maxAway()){ const cand=W.chars.filter(x=>x.dept!=='總'&&x.state==='work'); if(cand.length) startBossMeeting(pick(cand)); }
+  }
+  if((W.tick & 127)===0) checkProgress();              // 約每 2 秒檢查里程碑/成就
+  if(!DEBUG_MODE && (W.tick & 255)===0) saveGame();   // 約每 4 秒自動存檔
+  render(); updateHUD();
+  requestAnimationFrame(loop);
+}
+function fmtClock(){ const h=Math.floor(W.minutes/60),m=Math.floor(W.minutes%60); return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
+function updateHUD(){ document.getElementById('clock').textContent=fmtClock();
+  document.getElementById('s-day').textContent=W.day;
+  const cashEl=document.getElementById('s-cash'); cashEl.textContent=Math.round(W.cash).toLocaleString(); cashEl.style.color=W.cash<0?'#ff6b6b':'#fff';
+  document.getElementById('s-rev').textContent=Math.round(W.todayRev).toLocaleString();
+  document.getElementById('s-mor').textContent=Math.round(W.morale);
+  document.getElementById('s-ord').textContent=W.todayOrders;
+  document.getElementById('s-emp').textContent=W.chars.length;
+  document.getElementById('s-val').textContent=valuation().toLocaleString();
+  const sh=document.getElementById('scen-hud');
+  if(sh){ const sc=W.scenario, def=sc&&SCENARIOS[sc.id];
+    if(sc && sc.status==='running' && def && def.deadline){ const dl=sc.deadline||def.deadline, left=Math.max(0,dl-W.day+1), df=DIFFS[sc.diff];
+      sh.style.display='block';
+      sh.innerHTML=`${def.icon} ${def.name}${df?` ${df.icon}`:''}　<b>Day ${W.day}/${dl}</b>　${def.hud?def.hud():''}　<span class="sh-left">剩 ${left} 天</span>`;
+    } else sh.style.display='none'; }
+  const dg=document.getElementById('danger');
+  if(dg){ if(W.cash<0){ dg.classList.add('show'); dg.textContent=`⚠️ 資金告急　$${Math.round(W.cash).toLocaleString()} ／ 破產線 $${BANKRUPT_CASH.toLocaleString()}`; } else dg.classList.remove('show'); } }
+// 公司估值：單一成長指標（現金 + 累積營收 + 人才 + 士氣 + 關係 + 情侶）
+function valuation(){
+  const workers=W.chars.filter(c=>c.dept!=='總');
+  const teamVal=workers.reduce((s,c)=>s+Math.round(c.skill*120+c.salary*1.5),0);
+  const moraleVal=(W.morale-50)*200;
+  const relVals=Object.values(W.rel);
+  const relVal=relVals.filter(v=>v>=45).length*600 - relVals.filter(v=>v<=-45).length*350;
+  const coupleVal=Math.floor(W.chars.filter(c=>c.partner!=null).length/2)*2500;
+  return Math.max(0, Math.round(W.cash + W.rev*0.4 + teamVal + moraleVal + relVal + coupleVal));
+}
+// ===== 成長系統：里程碑（階段目標+獎勵）+ 成就（獎勵湧現玩法）=====
+const _wk=()=>W.chars.filter(c=>c.dept!=='總').length;
+const MILESTONES=[
+  {id:'firstprofit',name:'首次單日獲利',    reward:1000,  test:()=>W.stat.everProfit},
+  {id:'firstcouple',name:'第一對辦公室情侶', reward:2000,  test:()=>W.chars.some(c=>c.partner!=null)},
+  {id:'cash40k',    name:'現金突破 $40,000', reward:2500,  test:()=>W.cash>=40000},
+  {id:'survive7',   name:'營運滿 7 天',      reward:3000,  test:()=>W.day>=7},
+  {id:'val150k',    name:'估值突破 $150,000',reward:5000,  test:()=>valuation()>=150000},
+  {id:'full8',      name:'滿編 8 名員工',    reward:3500,  test:()=>_wk()>=8},
+  {id:'survive20',  name:'營運滿 20 天',     reward:8000,  test:()=>W.day>=20},
+  {id:'val300k',    name:'估值突破 $300,000',reward:12000, test:()=>valuation()>=300000},
+];
+const ACHIEVEMENTS=[
+  {id:'matchmaker',name:'🫶 紅娘',       desc:'促成一對情侶',     test:()=>W.chars.some(c=>c.partner!=null)},
+  {id:'ironboss',  name:'🪓 鐵血老闆',   desc:'累計解職 5 人',    test:()=>W.stat.fired>=5},
+  {id:'santa',     name:'💸 散財老闆',   desc:'累計加薪 10 次',   test:()=>W.stat.raises>=10},
+  {id:'ideaman',   name:'💡 點子工廠',   desc:'採納 5 個提案',    test:()=>W.stat.proposals>=5},
+  {id:'streak3',   name:'📈 穩健經營',   desc:'連續 3 天獲利',    test:()=>W.stat.profitStreak>=3},
+  {id:'drama',     name:'💔 辦公室八點檔',desc:'有一對情侶分手',  test:()=>W.stat.breakups>=1},
+  {id:'firstclear',name:'🎬 初次通關',   desc:'完成任一劇本挑戰',  test:()=>Object.keys(W.bestScores||{}).length>=1},
+  {id:'sgrade',    name:'⭐ S 級達人',    desc:'任一劇本拿下 S 級',  test:()=>Object.values(W.bestScores||{}).some(b=>b.g==='S')},
+  {id:'allclear',  name:'👑 劇本全通關', desc:'完成全部 4 個限時劇本',test:()=>countTimedCleared()>=4},
+];
+function countTimedCleared(){ return Object.entries(SCENARIOS).filter(([id,d])=>d.deadline && W.bestScores[id]).length; }
+function celebrate(title, sub){
+  const el=document.getElementById('celebrate'); if(!el) return;
+  el.innerHTML=`<div class="cel-t">${title}</div>${sub?`<div class="cel-s">${sub}</div>`:''}`;
+  el.classList.add('show'); clearTimeout(celebrate._t); celebrate._t=setTimeout(()=>el.classList.remove('show'),3200);
+}
+function checkProgress(){
+  for(const m of MILESTONES){ if(!W.milestones.includes(m.id) && m.test()){
+    W.milestones.push(m.id); W.cash+=m.reward; W.morale=Math.min(100,W.morale+3); gainGems(2,`達成里程碑`); pushHighlight('🏆',`達成里程碑：${m.name}`);
+    celebrate(`🏆 ${m.name}`, `里程碑達成　獎勵 $${m.reward.toLocaleString()}`); SOUND.sfx('good');
+    log(`🏆 達成里程碑「${m.name}」，獎勵 $${m.reward.toLocaleString()}`); pushEvent(`公司達成里程碑：${m.name}`);
+  } }
+  for(const a of ACHIEVEMENTS){ if(!W.achv.includes(a.id) && a.test()){
+    W.achv.push(a.id); gainGems(3,`解鎖成就`); celebrate(a.name, `解鎖成就・${a.desc}`); log(`🎖️ 解鎖成就「${a.name}」：${a.desc}`); SOUND.sfx('good');
+  } }
+  const v=valuation(); if(v>(W.stat.bestVal||0)) W.stat.bestVal=v;
+  lbSubmit();       // 排行榜即時更新（本局只佔一名次）
+  checkScenario();
+  checkBankruptcy();
+}
+function openGoals(){
+  const next=MILESTONES.find(m=>!W.milestones.includes(m.id));
+  const opts=[];
+  opts.push({label:`📈 目前估值　$${valuation().toLocaleString()}`, sub:`本局歷史最高 $${(W.stat.bestVal||0).toLocaleString()}`, value:'_'});
+  // 🏆 公司排行榜（跨局 Top 5）
+  lbSubmit(); const lb=lbLoad().slice(0,5); const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
+  opts.push({label:`🏆 公司排行榜（本機歷史 Top 5）`, sub: lb.length?'你經營過的最佳公司估值':'開始經營就會登上排行榜', value:'_'});
+  lb.forEach((e,i)=>{ const mine=e.id===W.runId;
+    opts.push({label:`${medals[i]} $${(e.val||0).toLocaleString()}${mine?'　◀ 本局':''}`, sub:`${e.mode}・第 ${e.day} 天`, value:'_'}); });
+  // 💀 倒閉記錄（跨局）
+  const bl=bankruptLog();
+  if(bl.length){ opts.push({label:`💀 倒閉記錄（共 ${bl.length} 間）`, sub:'那些沒撐過去的公司', value:'_'});
+    bl.slice(0,5).forEach(e=>opts.push({label:`🪦 ${e.mode}`, sub:`第 ${e.day} 天倒閉・當時估值 $${(e.val||0).toLocaleString()}`, value:'_'})); }
+  MILESTONES.forEach(m=>{ const done=W.milestones.includes(m.id);
+    opts.push({label:`${done?'✅':(m===next?'🎯':'🔒')} ${m.name}`, sub:done?'已達成':`獎勵 $${m.reward.toLocaleString()}`, value:'_'}); });
+  ACHIEVEMENTS.forEach(a=>{ const got=W.achv.includes(a.id);
+    opts.push({label:`${got?'🎖️':'▫️'} ${a.name}`, sub:a.desc+(got?'（已解鎖）':''), value:'_'}); });
+  // 🏅 劇本戰績牆
+  const timed=Object.entries(SCENARIOS).filter(([,d])=>d.deadline);
+  opts.push({label:`🏅 劇本戰績牆　通關 ${countTimedCleared()}/${timed.length}`, sub:'各劇本最高評級（刷更高評級、集滿全 S）', value:'_'});
+  timed.forEach(([id,def])=>{ const best=W.bestScores[id]; const bdfn=best?(DIFFS[best.diff]||DIFFS.normal).name:'';
+    opts.push({label:`${best?'🏅':'▫️'} ${def.icon} ${def.name}${best?`　${best.g} 級・${bdfn}`:''}`,
+      sub: best?`第 ${best.day} 天達成・估值 $${(best.val||0).toLocaleString()}`:'尚未通關', value:'_'}); });
+  openPicker(`🎯 目標與成就（${W.milestones.length}/${MILESTONES.length} 里程碑・${W.achv.length}/${ACHIEVEMENTS.length} 成就）`, opts, ()=>{});
+}
+// ===== 📜 劇本挑戰模式（限時目標＋付費劇本店面；商業化：賣內容）=====
+const DIFFS={
+  easy:   { k:'easy',   name:'簡單', icon:'🟢', rank:0, dl:1.3, cash:1.3 },
+  normal: { k:'normal', name:'普通', icon:'🟡', rank:1, dl:1.0, cash:1.0 },
+  hard:   { k:'hard',   name:'困難', icon:'🔴', rank:2, dl:0.7, cash:0.8 },
+};
+const SCENARIOS={
+  sandbox:{ name:'自由經營', icon:'🏢', free:true, deadline:0,
+    desc:'沒有時限，隨你把公司養多大、看員工談戀愛鬧分手。' },
+  ipo90:{ name:'90 天衝上市', icon:'🚀', free:true, deadline:90, winEarly:true,
+    desc:'90 個遊戲日內把公司估值衝到 $180,000，帶公司風光上市！',
+    intro:'創投把支票推到你面前，只給了一句話：「90 天，把估值做到 $180,000，我就帶你們敲上市的鐘。」\n時鐘，從現在開始倒數。',
+    goal:'90 天內估值達 $180,000',
+    setup(){ W.cash=20000; },
+    check:()=>valuation()>=180000,
+    hud:()=>`估值 $${valuation().toLocaleString()} / $180,000` },
+  turnaround:{ name:'絕地求生', icon:'🔥', free:true, deadline:30, winEarly:false,
+    desc:'接手快倒的公司：現金只剩 $4,000、士氣低落，30 天內轉虧為盈並撐到最後。',
+    intro:'你接手的是一間快燒光錢的公司——帳上只剩 $4,000，員工士氣低到谷底，隨時有人想走。\n30 天，證明你能把它從懸崖邊拉回來。',
+    goal:'撐滿 30 天且轉虧為盈',
+    setup(){ W.cash=4000; W.morale=42; W.chars.forEach(c=>{ c.mood=40; c.energy=55; }); },
+    check:()=>W.cash>0 && W.stat.everProfit,
+    hud:()=>`現金 $${Math.round(W.cash).toLocaleString()}・${W.stat.everProfit?'✅已轉盈':'尚未獲利'}` },
+  franchise:{ name:'連鎖帝國', icon:'👑', premium:true, deadline:120, winEarly:true,
+    desc:'滿編 8 人且估值突破 $400,000，打造連鎖帝國（付費劇本・免費體驗中）。',
+    intro:'一間店，不夠看。你的野心是一張覆蓋全國的版圖。\n120 天內把團隊擴到滿編 8 人、估值衝破 $400,000，建立屬於你的連鎖帝國。',
+    goal:'120 天內滿編 8 人 + 估值 $400,000',
+    setup(){ W.cash=18000; },
+    check:()=>workerCount()>=8 && valuation()>=400000,
+    hud:()=>`員工 ${workerCount()}/8・估值 $${valuation().toLocaleString()}/$400k` },
+  startup2:{ name:'兩人創業', icon:'🌱', premium:true, deadline:60, winEarly:true,
+    desc:'只有 2 名共同創辦人白手起家，60 天內估值衝到 $120,000（付費劇本・免費體驗中）。',
+    intro:'一間車庫、兩個共同創辦人、$8,000 存款——所有傳奇，都是這樣開始的。\n60 天，讓世界第一次記住你們的名字。',
+    goal:'60 天內估值達 $120,000',
+    setup(){ W.chars=W.chars.filter(c=>c.dept==='總'||c.dept==='產').slice(0,2); W.cash=8000; },
+    check:()=>valuation()>=120000,
+    hud:()=>`估值 $${valuation().toLocaleString()} / $120,000・員工 ${W.chars.length}` },
+};
+// ===== 📊 公司排行榜（本機跨局歷史最佳估值，localStorage 獨立於存檔）=====
+function newRunId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function modeLabel(){ const sc=W.scenario;
+  if(sc&&sc.id&&sc.id!=='sandbox'&&SCENARIOS[sc.id]){ const d=DIFFS[sc.diff]; return `${SCENARIOS[sc.id].icon}${SCENARIOS[sc.id].name}${d?'・'+d.name:''}`; }
+  return '🏢 自由經營'; }
+function lbLoad(){ try{ return JSON.parse(localStorage.getItem('yocat_leaderboard')||'[]'); }catch(e){ return []; } }
+function lbSubmit(){ if(!W.runId) return; const v=valuation(); const a=lbLoad();
+  let e=a.find(x=>x.id===W.runId);
+  if(e){ if(v>e.val){ e.val=v; e.day=W.day; e.mode=modeLabel(); e.date=Date.now(); } }
+  else a.push({ id:W.runId, val:v, day:W.day, mode:modeLabel(), date:Date.now() });
+  a.sort((x,y)=>y.val-x.val); if(a.length>10) a.length=10;
+  try{ localStorage.setItem('yocat_leaderboard', JSON.stringify(a)); }catch(e2){}
+  ACCT.pushLeaderboard();   // 同步到伺服器全域排行榜
+}
+function resetWorld(){
+  W.chars.length=0; W.day=1; W.minutes=9*60; W.cash=20000; W.morale=70; W.rev=0; W.orders=0;
+  W.todayRev=0; W.todayOrders=0; W.reported=false; W.announce=null;
+  W.rel={}; W.crush={}; W.events=[]; W.highlights=[]; W.milestones=[]; W.achv=[];
+  W.stat={ fired:0,raises:0,hired:0,proposals:0,breakups:0,profitStreak:0,everProfit:false,bestVal:0 };
+  W._surge=0; W._crash=0;
+  reqQueue.length=0; activeReq=null; updateReqBadge();
+  const rc=document.getElementById('reqcard'); if(rc) rc.style.display='none';
+  W.runId=newRunId(); W._bankruptShown=false;
+}   // 保留 theme / ownedThemes / autopilot / alumni / hiredDreams（排行榜另存 localStorage）
+function startScenario(id, diffKey){
+  const def=SCENARIOS[id]; if(!def) return;
+  const diff=DIFFS[diffKey]||DIFFS.normal;
+  lbSubmit();          // 先把要離開的這局成績記進排行榜，再重置
+  resetWorld();
+  const gseq=['m','f','m','f','m','f'].sort(()=>Math.random()-0.5);
+  ['總','產','銷','人','發','財'].forEach((d,i)=>addChar(d,null,gseq[i]));
+  if(def.setup) def.setup();
+  if(def.deadline) W.cash=Math.round(W.cash*diff.cash);          // 難度調整起始資金
+  W.morale = W.chars.length? Math.round(W.chars.reduce((s,c)=>s+c.mood,0)/W.chars.length):70;
+  W.scenario = def.deadline ? { id, deadline:Math.round(def.deadline*diff.dl), diff:diff.k, status:'running' } : { id:'sandbox', status:'free' };
+  closePicker(); closeDigest();
+  if(def.deadline){ log(`${def.icon} 開始劇本挑戰：${def.name}・${diff.icon}${diff.name}（${W.scenario.deadline} 天）`);
+    if(def.intro) showScenIntro(def); else celebrate(`${def.icon} ${def.name} 開始！`, `${diff.name}・限時 ${W.scenario.deadline} 天`);
+    if(def.premium) toast(`${def.icon} ${def.name}：付費劇本・目前免費體驗中`);
+  } else { log(`🏢 回到自由經營模式`); }
+  saveGame();
+}
+// 劇本開場旁白
+function showScenIntro(def){
+  document.getElementById('sm-title').textContent=`${def.icon} ${def.name}`;
+  const sc=W.scenario, df=sc&&DIFFS[sc.diff], dl=(sc&&sc.deadline)||def.deadline;
+  document.getElementById('sm-body').innerHTML=
+    `<div class="sm-narr">${def.intro.replace(/\n/g,'<br>')}</div>`+
+    `<div style="margin-top:12px;font-size:13.5px"><b style="color:#ffd166">🎯 目標</b>　${def.goal||def.desc}<br><b style="color:#79c0ff">⏳ 期限</b>　${dl} 個遊戲日${df?`　<b style="color:#c3a6ff">${df.icon} ${df.name}</b>`:''}${def.premium?'<br><span style="color:#b794f6">💎 付費劇本・免費體驗中</span>':''}</div>`;
+  document.getElementById('sm-share').classList.remove('on');
+  const go=document.getElementById('sm-go'); go.textContent='開始經營 →';
+  go.onclick=()=>{ document.getElementById('scen-modal').classList.remove('show'); };
+  document.getElementById('scen-modal').classList.add('show'); appEl&&appEl.classList.remove('menu-open');
+}
+// 劇本結算成績單（S/A/B/C 評級）
+function scenGrade(def,result){
+  if(result!=='won') return {g:'X', c:'時間到了，目標沒能達成。別灰心，調整策略再挑戰一次！'};
+  const dl=(W.scenario&&W.scenario.deadline)||def.deadline;
+  const ratio=W.day/dl;
+  let g='C'; if(ratio<=0.5) g='S'; else if(ratio<=0.7) g='A'; else if(ratio<=0.9) g='B';
+  const c={S:'神速達標！你是天生的 CEO。',A:'漂亮，提前達成目標，經營有術。',B:'穩健過關，做得好。',C:'壓線達標，驚險過關！'}[g];
+  return {g,c};
+}
+function showScenResult(def,result){
+  const gr=scenGrade(def,result);
+  document.getElementById('sm-title').textContent= result==='won'?`🏆 挑戰成功　${def.icon} ${def.name}`:`⌛ 挑戰結束　${def.icon} ${def.name}`;
+  const cashS=`$${Math.round(W.cash).toLocaleString()}`;
+  document.getElementById('sm-body').innerHTML=
+    `<div class="sm-grade ${gr.g}">${gr.g==='X'?'未達標':gr.g}</div>`+
+    (W.scenario&&W.scenario._newBest?`<div style="text-align:center;color:#ffd166;font-weight:700;margin:-4px 0 6px">⭐ 刷新最佳成績！</div>`:``)+
+    `<div class="sm-cmt">${gr.c}</div>`+
+    `<div class="sm-stats">`+
+      `<div><span>達成天數</span><b>第 ${W.day} 天 / 上限 ${def.deadline} 天</b></div>`+
+      `<div><span>最終估值</span><b>$${valuation().toLocaleString()}</b></div>`+
+      `<div><span>員工人數</span><b>${W.chars.length} 人</b></div>`+
+      `<div><span>公司現金</span><b>${cashS}</b></div>`+
+      (result==='won'?`<div><span>挑戰獎勵</span><b style="color:#ffd166">+$5,000</b></div>`:``)+
+    `</div>`;
+  const sh=document.getElementById('sm-share'); sh.classList.add('on');
+  sh.onclick=()=>shareScenResult(def,result,gr);
+  const go=document.getElementById('sm-go'); go.textContent='接下來 →';
+  go.onclick=()=>{ document.getElementById('scen-modal').classList.remove('show'); offerReplay(W.scenario.id,result,W.scenario.diff); };
+  document.getElementById('scen-modal').classList.add('show'); appEl&&appEl.classList.remove('menu-open');
+}
+// 成績單→分享圖（PNG）
+function shareScenResult(def,result,gr){
+  const Wd=620, Hd=560; const cv2=document.createElement('canvas'); cv2.width=Wd; cv2.height=Hd; const x=cv2.getContext('2d');
+  const g=x.createLinearGradient(0,0,Wd,Hd); g.addColorStop(0,'#232a44'); g.addColorStop(1,'#14182a'); x.fillStyle=g; x.fillRect(0,0,Wd,Hd);
+  const C={S:'#ffd166',A:'#7ee787',B:'#79c0ff',C:'#f0a868',X:'#ff7b72'}[gr.g]||'#fff';
+  const cx=Wd/2;
+  x.textAlign='center';
+  x.fillStyle='#9aa6c8'; x.font='16px "Microsoft JhengHei"'; x.fillText('🏢 yoCat Office・劇本挑戰', cx, 48);
+  x.fillStyle='#fff'; x.font='bold 30px "Microsoft JhengHei"'; x.fillText(`${def.icon} ${def.name}`, cx, 92);
+  x.fillStyle=result==='won'?'#7ee787':'#ff9f9f'; x.font='18px "Microsoft JhengHei"'; x.fillText(result==='won'?'✅ 挑戰成功':'⌛ 挑戰結束', cx, 124);
+  // 評級圓環
+  x.beginPath(); x.arc(cx,232,74,0,Math.PI*2); x.lineWidth=6; x.strokeStyle=C; x.stroke();
+  x.fillStyle=C; x.font=`900 ${gr.g==='X'?34:84}px "Microsoft JhengHei"`;
+  x.fillText(gr.g==='X'?'未達標':gr.g, cx, gr.g==='X'?244:262);
+  x.fillStyle='#fff'; x.font='bold 17px "Microsoft JhengHei"'; x.fillText(gr.c, cx, 340);
+  // 數據
+  const rows=[['達成天數',`第 ${W.day} 天 / 上限 ${def.deadline} 天`],['最終估值',`$${valuation().toLocaleString()}`],
+    ['員工人數',`${W.chars.length} 人`],['公司現金',`$${Math.round(W.cash).toLocaleString()}`]];
+  x.font='16px "Microsoft JhengHei"'; let y=386;
+  for(const [k,v] of rows){ x.textAlign='left'; x.fillStyle='#9aa6c8'; x.fillText(k, 120, y);
+    x.textAlign='right'; x.fillStyle='#fff'; x.fillText(v, Wd-120, y); y+=34; }
+  x.textAlign='center'; x.fillStyle='#6b779e'; x.font='13px "Microsoft JhengHei"'; x.fillText('你的 AI 辦公室，有自己的故事。', cx, 536);
+  const a=document.createElement('a'); a.download=`yoCat_${def.name}_${gr.g==='X'?'未達標':gr.g+'級'}_第${W.day}天.png`; a.href=cv2.toDataURL('image/png'); a.click();
+  toast('已存成成績分享圖！炫耀一下你的戰績吧');
+}
+const GRADE_RANK={S:4,A:3,B:2,C:1};
+function composite(g,diff){ return (GRADE_RANK[g]||0)*10 + ((DIFFS[diff]&&DIFFS[diff].rank)||0); }  // 評級×難度綜合分
+function recordBest(id,grade,diff){
+  if(!GRADE_RANK[grade]) return false; const prev=W.bestScores[id];
+  if(prev && composite(prev.g,prev.diff)>=composite(grade,diff)) return false;
+  W.bestScores[id]={ g:grade, diff:diff||'normal', day:W.day, val:valuation() }; return true;   // 困難 S > 普通 S
+}
+function endScenario(result){
+  const sc=W.scenario; if(!sc) return; const def=SCENARIOS[sc.id]; sc.status=result;
+  if(result==='won'){ W.cash+=5000; W.morale=Math.min(100,W.morale+5); gainGems(5,'劇本通關');
+    const gr=scenGrade(def,'won'); const isNew=recordBest(sc.id,gr.g,sc.diff); sc._newBest=isNew;
+    const dfn=(DIFFS[sc.diff]||DIFFS.normal).name;
+    pushHighlight('🏆',`挑戰成功：${def.name}・${dfn} ${gr.g} 級（第 ${W.day} 天）${isNew?' ⭐新紀錄':''}`);
+    log(`🏆 劇本「${def.name}」${dfn}挑戰成功！${gr.g} 級・獎勵 $5,000${isNew?'（刷新最佳成績！）':''}`); SOUND.sfx('levelup'); }
+  else { pushHighlight('⌛',`挑戰未達成：${def.name}`); log(`⌛ 劇本「${def.name}」時間到，目標未達成`); SOUND.sfx('bad'); }
+  saveGame();
+  showScenResult(def,result);
+}
+function offerReplay(id,result,diff){
+  const def=SCENARIOS[id], dfn=(DIFFS[diff]||DIFFS.normal).name;
+  openPicker(result==='won'?'🏆 挑戰成功！接下來？':'⌛ 挑戰結束，接下來？', [
+    {label:`🔁 再挑戰一次　${def.icon} ${def.name}`, sub:`同樣難度（${dfn}）重新開始`, value:'retry'},
+    {label:'🎮 換個難度玩', sub:'同劇本・選簡單／普通／困難', value:'rediff'},
+    {label:'🏢 回到自由經營', sub:'無時限，慢慢養公司', value:'sandbox'},
+    {label:'📜 看看其他劇本', sub:'挑選新挑戰', value:'more'},
+  ], v=>{ if(v==='retry') startScenario(id,diff); else if(v==='rediff') pickDifficulty(id);
+    else if(v==='sandbox') startScenario('sandbox'); else openScenarios(); });
+}
+function pickDifficulty(id){ const def=SCENARIOS[id]; const best=W.bestScores[id];
+  openPicker(`${def.icon} ${def.name}　選擇難度`, [
+    {label:`🟢 簡單`, sub:`期限 ${Math.round(def.deadline*DIFFS.easy.dl)} 天・起始資金較寬裕`, value:'easy'},
+    {label:`🟡 普通`, sub:`期限 ${def.deadline} 天・標準挑戰`, value:'normal'},
+    {label:`🔴 困難`, sub:`期限 ${Math.round(def.deadline*DIFFS.hard.dl)} 天・資金吃緊，S 級最榮耀`, value:'hard'},
+  ], diff=>startScenario(id,diff));
+}
+// ===== 💥 破產 Recycle（公司虧到見底 → 重整東山再起；§16.6/16.7）=====
+function checkBankruptcy(){
+  if(W.cash<0 && W.cash>=BANKRUPT_CASH && !W._bankruptShown && (W.tick & 1023)===0)
+    toast('⚠️ 公司正在虧損，再撐不住就要破產了');
+  if(W.cash<BANKRUPT_CASH && !W._bankruptShown) showBankruptcy();   // 一律跳窗讓老闆抉擇（含代管）
+}
+function showBankruptcy(){
+  W._bankruptShown=true; SOUND.sfx('bad');
+  const INJECT_CASH=20000;
+  const inScenario = W.scenario && W.scenario.status==='running';
+  document.getElementById('sm-title').textContent='💥 公司嚴重虧損';
+  document.getElementById('sm-body').innerHTML=
+    `<div class="sm-narr">現金只剩 $${Math.round(W.cash).toLocaleString()}，公司快撐不下去了，員工開始人心惶惶。<br>你要<b>繼續投資</b>，還是讓公司<b>倒閉</b>？</div>`+
+    `<div style="margin-top:12px;font-size:13.5px"><b style="color:#7ee787">💎 繼續投資</b>：注資 $${INJECT_CASH.toLocaleString()}，${inScenario?'撐下去繼續挑戰這個劇本。':'公司撐過難關繼續經營。'}<br><b style="color:#ff9f9f">🔚 讓公司倒閉</b>：留下一筆<b>倒閉記錄</b>；${inScenario?'本次劇本挑戰視為失敗。':'員工進校友庫、傳奇人才與成就保留，帶老班底東山再起。'}</div>`;
+  const sh=document.getElementById('sm-share'); sh.classList.add('on'); sh.textContent=`💵 繼續投資救公司（注資 $${INJECT_CASH.toLocaleString()}）`;
+  sh.onclick=()=>{ // 投資＝借現金、貸業主資本：現金與資本同步增加（不消耗資本）
+    if(ACCT.loggedIn()) ACCT.topupGems(INJECT_CASH).then(r=>{ if(r.ok) W.gems=ACCT.wallet.gems; }); else W.gems=(W.gems||0)+INJECT_CASH;
+    W.cash=Math.max(W.cash+INJECT_CASH, 8000); W._bankruptShown=false;   // 注資後保證有正現金跑道
+    document.getElementById('scen-modal').classList.remove('show');
+    log(`💎 繼續投資 $${INJECT_CASH.toLocaleString()}，公司保住了！`); celebrate('💎 注資成功','公司渡過難關，繼續經營'); SOUND.sfx('cash'); };
+  const go=document.getElementById('sm-go'); go.textContent=inScenario?'🔚 放棄挑戰，公司倒閉':'🔚 讓公司倒閉，重新開始';
+  go.onclick=()=>{ document.getElementById('scen-modal').classList.remove('show');
+    if(inScenario){ recordBankruptcy(); endScenario('lost'); }   // 劇本：記倒閉 + 挑戰失敗（結算卡→offerReplay）
+    else recycleCompany(); };
+  document.getElementById('scen-modal').classList.add('show'); appEl&&appEl.classList.remove('menu-open');
+}
+function bankruptLog(){ try{ return JSON.parse(localStorage.getItem('yocat_bankruptlog')||'[]'); }catch(e){ return []; } }
+function recordBankruptcy(){ const a=bankruptLog();
+  a.unshift({ day:W.day, val:valuation(), mode:modeLabel(), date:Date.now() });
+  if(a.length>20) a.length=20; try{ localStorage.setItem('yocat_bankruptlog', JSON.stringify(a)); }catch(e){}
+  ACCT.addRecord('bankruptcy',{ day:W.day, val:valuation(), mode:modeLabel() });   // 失敗記在帳號上（雲端）
+}
+function recycleCompany(){
+  recordBankruptcy();                                // 💀 留下倒閉記錄（持久，跨局）
+  lbSubmit();                                        // 把倒掉這間公司的最終成績記進排行榜
+  W.chars.filter(c=>c.dept!=='總').forEach(c=>toAlumnus(c));   // 你的員工進校友庫，不會消失
+  const keepHi=W.highlights.slice(), keepAchv=W.achv.slice(); // 保留大事記與成就（跨公司傳承）
+  resetWorld();                                      // 新 runId、現金/進度重置；alumni/hiredDreams/排行榜保留
+  W.highlights=keepHi; W.achv=keepAchv;
+  const gseq=['m','f','m'].sort(()=>Math.random()-0.5);
+  ['總','產','銷'].forEach((d,i)=>addChar(d,null,gseq[i]));    // 精簡班底重新起步，其餘靠校友招回
+  W.scenario=null; saveGame();
+  pushHighlight('🔄','上一間公司破產，老闆帶著老班底重新創業');
+  log('🔄 公司已清算重整——你的人都在校友庫，帶他們東山再起吧');
+  celebrate('🔄 東山再起','舊公司已清算・老班底在校友庫等你招回');
+}
+function checkScenario(){
+  const sc=W.scenario; if(!sc || sc.status!=='running') return;
+  const def=SCENARIOS[sc.id]; if(!def || !def.deadline) return;
+  // 破產改由 checkBankruptcy 統一處理（劇本也會跳「繼續投資 / 倒閉」抉擇窗）
+  if(def.winEarly && def.check && def.check()){ endScenario('won'); return; }
+  if(W.day > (sc.deadline||def.deadline)){ endScenario(def.check && def.check() ? 'won' : 'lost'); }
+}
+function openScenarios(){
+  const cur=W.scenario&&W.scenario.id, running=W.scenario&&W.scenario.status==='running';
+  const timed=Object.entries(SCENARIOS).filter(([,d])=>d.deadline);
+  const cleared=timed.filter(([id])=>W.bestScores[id]).length;
+  const opts=Object.entries(SCENARIOS).map(([id,def])=>{
+    const best=W.bestScores[id];
+    const bdfn=best?(DIFFS[best.diff]||DIFFS.normal).name:'';
+    const medal=best?`　🏅${best.g}`:'';
+    const sub= best
+      ? `最佳 ${best.g} 級・${bdfn}（第 ${best.day} 天）`
+      : (def.deadline?`限時 ${def.deadline} 天・${def.desc}`:def.desc);
+    return { label:`${def.premium?'💎 ':''}${def.icon} ${def.name}${medal}${(cur===id&&running)?'　▶ 進行中':''}`, sub, value:id };
+  });
+  opts.unshift({ label:`🏅 戰績牆：通關 ${cleared}/${timed.length} 個劇本`, sub:'選一個劇本開新局，挑戰更高評級', value:'_hdr' });
+  openPicker('📜 劇本挑戰（選一個開新局）', opts, id=>{
+    if(id==='_hdr'){ openScenarios(); return; }
+    const def=SCENARIOS[id];
+    if(!def.deadline){ startScenario(id); return; }   // 自由經營：直接開
+    pickDifficulty(id);                                // 限時劇本：先選難度（即為確認）
+  });
+}
+// 公司大事記面板 + 分享圖
+function openDigest(){
+  const list=document.getElementById('dg-list'); list.innerHTML='';
+  document.getElementById('dg-sub').textContent=`第 ${W.day} 天・估值 $${valuation().toLocaleString()}・士氣 ${Math.round(W.morale)}`;
+  const hs=W.highlights.slice(-24).reverse();
+  if(!hs.length) list.innerHTML='<div class="dg-item"><div style="flex:1">公司還很平靜，等故事發生吧～ 情侶、吵架、分手、里程碑都會記在這裡。</div></div>';
+  else for(const h of hs){ const d=document.createElement('div'); d.className='dg-item';
+    d.innerHTML=`<div>${h.icon}</div><div style="flex:1">${h.text}</div><div class="dg-d">第${h.day}天</div>`; list.appendChild(d); }
+  document.getElementById('digest').classList.add('show'); appEl.classList.remove('menu-open');
+}
+function closeDigest(){ document.getElementById('digest').classList.remove('show'); }
+function shareDigest(){
+  const hs=W.highlights.slice(-10).reverse();
+  const Wd=620, pad=30, lineH=40, headH=118;
+  const Hd=headH + Math.max(1,hs.length)*lineH + pad;
+  const cv2=document.createElement('canvas'); cv2.width=Wd; cv2.height=Hd; const x=cv2.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,Hd); g.addColorStop(0,'#1d2336'); g.addColorStop(1,'#0f1420'); x.fillStyle=g; x.fillRect(0,0,Wd,Hd);
+  x.fillStyle='#ffd166'; x.font='bold 27px "Microsoft JhengHei"'; x.fillText('🏢 yoCat Office 大事記', pad, 50);
+  x.fillStyle='#9aa6c8'; x.font='15px "Microsoft JhengHei"'; x.fillText(`第 ${W.day} 天・估值 $${valuation().toLocaleString()}・士氣 ${Math.round(W.morale)}`, pad, 80);
+  x.strokeStyle='#2c4068'; x.lineWidth=1; x.beginPath(); x.moveTo(pad,100); x.lineTo(Wd-pad,100); x.stroke();
+  let y=headH+10;
+  if(!hs.length){ x.fillStyle='#cfe0ff'; x.font='18px "Microsoft JhengHei"'; x.fillText('公司還很平靜…', pad, y); }
+  for(const h of hs){ x.fillStyle='#eaf0ff'; x.font='18px "Microsoft JhengHei"'; x.fillText(`${h.icon} ${h.text}`, pad, y);
+    x.fillStyle='#6b779e'; x.font='13px "Microsoft JhengHei"'; x.fillText(`第${h.day}天`, Wd-pad-50, y); y+=lineH; }
+  const a=document.createElement('a'); a.download=`yoCat大事記_第${W.day}天.png`; a.href=cv2.toDataURL('image/png'); a.click();
+  toast('已存成分享圖！把你的辦公室故事分享出去吧');
+}
+// 🎭 辦公室八點檔海報：只挑人際/感情 drama，做成聳動可傳播的海報
+const DRAMA_ICONS=new Set(['💞','💔','👋','💪','🌈','⚡','🫶','🎣','🔴','😠','⭐','📖']);
+function dramaHighlights(){ return W.highlights.filter(h=>DRAMA_ICONS.has(h.icon)); }
+function shareDrama(){
+  const hs=dramaHighlights().slice(-8).reverse();
+  if(!hs.length){ toast('目前還沒有八卦可爆——等員工談戀愛、鬧分手、被挖角吧'); return; }
+  const Wd=620, pad=30, lineH=44, headH=130;
+  const Hd=headH + hs.length*lineH + pad+10;
+  const cv2=document.createElement('canvas'); cv2.width=Wd; cv2.height=Hd; const x=cv2.getContext('2d');
+  const g=x.createLinearGradient(0,0,Wd,Hd); g.addColorStop(0,'#3a1030'); g.addColorStop(1,'#1a0a1e'); x.fillStyle=g; x.fillRect(0,0,Wd,Hd);
+  x.fillStyle='#ff6fb0'; x.font='bold 30px "Microsoft JhengHei"'; x.fillText('🎭 辦公室八點檔', pad, 54);
+  x.fillStyle='#ffd166'; x.font='15px "Microsoft JhengHei"'; x.fillText(`yoCat Office・第 ${W.day} 天・${hs.length} 則勁爆內幕`, pad, 84);
+  x.strokeStyle='#7a2a5a'; x.lineWidth=1.5; x.beginPath(); x.moveTo(pad,106); x.lineTo(Wd-pad,106); x.stroke();
+  let y=headH+8;
+  for(const h of hs){ x.fillStyle='#ffe0f0'; x.font='18px "Microsoft JhengHei"'; x.fillText(`${h.icon} ${h.text}`, pad, y);
+    x.fillStyle='#b06a8e'; x.font='13px "Microsoft JhengHei"'; x.fillText(`第${h.day}天`, Wd-pad-50, y); y+=lineH; }
+  x.fillStyle='#8a5a74'; x.font='13px "Microsoft JhengHei"'; x.fillText('你的 AI 辦公室，每天都在上演。', pad, Hd-16);
+  const a=document.createElement('a'); a.download=`yoCat八點檔_第${W.day}天.png`; a.href=cv2.toDataURL('image/png'); a.click();
+  toast('🎭 八點檔海報已存檔！把辦公室內幕爆給大家看');
+}
+
+function log(t){ const el=document.getElementById('log'); const d=document.createElement('div');
+  d.textContent=`[${fmtClock()}] ${t}`; el.prepend(d); while(el.children.length>40) el.lastChild.remove(); }
+
+// 員工請求卡片按鈕
+document.getElementById('req-yes').onclick=()=>resolveRequest(true);
+document.getElementById('req-no').onclick=()=>resolveRequest(false);
+document.getElementById('req-badge').onclick=showNextRequest;
+
+// 🤖 AI 代管開關（預設開啟；存檔若有記錄則沿用）
+document.getElementById('autopilot-btn').onclick=()=>setAutopilot(!W.autopilot);
+setAutopilot(LOADED ? !!W.autopilot : true);
+document.getElementById('shop-btn').onclick=()=>{ openShop(); appEl.classList.remove('menu-open'); };
+document.getElementById('goals-btn').onclick=()=>{ openGoals(); appEl.classList.remove('menu-open'); };
+document.getElementById('scen-btn').onclick=()=>{ openScenarios(); appEl.classList.remove('menu-open'); };
+document.getElementById('gem-btn').onclick=()=>{ openRecharge(); appEl.classList.remove('menu-open'); };
+function openSound(){ const p=SOUND.pref();
+  openPicker('🔊 音效與音樂', [
+    {label:`音效 SFX：${p.sfx?'🔊 開':'🔇 關'}`, sub:'里程碑、進帳、事件提示音', value:'sfx'},
+    {label:`背景音樂 BGM：${p.bgm?'🎵 開':'🔕 關'}`, sub:'辦公室環境音樂（程序生成）', value:'bgm'},
+  ], v=>{ if(v==='sfx') SOUND.setSfx(!p.sfx); else if(v==='bgm') SOUND.setBgm(!p.bgm); openSound(); });
+}
+document.getElementById('sound-btn').onclick=()=>{ openSound(); appEl.classList.remove('menu-open'); };
+// 瀏覽器自動播放政策：首次互動後才解鎖音訊
+['pointerdown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>SOUND.unlock(),{once:true}));
+document.getElementById('digest-btn').onclick=()=>{ openDigest(); };
+document.getElementById('dg-share').onclick=shareDigest;
+document.getElementById('dg-drama').onclick=shareDrama;
+document.getElementById('dg-close').onclick=closeDigest;
+document.getElementById('digest').onclick=e=>{ if(e.target.id==='digest') closeDigest(); };
+// 新手引導：每個瀏覽器只顯示一次（在帳號畫面解決後才顯示，見下方 boot）
+document.getElementById('wc-go').onclick=()=>{ document.getElementById('welcome').classList.remove('show'); try{localStorage.setItem('yocat_onboarded','1');}catch(e){} };
+
+// ===== 帳號畫面：登入 / 註冊 / 訪客 =====
+const acVal=id=>document.getElementById(id).value.trim();
+function acMsg(t,ok){ const m=document.getElementById('ac-msg'); if(m){ m.textContent=t||''; m.style.color=ok?'#7ee787':'#ff9f9f'; } }
+document.getElementById('acct-btn').onclick=()=>{ appEl.classList.remove('menu-open'); if(ACCT.loggedIn()) openAccountPanel(); else { acMsg(''); showAccount(); } };
+document.getElementById('ac-guest').onclick=()=>{ hideAccount(); maybeWelcome(); };
+document.getElementById('ac-login').onclick=async()=>{
+  const email=acVal('ac-email'), pw=acVal('ac-pw');
+  if(!email||!pw){ acMsg('請輸入 email 和密碼'); return; }
+  acMsg('登入中…',true);
+  const r=await ACCT.login(email,pw);
+  if(!r.ok){ acMsg(r.d.error||'登入失敗'); return; }
+  await afterAuthLoad(false); updateAccountUI(); hideAccount(); maybeWelcome();
+  toast('👤 歡迎回來，'+ACCT.account.display_name);
+};
+document.getElementById('ac-register').onclick=async()=>{
+  const email=acVal('ac-email'), pw=acVal('ac-pw'), name=acVal('ac-name');
+  if(!email||!pw||!name){ acMsg('註冊需要 email、密碼、公司／老闆名'); return; }
+  acMsg('建立中…',true);
+  const r=await ACCT.register(email,pw,name);
+  if(!r.ok){ acMsg(r.d.error||'註冊失敗'); return; }
+  await afterAuthLoad(true); updateAccountUI(); hideAccount(); maybeWelcome();
+  toast('🏢 辦公室已建立，'+ACCT.account.display_name);
+};
+function openAccountPanel(){
+  openPicker('👤 '+ACCT.account.display_name, [
+    {label:`💎 資本：${ACCT.wallet.gems}`, sub:ACCT.account.email, value:'_'},
+    {label:'🔄 切換帳號', sub:'登出並以另一個帳號登入（會開一間新公司等你登入覆蓋）', value:'switch'},
+    {label:'🚪 登出', sub:'回到訪客模式（本機存檔保留）', value:'logout'},
+  ], async v=>{
+    if(v==='switch'){ await ACCT.logout(); newCompany(); updateAccountUI(); acMsg(''); showAccount(); }
+    else if(v==='logout'){ await ACCT.logout(); updateAccountUI(); toast('已登出（回到訪客模式）'); }
+  });
+}
+// 開一間全新公司（切換帳號時用；登入既有帳號會被雲端存檔覆蓋）
+function newCompany(){
+  resetWorld(); W.alumni=[]; W.hiredDreams=[]; W.gems=0; W.scenario=null;
+  const gseq=['m','f','m','f','m','f'].sort(()=>Math.random()-0.5);
+  ['總','產','銷','人','發','財'].forEach((d,i)=>addChar(d,null,gseq[i]));
+}
+applyTheme(W.theme);   // 套用目前主題背景
+
+// 手機選單抽屜：☰ 開合、點背景關閉
+const appEl=document.getElementById('app');
+function toggleMenu(on){ appEl.classList.toggle('menu-open', on===undefined?undefined:on); }
+document.getElementById('menu-toggle').onclick=()=>appEl.classList.toggle('menu-open');
+document.getElementById('menu-backdrop').onclick=()=>appEl.classList.remove('menu-open');
+
+// 圖例（部門全名）
+const lg=document.getElementById('legend');
+for(const [k,v] of Object.entries(DEPTS)){ const e=document.createElement('div'); e.className='dept';
+  e.innerHTML=`<span class="dot" style="background:${v.color}"></span>${v.name}`; lg.appendChild(e); }
+
+// 後端健康檢查
+// ===== 生成來源決策：後端(A/B) 優先，否則瀏覽器 WebLLM(C)；?browser 強制瀏覽器 =====
+if(location.search.includes('browser')) GEN.mode='browser';
+const _conn=document.getElementById('conn');
+if(typeof WLLM!=='undefined') WLLM.status(s=>{ if(_conn) _conn.textContent=s; });
+(async()=>{
+  // 策略：開場優先用後端 vLLM（7B，品質好）；同時背景預載瀏覽器 WebLLM，
+  // 待其「下載完成且實測能生成一句」才切換到瀏覽器引擎（之後零伺服器成本）。切不切由實測決定。
+  const ok = GEN.mode==='browser' ? (GEN.backendOK=false) : await checkBackend();
+  if(ok && _conn) _conn.textContent='LLM：後端 vLLM 已連線 ✅（背景載入瀏覽器模型中…）';
+
+  const hasWLLM = typeof WLLM!=='undefined' && WLLM.available();
+  if(!ok && !hasWLLM){ if(_conn) _conn.textContent='LLM：離線（無後端 / 瀏覽器不支援 WebGPU）'; return; }
+  if(!ok && hasWLLM && _conn) _conn.textContent='LLM：無後端，瀏覽器模式載入中…';
+
+  if(hasWLLM){
+    try{
+      await WLLM.ensure();                                              // 下載 + 初始化（首次約 1GB 快取）
+      // 真·品質閘：連續實測多句，全部通過「繁中、無亂碼、無重複、無特殊 token」才切換。
+      // 在 WebGPU 數值異常的硬體（如部分 Blackwell GPU）上小模型會吐亂碼 → 過不了 → 維持後端。
+      const p1 = await WLLM.think({name:'小測',dept:'產',persona:['測試'],mood:60,energy:60});
+      const p2 = await WLLM.chat({name:'小測',dept:'銷',persona:['測試'],message:'最近專案進度如何？'});
+      if(llmOutputOK(p1) && llmOutputOK(p2)){
+        GEN.mode='browser';                                            // 載好且實測品質過關 → 切到瀏覽器引擎
+        if(_conn) _conn.textContent='LLM：瀏覽器模型就緒，已切換 ✅（省伺服器算力）';
+      } else if(ok){
+        GEN.mode='backend';                                            // 品質不過關 → 鎖定後端，不再嘗試切換
+        if(_conn) _conn.textContent='LLM：後端 vLLM（瀏覽器模型品質不足，未切換）';
+        console.warn('[LLM] 瀏覽器模型實測品質不足，維持後端。probe1=',JSON.stringify(p1),'probe2=',JSON.stringify(p2));
+      } else if(_conn){ _conn.textContent='LLM：瀏覽器模型品質不足且無後端，維持離線'; }
+    }catch(e){
+      if(!ok && _conn) _conn.textContent='瀏覽器 LLM 載入失敗';         // 後端可用時：安靜維持後端
+    }
+  }
+})();
+
+if(!LOADED) log('辦公室開張！點員工可互動，右側四個按鈕操作。');
+if(!DEBUG_MODE) window.addEventListener('beforeunload', saveGame);   // 離開前存檔
+requestAnimationFrame(loop);
+
+// ===== 帳號 boot：有有效 token 自動登入並載入雲端辦公室；否則顯示帳號畫面（含訪客） =====
+(async()=>{
+  if(DEBUG_MODE) return;
+  try{ ACCT.token=localStorage.getItem('yocat_token')||null; }catch(e){}
+  if(ACCT.token){
+    const ok=await ACCT.refreshMe();
+    if(ok){ await afterAuthLoad(false); updateAccountUI(); maybeWelcome(); return; }
+    ACCT.saveToken(null);   // token 失效 → 當作未登入
+  }
+  updateAccountUI();
+  showAccount();
+})();
+</script>
+</body>
+</html>

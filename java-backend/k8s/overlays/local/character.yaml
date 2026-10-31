@@ -1,0 +1,64 @@
+# yocat-character — NPC 大腦服務（client 的 /character/* 後端，代理 host 上的 vLLM）。
+# 在 k8s 內用 host.docker.internal 觸達 host 的 vLLM（Rancher Desktop 已驗證 pod 可達）。
+# readiness/liveness 用 tcpSocket（只檢查 Node 進程存活），不綁 vLLM——vLLM 暫時掛掉時，
+# 讓 /health 回 503 由 client 自行 fallback 到瀏覽器 WebLLM，而不是把 pod 判成 NotReady。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yocat-character
+  labels:
+    app: yocat-character
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yocat-character
+  template:
+    metadata:
+      labels:
+        app: yocat-character
+    spec:
+      containers:
+        - name: character
+          image: yocat-office-backend/character:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3001
+          env:
+            - name: LLM_BASE
+              value: "http://host.docker.internal:8000/v1"
+            - name: LLM_MODEL
+              value: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+            - name: LLM_TIMEOUT_MS
+              value: "20000"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yocat-character
+  labels:
+    app: yocat-character
+spec:
+  selector:
+    app: yocat-character
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3001

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/TopupRequest",
+  "title": "TopupRequest",
+  "description": "POST /wallet/topup（pack 與 currency+amount 二擇一）",
+  "type": "object",
+  "properties": {
+    "pack": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "g_small/g_mid/g_big/cap_1000"
+    },
+    "currency": {
+      "oneOf": [
+        {
+          "$ref": "Currency.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "amount": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1,
+      "maximum": 10000000
+    }
+  },
+  "required": [],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<RequestDTO>>"
+}

@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Runbook — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">Runbook</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">Runbook</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link active" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control文件控制">Document Control（文件控制）</a></li><li><a class="toc__link" href="#table-of-contents目錄">Table of Contents（目錄）</a></li><li><a class="toc__link" href="#1-系統總覽-system-overview">1. 系統總覽 System Overview</a></li><li><a class="toc__link toc__link--h3" href="#11-技術棧摘要tech-stack-summary">1.1 技術棧摘要（Tech Stack Summary）</a></li><li><a class="toc__link toc__link--h3" href="#12-部署環境deployment-environment">1.2 部署環境（Deployment Environment）</a></li><li><a class="toc__link toc__link--h3" href="#13-子系統邊界參考7-bounded-contexts">1.3 子系統邊界參考（7 Bounded Contexts）</a></li><li><a class="toc__link" href="#2-架構-architecture">2. 架構 Architecture</a></li><li><a class="toc__link toc__link--h3" href="#21-runtime-topology執行期拓撲">2.1 Runtime Topology（執行期拓撲）</a></li><li><a class="toc__link toc__link--h3" href="#22-component-inventory元件清單">2.2 Component Inventory（元件清單）</a></li><li><a class="toc__link toc__link--h3" href="#23-network-and-port-reference網路與連接埠">2.3 Network and Port Reference（網路與連接埠）</a></li><li><a class="toc__link" href="#3-slislosla-定義">3. SLI/SLO/SLA 定義</a></li><li><a class="toc__link toc__link--h3" href="#31-service-level-indicatorssli">3.1 Service Level Indicators（SLI）</a></li><li><a class="toc__link toc__link--h3" href="#32-service-level-objectivesslo">3.2 Service Level Objectives（SLO）</a></li><li><a class="toc__link toc__link--h3" href="#33-customer-sla對客戶承諾">3.3 Customer SLA（對客戶承諾）</a></li><li><a class="toc__link" href="#4-部署程序-deployment-procedures">4. 部署程序 Deployment Procedures</a></li><li><a class="toc__link toc__link--h3" href="#41-部署前檢查清單pre-deployment-checklist">4.1 部署前檢查清單（Pre-Deployment Checklist）</a></li><li><a class="toc__link toc__link--h3" href="#42-標準部署rolling--canary-via-argocd">4.2 標準部署（Rolling / Canary via ArgoCD）</a></li><li><a class="toc__link toc__link--h3" href="#43-緊急-hotfix-部署">4.3 緊急 Hotfix 部署</a></li><li><a class="toc__link toc__link--h3" href="#44-本機一鍵部署local-firstrancher-desktop">4.4 本機一鍵部署（Local-First，Rancher Desktop）</a></li><li><a class="toc__link" href="#5-監控與告警-monitoring-and-alerting">5. 監控與告警 Monitoring and Alerting</a></li><li><a class="toc__link toc__link--h3" href="#51-dashboards">5.1 Dashboards</a></li><li><a class="toc__link toc__link--h3" href="#52-alert-reference告警對照表">5.2 Alert Reference（告警對照表）</a></li><li><a class="toc__link toc__link--h3" href="#53-log-存取">5.3 Log 存取</a></li><li><a class="toc__link" href="#6-事故處理-incident-response">6. 事故處理 Incident Response</a></li><li><a class="toc__link toc__link--h3" href="#61-事故生命週期">6.1 事故生命週期</a></li><li><a class="toc__link toc__link--h3" href="#62-嚴重度分級severity-classification">6.2 嚴重度分級（Severity Classification）</a></li><li><a class="toc__link toc__link--h3" href="#63-phase-1偵測detection">6.3 Phase 1：偵測（Detection）</a></li><li><a class="toc__link toc__link--h3" href="#64-phase-2分級triage">6.4 Phase 2：分級（Triage）</a></li><li><a class="toc__link toc__link--h3" href="#65-phase-3升級escalation">6.5 Phase 3：升級（Escalation）</a></li><li><a class="toc__link toc__link--h3" href="#66-phase-4止血與解決mitigation--resolution">6.6 Phase 4：止血與解決（Mitigation &amp;amp; Resolution）</a></li><li><a class="toc__link toc__link--h3" href="#67-客戶溝通">6.7 客戶溝通</a></li><li><a class="toc__link toc__link--h3" href="#68-post-mortemp0p1-必做blameless">6.8 Post-Mortem（P0/P1 必做，blameless）</a></li><li><a class="toc__link" href="#7-故障排除-troubleshooting">7. 故障排除 Troubleshooting</a></li><li><a class="toc__link toc__link--h3" href="#71-api-server-5xx-錯誤">7.1 API Server 5xx 錯誤</a></li><li><a class="toc__link toc__link--h3" href="#72-服務完全不可用">7.2 服務完全不可用</a></li><li><a class="toc__link toc__link--h3" href="#73-high-latency-高延遲">7.3 High Latency 高延遲</a></li><li><a class="toc__link toc__link--h3" href="#74-outbox-事件積壓">7.4 Outbox 事件積壓</a></li><li><a class="toc__link toc__link--h3" href="#75-database-issues-資料庫問題">7.5 Database Issues 資料庫問題</a></li><li><a class="toc__link toc__link--h3" href="#76-pod-crashloopbackoff">7.6 Pod CrashLoopBackOff</a></li><li><a class="toc__link toc__link--h3" href="#77-redis-sentinel-故障切換">7.7 Redis Sentinel 故障切換</a></li><li><a class="toc__link toc__link--h3" href="#78-錢包餘額異常對帳">7.8 錢包餘額異常對帳</a></li><li><a class="toc__link toc__link--h3" href="#79-disk-pressure-磁碟壓力">7.9 Disk Pressure 磁碟壓力</a></li><li><a class="toc__link toc__link--h3" href="#710-備份batch-失敗">7.10 備份/Batch 失敗</a></li><li><a class="toc__link" href="#8-例行維護-routine-maintenance">8. 例行維護 Routine Maintenance</a></li><li><a class="toc__link toc__link--h3" href="#81-維護排程maintenance-schedule">8.1 維護排程（Maintenance Schedule）</a></li><li><a class="toc__link toc__link--h3" href="#82-資料庫維護database-maintenance">8.2 資料庫維護（Database Maintenance）</a></li><li><a class="toc__link toc__link--h3" href="#83-log-輪換與清理">8.3 Log 輪換與清理</a></li><li><a class="toc__link toc__link--h3" href="#84-容量審查capacity-reviewiron-constraint--replicas--2">8.4 容量審查（Capacity Review，Iron Constraint — Replicas ≥ 2）</a></li><li><a class="toc__link" href="#9-回滾程序-rollback-procedures">9. 回滾程序 Rollback Procedures</a></li><li><a class="toc__link toc__link--h3" href="#91-應用版本回滾deployment-rollback">9.1 應用版本回滾（Deployment Rollback）</a></li><li><a class="toc__link toc__link--h3" href="#92-db-migration-回滾expand-contract">9.2 DB Migration 回滾（expand-contract）</a></li><li><a class="toc__link toc__link--h3" href="#93-regional-failover跨-region-回滾--dr-切換">9.3 Regional Failover（跨 Region 回滾 / DR 切換）</a></li><li><a class="toc__link toc__link--h3" href="#94-回滾後全套驗證rollback-完成標準">9.4 回滾後全套驗證（Rollback 完成標準）</a></li><li><a class="toc__link" href="#10-備份與還原-backup-and-restore">10. 備份與還原 Backup and Restore</a></li><li><a class="toc__link toc__link--h3" href="#101-rto--rpo-目標來源-edd-135--arch-8">10.1 RTO / RPO 目標（來源 EDD §13.5 / ARCH §8）</a></li><li><a class="toc__link toc__link--h3" href="#102-db-還原程序db-restore">10.2 DB 還原程序（DB Restore）</a></li><li><a class="toc__link toc__link--h3" href="#103-還原後驗證">10.3 還原後驗證</a></li><li><a class="toc__link" href="#11-安全程序-security-procedures">11. 安全程序 Security Procedures</a></li><li><a class="toc__link toc__link--h3" href="#111-secret-輪換正確順序順序錯誤會中斷服務">11.1 Secret 輪換（正確順序，順序錯誤會中斷服務）</a></li><li><a class="toc__link toc__link--h3" href="#112-tls-憑證續期">11.2 TLS 憑證續期</a></li><li><a class="toc__link toc__link--h3" href="#113-credentials-洩漏處置compromised-credentials">11.3 Credentials 洩漏處置（Compromised Credentials）</a></li><li><a class="toc__link toc__link--h3" href="#114-waf-緊急封鎖cloud-production本機以-networkpolicy">11.4 WAF 緊急封鎖（Cloud Production；本機以 NetworkPolicy）</a></li><li><a class="toc__link toc__link--h3" href="#115-audit-log-查詢事後追查">11.5 Audit Log 查詢（事後追查）</a></li><li><a class="toc__link" href="#12-聯絡與升級-contacts-and-escalation">12. 聯絡與升級 Contacts and Escalation</a></li><li><a class="toc__link" href="#13-變更紀錄-change-log">13. 變更紀錄 Change Log</a></li><li><a class="toc__link" href="#14-on-call-交接-on-call-handoff">14. On-Call 交接 On-Call Handoff</a></li><li><a class="toc__link" href="#15-runbook-驗證程序-runbook-validation-procedure">15. Runbook 驗證程序 Runbook Validation Procedure</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="yocat-office-後端信任層--營運-runbookoperations-runbook">yoCat Office 後端信任層 — 營運 Runbook（Operations Runbook）</h1>
+<blockquote><p><strong>本 Runbook 是 yocat-office-backend（yoCat Office 後端信任層）的權威營運參考文件。</strong></p></blockquote>
+<blockquote><p>任何 on-call 工程師、SRE 或自動化代理，在凌晨 3 點被叫醒、零前情提要的情況下，</p></blockquote>
+<blockquote><p>必須能依本文件獨立診斷並處置所有涵蓋的故障情境，不需詢問任何人。</p></blockquote>
+<blockquote><p>若發現缺口，請立即提交文件缺陷 ticket —— 該缺口即為一個正式的生產風險。</p></blockquote>
+<hr>
+<h2 id="document-control文件控制">Document Control（文件控制）</h2>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>DOC-ID</strong></td><td>RUNBOOK-YOCAT-OFFICE-BACKEND-20261030</td></tr>
+<tr><td><strong>專案</strong></td><td>yoCat Office 後端信任層（yocat-office-backend）</td></tr>
+<tr><td><strong>版本</strong></td><td>v0.1</td></tr>
+<tr><td><strong>狀態</strong></td><td>DRAFT</td></tr>
+<tr><td><strong>技術棧</strong></td><td>Java 21 + Spring Boot 3.3 + Spring Modulith 1.3 + PostgreSQL 16 + Kubernetes 1.30</td></tr>
+<tr><td><strong>架構</strong></td><td>Spring Modulith 單體（7 個有界上下文）+ Clean Architecture 4 層 + Day1 HA（≥2 replicas、HPA、PDB）</td></tr>
+<tr><td><strong>Owner</strong></td><td><code>{{RUNBOOK_OWNER}}</code>: 填入主要 on-call 負責人姓名/Email</td></tr>
+<tr><td><strong>On-Call 輪值</strong></td><td><code>{{ONCALL_ROTATION_LINK}}</code>（格式範例：<code>https://{{ORG}}.pagerduty.com/schedules/{{SCHEDULE_ID}}</code>）</td></tr>
+<tr><td><strong>最近更新</strong></td><td>2026-10-30</td></tr>
+<tr><td><strong>最近演練</strong></td><td><code>{{LAST_TESTED_DATE}}</code>: 填入最近一次端到端演練日期</td></tr>
+<tr><td><strong>演練執行者</strong></td><td><code>{{TESTER_NAME}}</code>: 填入演練執行者</td></tr>
+<tr><td><strong>上游真相來源</strong></td><td>CONSTANTS（SSOT）、EDD §10/§3.6/§13、ARCH §7/§8/§9、API、test-plan</td></tr>
+</table>
+<hr>
+<h2 id="table-of-contents目錄">Table of Contents（目錄）</h2>
+<ol><li><a href="#1-系統總覽-system-overview">系統總覽 System Overview</a></li><li><a href="#2-架構-architecture">架構 Architecture</a></li><li><a href="#3-slislosla-定義">SLI/SLO/SLA 定義</a></li><li><a href="#4-部署程序-deployment-procedures">部署程序 Deployment Procedures</a></li><li><a href="#5-監控與告警-monitoring-and-alerting">監控與告警 Monitoring and Alerting</a></li><li><a href="#6-事故處理-incident-response">事故處理 Incident Response</a></li><li><a href="#7-故障排除-troubleshooting">故障排除 Troubleshooting</a></li><li><a href="#8-例行維護-routine-maintenance">例行維護 Routine Maintenance</a></li><li><a href="#9-回滾程序-rollback-procedures">回滾程序 Rollback Procedures</a></li><li><a href="#10-備份與還原-backup-and-restore">備份與還原 Backup and Restore</a></li><li><a href="#11-安全程序-security-procedures">安全程序 Security Procedures</a></li><li><a href="#12-聯絡與升級-contacts-and-escalation">聯絡與升級 Contacts and Escalation</a></li><li><a href="#13-變更紀錄-change-log">變更紀錄 Change Log</a></li><li><a href="#14-on-call-交接-on-call-handoff">On-Call 交接 On-Call Handoff</a></li><li><a href="#15-runbook-驗證程序-runbook-validation-procedure">Runbook 驗證程序 Runbook Validation Procedure</a></li></ol>
+<hr>
+<h2 id="1-系統總覽-system-overview">1. 系統總覽 System Overview</h2>
+<p>yoCat Office 後端信任層（yocat-office-backend）是 yoCat Office 辦公室經營模擬遊戲的<strong>伺服器權威信任層</strong>：負責玩家身分（註冊/登入/session）、伺服器權威錢包（資本 cash / 寶石 gems，append-only 帳本）、儲值金流接口、已購權益、經營史記錄、全域排行榜，以及跨裝置辦公室存檔。遊戲模擬與 LLM 算力留在玩家本機（算力留本地），<strong>僅信任層上雲端</strong>，因此後端只持有與驗證「可被金錢或排名影響」的權威資料，不持有遊戲數值本身。</p>
+<p><strong>誰依賴它（上下游）：</strong></p>
+<table>
+<tr><th>系統</th><th>依賴類型</th><th>系統下線時的衝擊（Blast Radius）</th></tr>
+<tr><td>遊戲前端客戶端（HTML5 Canvas 遊戲，代表玩家發請求）</td><td>同步 HTTP（Bearer session token）</td><td>無法登入/儲值/購買/存檔/上榜；玩家可離線遊玩但付費與跨裝置同步中斷</td></tr>
+<tr><td>營運／客服後台（唯讀對帳與風控）</td><td>同步 HTTP（唯讀查詢）</td><td>無法對帳與查 PII；風控稽核暫停</td></tr>
+<tr><td>遊戲客戶端本地算力 BC（玩家端模擬）</td><td>單向：僅透過 <code>wallet_ledger.reason</code>（如 <code>rescue</code>）感知結果</td><td>不直接呼叫後端；後端下線不影響本機單機遊玩</td></tr>
+</table>
+<p><strong>操作限制（Operational Constraints）：</strong></p>
+<ul><li>峰值流量窗口：啟動期 500 PCU（對應 5,000 DAU），成長期目標 3,000 PCU（50,000 DAU）；信任層請求頻率低（登入/儲值/存檔/上榜為主，非每幀），峰值 QPS ~35（CONSTANTS §8、EDD §11.1）。</li><li>維護窗口：採零停機滾動更新與 Canary（EDD §13.2），<strong>無強制停機維護窗口</strong>；破壞性 DB 變更採 expand-contract，禁止 drop-before-migrate。</li><li>資料分類：台灣用戶 PII（email、display_name）受個資法規範；<code>wallet_ledger</code> 為 append-only 審計帳本（永久保留，帳號刪除時 CASCADE 匿名化）；Audit Log 保留 7 年（WORM）。</li><li>絕對紅線：<strong>錢包對帳一致性 = 0 筆不一致</strong>（ledger 與 wallet 餘額 100% 相符）；任一筆不一致即 P0 事故（CONSTANTS §4、EDD §10.5）。</li></ul>
+<h3 id="11-技術棧摘要tech-stack-summary">1.1 技術棧摘要（Tech Stack Summary）</h3>
+<table>
+<tr><th>層次</th><th>技術</th><th>版本</th><th>備註（來源 EDD §3.3 / §11）</th></tr>
+<tr><td>後端語言</td><td>Java（Eclipse Temurin JVM）</td><td>21 (LTS)</td><td>Virtual Threads 提升 I/O 併發</td></tr>
+<tr><td>Web/API 框架</td><td>Spring Boot</td><td>3.3.x</td><td>與 Modulith 原生整合</td></tr>
+<tr><td>模組化框架</td><td>Spring Modulith</td><td>1.3.x</td><td><code>@ApplicationModule</code> 邊界、Event Publication Registry（Outbox）</td></tr>
+<tr><td>資料存取</td><td>Spring Data JDBC</td><td>3.3.x</td><td>原生 <code>SELECT ... FOR UPDATE</code> 行鎖</td></tr>
+<tr><td>主資料庫</td><td>PostgreSQL</td><td>16</td><td>JSONB、行鎖、Patroni HA</td></tr>
+<tr><td>快取</td><td>Redis</td><td>7.2</td><td>session/限流/排行榜快取；Sentinel HA</td></tr>
+<tr><td>容器編排</td><td>Kubernetes</td><td>1.30</td><td>Day1 HA；Local=Rancher Desktop（context <code>rancher-desktop</code>）</td></tr>
+<tr><td>CI/CD</td><td>ArgoCD GitOps + GitHub Actions</td><td>—</td><td>Canary（prod）、image tag <code>git-sha8</code></td></tr>
+</table>
+<h3 id="12-部署環境deployment-environment">1.2 部署環境（Deployment Environment）</h3>
+<table>
+<tr><th>欄位</th><th>Production</th><th>Local（Rancher Desktop）</th></tr>
+<tr><td><strong>K8s Namespace</strong></td><td><code>yocat-prod</code></td><td><code>yocat-office-backend-local</code></td></tr>
+<tr><td><strong>kubectl Context</strong></td><td><code>prod-k8s</code></td><td><code>rancher-desktop</code></td></tr>
+<tr><td><strong>API Deployment</strong></td><td><code>yocat-office-backend-api</code></td><td><code>yocat-office-backend-api</code></td></tr>
+<tr><td><strong>API 副本數</strong></td><td>2–8（HPA min–max）</td><td>2（HA 測試最低）</td></tr>
+<tr><td><strong>DB Host</strong></td><td><code>pg-primary.yocat-prod</code>（Patroni VIP）</td><td><code>postgres.yocat-office-backend-local.svc.cluster.local</code>（本機 NodePort 30432，見 postgres.yaml）</td></tr>
+<tr><td><strong>Redis Host</strong></td><td><code>redis-sentinel.yocat-prod</code>（3 nodes）</td><td><code>redis.yocat-office-backend-local.svc</code></td></tr>
+<tr><td><strong>Container Registry</strong></td><td><code>registry.sayyogames.internal/yocat-office-backend</code></td><td>本機映像</td></tr>
+<tr><td><strong>Secret 路徑前綴</strong></td><td><code>secret:yocat-office-backend/</code>（Sealed Secrets / Vault）</td><td><code>k8s/overlays/local/secrets.env</code>（不提交）</td></tr>
+<tr><td><strong>一鍵部署</strong></td><td>ArgoCD（Canary via GitOps）</td><td><code>kubectl apply -k k8s/overlays/local/</code></td></tr>
+</table>
+<blockquote><p>切換到 Production context：<code>kubectl config use-context prod-k8s</code>；本機：<code>kubectl config use-context rancher-desktop</code>。</p></blockquote>
+<h3 id="13-子系統邊界參考7-bounded-contexts">1.3 子系統邊界參考（7 Bounded Contexts）</h3>
+<table>
+<tr><th>Bounded Context</th><th>K8s Deployment</th><th>擁有 DB Schema（表）</th><th>Public API Prefix</th><th>Domain Event</th></tr>
+<tr><td><code>member</code></td><td><code>yocat-office-backend-api</code></td><td><code>member</code>: <code>accounts</code>, <code>sessions</code></td><td><code>/auth/</code></td><td><code>member.MemberRegistered</code> / <code>MemberDeleted</code></td></tr>
+<tr><td><code>wallet</code></td><td><code>yocat-office-backend-api</code></td><td><code>wallet</code>: <code>wallets</code>, <code>wallet_ledger</code></td><td><code>/wallet/</code></td><td><code>wallet.*</code></td></tr>
+<tr><td><code>deposit</code></td><td><code>yocat-office-backend-api</code></td><td><code>deposit</code>: <code>deposit_pack</code>, <code>deposit_order</code>(Phase B)</td><td><code>/deposit/</code>、<code>POST /wallet/topup</code></td><td><code>deposit.*</code></td></tr>
+<tr><td><code>entitlement</code></td><td><code>yocat-office-backend-api</code></td><td><code>entitlement</code>: <code>entitlements</code></td><td><code>/entitlements</code></td><td><code>entitlement.*</code></td></tr>
+<tr><td><code>record</code></td><td><code>yocat-office-backend-api</code></td><td><code>record</code>: <code>records</code></td><td><code>/records</code></td><td><code>record.*</code></td></tr>
+<tr><td><code>leaderboard</code></td><td><code>yocat-office-backend-api</code></td><td><code>leaderboard</code>: <code>leaderboard</code></td><td><code>/leaderboard</code></td><td><code>leaderboard.*</code></td></tr>
+<tr><td><code>game-save</code></td><td><code>yocat-office-backend-api</code></td><td><code>game_save</code>: <code>saves</code></td><td><code>/save</code></td><td><code>game_save.*</code></td></tr>
+<tr><td>平台底座（非 BC，橫切）</td><td><code>yocat-office-backend-api</code></td><td>—（承載 7 BC + Outbox <code>event_publication</code>）</td><td><code>/health/</code>、<code>/actuator/*</code></td><td>—</td></tr>
+</table>
+<blockquote><p>7 個 BC 於 Day1 合部署為單一 Spring Modulith Deployment（<code>yocat-office-backend-api</code>），跨 BC 僅走 Public API 或 Domain Event（Transactional Outbox），無跨 BC DB FK。跨 BC 呼叫失敗時，先確認 <code>yocat-office-backend-api</code> Pod 健康（§7.1）。</p></blockquote>
+<hr>
+<h2 id="2-架構-architecture">2. 架構 Architecture</h2>
+<h3 id="21-runtime-topology執行期拓撲">2.1 Runtime Topology（執行期拓撲）</h3>
+<div class="diagram-container"><pre class="mermaid">graph TB
+    subgraph External[&quot;外部呼叫方&quot;]
+        Client[&quot;遊戲客戶端 / 營運後台&quot;]
+    end
+
+    subgraph Ingress[&quot;Ingress 層&quot;]
+        LB[&quot;Cloud LB / Ingress\n(≥2, TLS :443, OWASP WAF)\n本機: Traefik ≥2&quot;]
+    end
+
+    subgraph AppPlane[&quot;應用平面\n(k8s namespace: yocat-prod)&quot;]
+        API[&quot;api-server\n(deployment: yocat-office-backend-api)\n:8080, HPA 2-8&quot;]
+        Outbox[&quot;Outbox worker\n(內嵌 API Pod, event_publication)\nSELECT FOR UPDATE SKIP LOCKED&quot;]
+    end
+
+    subgraph DataPlane[&quot;資料平面\n(k8s namespace: yocat-prod)&quot;]
+        DB[(&quot;PostgreSQL 16\npg-primary.yocat-prod:5432\nDB: yocat\nPatroni Primary+Standby&quot;)]
+        Cache[(&quot;Redis 7.2\nredis-sentinel.yocat-prod:6379\nSentinel x3&quot;)]
+    end
+
+    subgraph Observability[&quot;可觀測性&quot;]
+        Prom[&quot;Prometheus\n(/actuator/prometheus)\nhttps://prometheus.{{COMPANY_DOMAIN}}&quot;]
+        Graf[&quot;Grafana\nhttps://grafana.{{COMPANY_DOMAIN}}&quot;]
+        Loki[&quot;Loki / Log Aggregator\nhttps://logs.{{COMPANY_DOMAIN}}&quot;]
+        Tempo[&quot;Tempo / Jaeger (OTLP Tracing)&quot;]
+    end
+
+    Client --&gt;|HTTPS :443| LB
+    LB --&gt;|HTTP :8080| API
+    API --&gt;|sync 行鎖交易| DB
+    API --&gt;|&quot;session/限流/排行快取&quot;| Cache
+    API --&gt; Outbox
+    Outbox --&gt;|同交易寫入 + 非同步投遞| DB
+    API -.-&gt;|metrics| Prom
+    Prom -.-&gt;|datasource| Graf
+    API -.-&gt;|logs JSON| Loki
+    API -.-&gt;|traces OTLP| Tempo</pre></div>
+<h3 id="22-component-inventory元件清單">2.2 Component Inventory（元件清單）</h3>
+<table>
+<tr><th>元件</th><th>K8s Namespace</th><th>K8s Deployment</th><th>Port</th><th>健康檢查</th><th>狀態查詢指令</th></tr>
+<tr><td>api-server（含內嵌 Outbox worker）</td><td><code>yocat-prod</code></td><td><code>yocat-office-backend-api</code></td><td><code>8080</code></td><td><code>GET /health/ready</code>（含 DB/Redis 檢查）</td><td><code>kubectl get pods -n yocat-prod -l app=yocat-office-backend-api</code></td></tr>
+<tr><td>PostgreSQL（Patroni Primary+Standby）</td><td><code>yocat-prod</code></td><td><code>yocat-pg</code>（StatefulSet）</td><td><code>5432</code></td><td><code>pg_isready -h pg-primary.yocat-prod -p 5432 -U yocat</code></td><td><code>kubectl get pods -n yocat-prod -l app=yocat-pg</code></td></tr>
+<tr><td>Redis Sentinel（×3）</td><td><code>yocat-prod</code></td><td><code>redis-sentinel</code></td><td><code>6379</code></td><td><code>redis-cli -h redis-sentinel.yocat-prod ping</code></td><td><code>kubectl get pods -n yocat-prod -l app=redis-sentinel</code></td></tr>
+<tr><td>Ingress / Traefik</td><td><code>yocat-prod</code></td><td><code>traefik</code></td><td><code>443</code></td><td><code>curl -sf https://api.yocat.sayyogames.com/health/live</code></td><td><code>kubectl get pods -n yocat-prod -l app=traefik</code></td></tr>
+</table>
+<blockquote><p><strong>本機（local-first）對照</strong>：namespace 改為 <code>yocat-office-backend-local</code>，context <code>rancher-desktop</code>；本機 PostgreSQL 為單節點 StatefulSet（label <code>app=yocat-pg</code>，NodePort 30432，見 docs/req/postgres.yaml），Redis 單節點；API 仍維持 ≥2 replicas（HA 測試最低）。</p></blockquote>
+<h3 id="23-network-and-port-reference網路與連接埠">2.3 Network and Port Reference（網路與連接埠）</h3>
+<table>
+<tr><th>服務</th><th>協議</th><th>Port</th><th>可存取來源</th><th>備註</th></tr>
+<tr><td>api-server（對外）</td><td>HTTPS</td><td>443</td><td>Internet via LB</td><td>TLS 於 LB 終止</td></tr>
+<tr><td>api-server（內部）</td><td>HTTP</td><td>8080</td><td><code>yocat-prod</code> namespace</td><td>Pod-to-Pod；<code>/actuator/prometheus</code> 僅 monitoring namespace</td></tr>
+<tr><td>PostgreSQL</td><td>TCP</td><td>5432</td><td>App namespace only（Data Subnet 10.0.3.0/24）</td><td>不對外暴露</td></tr>
+<tr><td>Redis</td><td>TCP</td><td>6379</td><td>App namespace only</td><td>不對外暴露</td></tr>
+<tr><td>Prometheus</td><td>HTTP</td><td>9090</td><td>Ops VPN only</td><td><code>https://prometheus.{{COMPANY_DOMAIN}}</code></td></tr>
+<tr><td>Grafana</td><td>HTTPS</td><td>443</td><td>Ops VPN only</td><td><code>https://grafana.{{COMPANY_DOMAIN}}</code></td></tr>
+</table>
+<hr>
+<h2 id="3-slislosla-定義">3. SLI/SLO/SLA 定義</h2>
+<blockquote><p>所有 SLO 數字皆來自 <strong>EDD §10.5 / CONSTANTS §4（SSOT）</strong>，不得使用樣板預設值。</p></blockquote>
+<h3 id="31-service-level-indicatorssli">3.1 Service Level Indicators（SLI）</h3>
+<table>
+<tr><th>SLI</th><th>量測內容</th><th>量測方式（PromQL）</th><th>窗口</th></tr>
+<tr><td><strong>Availability</strong></td><td>2xx/3xx 佔比（排除 /health 探針）</td><td>`sum(rate(http_server_requests_seconds_count{status=~&quot;2..</td><td>3..&quot;,uri!~&quot;/health.<em>&quot;}[5m])) / sum(rate(http_server_requests_seconds_count{uri!~&quot;/health.</em>&quot;}[5m]))`</td><td>5 分鐘滾動</td></tr>
+<tr><td><strong>Latency P99</strong></td><td>99 百分位回應時間</td><td><code>histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{uri!~&quot;/health.*&quot;}[5m])) by (le))</code></td><td>5 分鐘滾動</td></tr>
+<tr><td><strong>Error Rate（5xx）</strong></td><td>5xx 佔比</td><td><code>sum(rate(http_server_requests_seconds_count{status=~&quot;5..&quot;,uri!~&quot;/health.<em>&quot;}[5m])) / sum(rate(http_server_requests_seconds_count{uri!~&quot;/health.</em>&quot;}[5m]))</code></td><td>5 分鐘滾動</td></tr>
+<tr><td><strong>排行榜 Top N P99</strong></td><td><code>/leaderboard</code> 查詢 P99</td><td><code>histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{uri=&quot;/leaderboard&quot;}[5m])) by (le))</code></td><td>5 分鐘滾動</td></tr>
+<tr><td><strong>錢包對帳不一致</strong></td><td><code>wallet</code> 餘額與 ledger 累計差異</td><td><code>wallet_ledger_mismatch_total</code>（應恆為 0）</td><td>持續</td></tr>
+<tr><td><strong>Outbox pending</strong></td><td>未投遞事件數</td><td><code>outbox_pending_count</code></td><td>1 分鐘滾動</td></tr>
+</table>
+<h3 id="32-service-level-objectivesslo">3.2 Service Level Objectives（SLO）</h3>
+<table>
+<tr><th>SLI</th><th>SLO 目標</th><th>窗口</th><th>Error Budget（30 天）</th><th>告警閾值（消耗 50% budget）</th></tr>
+<tr><td>Availability</td><td>≥ 99.9%</td><td>30 天滾動</td><td><strong>43.2 分鐘</strong>/30 天 downtime（(1−0.999)×30×24×60 = 43.2）</td><td>&lt; 99.95%</td></tr>
+<tr><td>Latency P99</td><td>≤ 1000ms @500 PCU（成長期 3,000 PCU ≤ 1500ms）</td><td>7 天</td><td>1% 請求允許超標</td><td>&gt; 800ms</td></tr>
+<tr><td>Error Rate（5xx）</td><td>≤ 1%</td><td>1 小時</td><td>1% 請求預算</td><td>&gt; 0.5%</td></tr>
+<tr><td>排行榜 Top N P99</td><td>≤ 300ms（limit ≤ 100）</td><td>7 天</td><td>—</td><td>&gt; 250ms</td></tr>
+<tr><td>寫入 TPS</td><td>≥ 200 txn/s（wallet/entitlement）</td><td>壓測</td><td>—</td><td>&lt; 200</td></tr>
+<tr><td><strong>錢包對帳一致</strong></td><td><strong>0 筆不一致</strong></td><td>持續</td><td><strong>0（零容忍）</strong></td><td><strong>&gt; 0 即 P0</strong></td></tr>
+</table>
+<p><strong>Error Budget 政策（EDD §10.5）：</strong></p>
+<ul><li>消耗 0–50%：正常開發，允許新功能部署。</li><li>消耗 50–75%：限制高風險變更，SRE 審查後方可部署。</li><li>消耗 75–100%：僅允許 hotfix。</li><li>消耗 &gt; 100%：凍結所有非 SLO 相關部署，宣告事故並 executive escalation。</li></ul>
+<p><strong>SLO Burn Rate 多窗口告警（Google SRE Workbook 標準；Availability error budget = 1 − 0.999 = 0.001）：</strong></p>
+<pre><code class="language-yaml"># Critical（P1）：以 14.4x 速率燃燒 error budget，約 2 天內耗盡；multi-window 1h + 5m
+- alert: yocat-office-backend_slo_burn_rate_critical
+  expr: |
+    (
+      sum(rate(http_server_requests_seconds_count{status=~&quot;5..&quot;,uri!~&quot;/health.*&quot;}[5m]))
+      / sum(rate(http_server_requests_seconds_count{uri!~&quot;/health.*&quot;}[5m]))
+    ) &gt; 0.0144
+    and
+    (
+      sum(rate(http_server_requests_seconds_count{status=~&quot;5..&quot;,uri!~&quot;/health.*&quot;}[1h]))
+      / sum(rate(http_server_requests_seconds_count{uri!~&quot;/health.*&quot;}[1h]))
+    ) &gt; 0.0144
+  for: 2m
+  labels: { severity: critical }
+  annotations:
+    summary: &quot;SLO critical burn rate — error budget 約 2 天內耗盡&quot;
+
+# Warning（P2）：以 6x 速率燃燒；multi-window 6h + 30m
+- alert: yocat-office-backend_slo_burn_rate_warning
+  expr: |
+    (
+      sum(rate(http_server_requests_seconds_count{status=~&quot;5..&quot;,uri!~&quot;/health.*&quot;}[30m]))
+      / sum(rate(http_server_requests_seconds_count{uri!~&quot;/health.*&quot;}[30m]))
+    ) &gt; 0.006
+    and
+    (
+      sum(rate(http_server_requests_seconds_count{status=~&quot;5..&quot;,uri!~&quot;/health.*&quot;}[6h]))
+      / sum(rate(http_server_requests_seconds_count{uri!~&quot;/health.*&quot;}[6h]))
+    ) &gt; 0.006
+  for: 15m
+  labels: { severity: warning }
+  annotations:
+    summary: &quot;SLO warning burn rate — error budget 約 5 天內耗盡&quot;</code></pre>
+<h3 id="33-customer-sla對客戶承諾">3.3 Customer SLA（對客戶承諾）</h3>
+<table>
+<tr><th>承諾</th><th>目標</th><th>量測週期</th><th>違約後果</th></tr>
+<tr><td>可用性</td><td>99.9%（Production）</td><td>月曆月</td><td>服務信用（見客戶合約 <code>{{CONTRACT_URL}}</code>）</td></tr>
+<tr><td>首次回應（P0 錢包/資料不一致）</td><td>&lt; 15 分鐘</td><td>每事故</td><td>依事故處理 SLA（§6.2、EDD §13.7）</td></tr>
+<tr><td>首次回應（P1 服務中斷）</td><td>&lt; 30 分鐘</td><td>每事故</td><td>依事故處理 SLA（§6.2、EDD §13.7）</td></tr>
+</table>
+<blockquote><p>P0/P1 首次回應 SLA 來源：EDD §13.7 Runbook Framework（P0 15 分鐘 / P1 30 分鐘）；PRD §9.2。</p></blockquote>
+<hr>
+<h2 id="4-部署程序-deployment-procedures">4. 部署程序 Deployment Procedures</h2>
+<blockquote><p><strong>Iron Constraint — Replicas ≥ 2</strong>：本章所有 <code>kubectl scale</code> / <code>replicas:</code> 數值不得低於 2（EDD §3.6 強制）。</p></blockquote>
+<h3 id="41-部署前檢查清單pre-deployment-checklist">4.1 部署前檢查清單（Pre-Deployment Checklist）</h3>
+<ul><li style="list-style:none"><input type="checkbox" disabled> Error budget 剩餘 ≥ 20%（檢查 <code>https://grafana.{{COMPANY_DOMAIN}}/d/{{SLO_DASHBOARD_ID}}/slo</code>）。</li><li style="list-style:none"><input type="checkbox" disabled> 無進行中 P0/P1 事故（檢查 <code>{{INCIDENT_TRACKER_URL}}</code>）。</li><li style="list-style:none"><input type="checkbox" disabled> Release 分支已通過全部 CI 檢查：<code>gh run list --branch main --limit 5</code>（Expected: 最新一筆 conclusion=success）。</li><li style="list-style:none"><input type="checkbox" disabled> 待部署映像已在 staging 驗證：<code>curl -sf https://api-staging.yocat.sayyogames.com/health/ready</code>（Expected: <code>{&quot;status&quot;:&quot;ok&quot;}</code>）。</li><li style="list-style:none"><input type="checkbox" disabled> 回滾計畫已確認（見 §9）。</li><li style="list-style:none"><input type="checkbox" disabled> 已於 <code>#deploy-yocat-office-backend</code> 公告：<code>[DEPLOY] yocat-office-backend vX.Y.Z — starting。Rollback owner: @{{ROLLBACK_CONTACT}}</code>。</li></ul>
+<h3 id="42-標準部署rolling--canary-via-argocd">4.2 標準部署（Rolling / Canary via ArgoCD）</h3>
+<p><strong>Step 0：確認 Kubernetes context</strong></p>
+<pre><code class="language-bash">kubectl config current-context
+# Expected: prod-k8s
+# If this fails（非 prod-k8s）：立即停止，執行 kubectl config use-context prod-k8s 後重新確認；絕不在錯誤 context 下操作。</code></pre>
+<p><strong>Step 1：打版本 tag 觸發 Pipeline</strong></p>
+<pre><code class="language-bash">git checkout main &amp;&amp; git pull origin main
+git tag v{{NEXT_VERSION}}        # 範例：v1.2.0
+git push origin v{{NEXT_VERSION}}
+# Expected: GitHub Actions deploy workflow 於 30 秒內觸發（gh run list --workflow=deploy.yml --limit 1 顯示 in_progress）
+# If this fails：檢查 gh run list --workflow=deploy.yml --limit 5 的錯誤，CI 未綠不得繼續。</code></pre>
+<p><strong>Step 2：監控 Pipeline（lint → test → SAST → build → deploy → k6）</strong></p>
+<pre><code class="language-bash">gh run watch --repo {{GH_OWNER}}/{{GH_REPO}}
+# Expected: 所有階段綠勾（涵蓋 ArchUnit/Modulith verify、coverage ≥80%、SAST 無 CRITICAL、k6 P99&lt;1000ms err&lt;0.1%）
+# If this fails：記下失敗階段，開啟 pipeline URL 讀 log；部署階段失敗見 §7.6。</code></pre>
+<p><strong>Step 3：驗證滾動更新進度（狀態變更後驗證）</strong></p>
+<pre><code class="language-bash">kubectl rollout status deployment/yocat-office-backend-api -n yocat-prod --timeout=300s
+# Expected: &quot;deployment \&quot;yocat-office-backend-api\&quot; successfully rolled out&quot;
+# If this fails：執行 kubectl describe deployment yocat-office-backend-api -n yocat-prod，查 Warning events（ImagePullBackOff / OOMKilled / readiness 失敗）；見 §7.6。必要時回滾（§9）。</code></pre>
+<p><strong>Step 4：驗證應用健康（部署後必驗）</strong></p>
+<pre><code class="language-bash">curl -sf https://api.yocat.sayyogames.com/health/ready | jq .
+# Expected: {&quot;status&quot;:&quot;ok&quot;,&quot;checks&quot;:{&quot;db&quot;:&quot;ok&quot;,&quot;redis&quot;:&quot;ok&quot;}}
+# If this fails：readiness 探針失敗，執行 kubectl logs &lt;pod&gt; -n yocat-prod --previous 讀崩潰 log；若使用者受影響且降級，立即回滾（§9）。
+
+kubectl get pods -n yocat-prod -l app=yocat-office-backend-api
+# Expected: 全部 pod STATUS=Running、READY=1/1，數量 ≥ 2
+# If this fails：見 §7.6 Pod CrashLoopBackOff。</code></pre>
+<p><strong>Step 5：Smoke test（關鍵路徑）</strong></p>
+<pre><code class="language-bash">./scripts/smoke-test.sh --env production
+# 涵蓋：register → login → topup → spend → buy → save → leaderboard（EDD §10.7 合成腳本路徑）
+# Expected: exit 0（全部斷言通過）
+# If this fails（exit 2 關鍵流程失敗）：立即回滾（§9）。exit 1（非關鍵）：開事故並持續觀察。</code></pre>
+<p><strong>Step 6：部署後確認與對帳快檢</strong></p>
+<pre><code class="language-bash">curl -sf https://api.yocat.sayyogames.com/health/live | jq &#x27;.version&#x27;   # Expected: &quot;{{NEXT_VERSION}}&quot;
+# 錢包對帳不一致必須恆為 0（部署不得引入半筆異動）
+kubectl exec -n yocat-prod deploy/yocat-office-backend-api -- \
+  curl -s localhost:8080/actuator/prometheus | grep &#x27;^wallet_ledger_mismatch_total&#x27;
+# Expected: wallet_ledger_mismatch_total 0.0
+# If this fails（&gt; 0）：立即宣告 P0，見 §7.8 錢包餘額異常對帳，並評估回滾（§9）。</code></pre>
+<p>公告：<code>[DEPLOY] yocat-office-backend v{{NEXT_VERSION}} — deployed and verified ✓</code>。</p>
+<h3 id="43-緊急-hotfix-部署">4.3 緊急 Hotfix 部署</h3>
+<p><strong>前置</strong>：P1 事故已開、Incident Commander 已授權、修復在 <code>hotfix/{{TICKET_ID}}-desc</code> 分支。</p>
+<pre><code class="language-bash">kubectl config current-context                 # Expected: prod-k8s（否則先切換）
+git checkout main &amp;&amp; git pull origin main
+git merge --no-ff hotfix/{{TICKET_ID}}-desc
+git tag v{{HOTFIX_VERSION}}                     # patch+1，如 v1.2.0 → v1.2.1
+git push origin main v{{HOTFIX_VERSION}}
+gh run watch --repo {{GH_OWNER}}/{{GH_REPO}}     # Expected: 全綠；If fails：讀失敗階段 log，CI 未綠不續
+kubectl rollout status deployment/yocat-office-backend-api -n yocat-prod --timeout=300s
+# Expected: &quot;successfully rolled out&quot;；If fails：kubectl describe ... 查 Warning，見 §7.6
+curl -sf https://api.yocat.sayyogames.com/health/ready | jq .   # Expected: {&quot;status&quot;:&quot;ok&quot;,...}；If fails：回滾 §9
+./scripts/smoke-test.sh --env production         # Expected: exit 0；exit 2：立即回滾 §9</code></pre>
+<h3 id="44-本機一鍵部署local-firstrancher-desktop">4.4 本機一鍵部署（Local-First，Rancher Desktop）</h3>
+<pre><code class="language-bash">kubectl config use-context rancher-desktop       # Expected: context 切至 rancher-desktop
+kubectl apply -k k8s/overlays/local/             # Expected: deployment/service/secret 均 created/configured
+kubectl rollout status deployment/yocat-office-backend-api -n yocat-office-backend-local --timeout=180s
+# Expected: &quot;successfully rolled out&quot;
+kubectl get pods -l app=yocat-office-backend-api -n yocat-office-backend-local | grep -c &quot;Running&quot;
+# Expected: ≥ 2（HA 下限，EDD §3.7.2）
+# If this fails：kubectl describe pod &lt;name&gt; -n yocat-office-backend-local 查事件；本機常見為映像未 build 或 secrets.env 缺漏。
+curl -sf http://localhost:8080/health/ready | jq .   # Expected: {&quot;status&quot;:&quot;ok&quot;,&quot;checks&quot;:{&quot;db&quot;:&quot;ok&quot;,&quot;redis&quot;:&quot;ok&quot;}}</code></pre>
+<hr>
+<h2 id="5-監控與告警-monitoring-and-alerting">5. 監控與告警 Monitoring and Alerting</h2>
+<h3 id="51-dashboards">5.1 Dashboards</h3>
+<table>
+<tr><th>Dashboard</th><th>URL</th><th>何時開啟</th></tr>
+<tr><td>Service Health Overview</td><td><code>https://grafana.{{COMPANY_DOMAIN}}/d/{{OVERVIEW_DASHBOARD_ID}}/overview</code></td><td>任何事故第一個開的畫面</td></tr>
+<tr><td>SLO / Error Budget</td><td><code>https://grafana.{{COMPANY_DOMAIN}}/d/{{SLO_DASHBOARD_ID}}/slo</code></td><td>檢查 error budget 燃燒率</td></tr>
+<tr><td>Latency / Throughput</td><td><code>https://grafana.{{COMPANY_DOMAIN}}/d/{{LATENCY_DASHBOARD_ID}}/latency</code></td><td>延遲/吞吐異常</td></tr>
+<tr><td>Database（HikariCP / 複製延遲）</td><td><code>https://grafana.{{COMPANY_DOMAIN}}/d/{{DB_DASHBOARD_ID}}/db</code></td><td>慢查詢、連線池耗盡、Patroni failover</td></tr>
+<tr><td>Wallet 對帳 / Outbox</td><td><code>https://grafana.{{COMPANY_DOMAIN}}/d/{{WALLET_DASHBOARD_ID}}/wallet</code></td><td>對帳不一致、Outbox 積壓</td></tr>
+<tr><td>Infrastructure</td><td><code>https://grafana.{{COMPANY_DOMAIN}}/d/{{INFRA_DASHBOARD_ID}}/infra</code></td><td>CPU/記憶體/磁碟/節點壓力</td></tr>
+</table>
+<h3 id="52-alert-reference告警對照表">5.2 Alert Reference（告警對照表）</h3>
+<table>
+<tr><th>Alert 名稱（完整）</th><th>嚴重度</th><th>白話意義</th><th>Triage Dashboard</th><th>首次處置</th><th>Runbook 章節</th></tr>
+<tr><td><code>yocat-office-backend_wallet_ledger_mismatch</code></td><td>P0</td><td><code>wallet_ledger_mismatch_total &gt; 0</code>，錢包餘額與帳本不一致</td><td>Wallet Dashboard</td><td>立即凍結該帳號寫入；啟動對帳稽核</td><td><a href="#78-錢包餘額異常對帳">§7.8</a></td></tr>
+<tr><td><code>yocat-office-backend_high_error_rate</code></td><td>P1</td><td>5xx &gt; 1% 持續 5 分鐘</td><td>Latency Dashboard</td><td>查 api-server log，辨識 5xx 類型</td><td><a href="#71-api-server-5xx-錯誤">§7.1</a></td></tr>
+<tr><td><code>yocat-office-backend_availability_breach</code></td><td>P1</td><td>Availability SLO 跌破</td><td>SLO Dashboard</td><td>確認範圍、查 pod 健康、呼叫 on-call lead</td><td><a href="#72-服務完全不可用">§7.2</a></td></tr>
+<tr><td><code>yocat-office-backend_p99_latency_high</code></td><td>P2</td><td>P99 &gt; 1000ms 持續 5 分鐘</td><td>Latency Dashboard</td><td>查 DB 慢查詢與 cache 命中率</td><td><a href="#73-high-latency-高延遲">§7.3</a></td></tr>
+<tr><td><code>yocat-office-backend_db_connection_pool_exhausted</code></td><td>P1</td><td>HikariCP 連線池 100% 持續 1 分鐘</td><td>Database Dashboard</td><td>查連線洩漏；滾動重啟 api-server</td><td><a href="#75-database-issues-資料庫問題">§7.5</a></td></tr>
+<tr><td><code>yocat-office-backend_db_failover</code></td><td>P1</td><td>Patroni Primary failover 觸發</td><td>Database Dashboard</td><td>確認 Standby 已提升、應用重連</td><td><a href="#75-database-issues-資料庫問題">§7.5</a></td></tr>
+<tr><td><code>yocat-office-backend_redis_sentinel_failover</code></td><td>P2</td><td>Redis Sentinel 選新 Master</td><td>Infra Dashboard</td><td>確認選主完成、cache miss 降級正常</td><td><a href="#77-redis-sentinel-故障切換">§7.7</a></td></tr>
+<tr><td><code>yocat-office-backend_pod_crashloopbackoff</code></td><td>P1</td><td>一個以上 pod CrashLoopBackOff</td><td>Infra Dashboard</td><td>讀崩潰 log，辨識 OOM/設定/啟動失敗</td><td><a href="#76-pod-crashloopbackoff">§7.6</a></td></tr>
+<tr><td><code>yocat-office-backend_oom_killed</code></td><td>P2</td><td>容器 OOMKilled（<code>kube_pod_container_status_last_terminated_reason{reason=&quot;OOMKilled&quot;} &gt; 0</code>）</td><td>Infra Dashboard</td><td>暫調高記憶體 limit；查記憶體洩漏</td><td><a href="#76-pod-crashloopbackoff">§7.6</a></td></tr>
+<tr><td><code>yocat-office-backend_outbox_backlog</code></td><td>P2</td><td>Outbox pending &gt; 100 持續 5 分鐘</td><td>Wallet Dashboard</td><td>查 Outbox worker 投遞與消費端錯誤</td><td><a href="#74-outbox-事件積壓">§7.4</a></td></tr>
+<tr><td><code>yocat-office-backend_disk_pressure</code></td><td>P2</td><td>節點磁碟使用 &gt; 85%</td><td>Infra Dashboard</td><td>辨識最大消耗者；清理或擴容</td><td><a href="#79-disk-pressure-磁碟壓力">§7.9</a></td></tr>
+<tr><td><code>yocat-office-backend_backup_not_completed</code></td><td>P2</td><td>排程備份未於窗口內完成</td><td>Infra Dashboard</td><td>查備份 job log；手動重跑</td><td><a href="#710-備份batch-失敗">§7.10</a></td></tr>
+<tr><td><code>yocat-office-backend_slo_burn_rate_critical</code></td><td>P1</td><td>Error budget 以 &gt; 14.4× 燃燒</td><td>SLO Dashboard</td><td>視為可用性事故；評估變更凍結</td><td><a href="#32-service-level-objectivesslo">§3.2</a></td></tr>
+<tr><td><code>yocat-office-backend_slo_burn_rate_warning</code></td><td>P2</td><td>Error budget 以 &gt; 6× 燃燒</td><td>SLO Dashboard</td><td>檢視近期變更與錯誤趨勢</td><td><a href="#32-service-level-objectivesslo">§3.2</a></td></tr>
+</table>
+<h3 id="53-log-存取">5.3 Log 存取</h3>
+<pre><code class="language-bash"># 串流所有 api-server pod log（最後 100 行後追蹤）
+kubectl logs -n yocat-prod -l app=yocat-office-backend-api --tail=100 -f
+# 查結構化 JSON log（Loki）：{service=&quot;yocat-office-backend&quot;, level=&quot;error&quot;} | json
+#   Dashboard: https://logs.{{COMPANY_DOMAIN}}
+# 指定 pod、指定時間起點
+kubectl logs &lt;pod-name&gt; -n yocat-prod --since-time=&quot;2026-10-30T03:00:00Z&quot;
+# Expected: 回傳結構化 JSON（含 trace_id/span_id）；PII（email）已遮罩，無 password/token。
+# If this fails（No resources）：確認 pod 名稱 kubectl get pods -n yocat-prod；pod 已重建則用 --previous 讀前一次。</code></pre>
+<hr>
+<h2 id="6-事故處理-incident-response">6. 事故處理 Incident Response</h2>
+<h3 id="61-事故生命週期">6.1 事故生命週期</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+    Alert[&quot;告警觸發 (PagerDuty / Grafana)&quot;]
+    Detect[&quot;偵測：on-call 於 ACK SLA 內確認&quot;]
+    Triage[&quot;分級：評估範圍與嚴重度&quot;]
+    P0{{&quot;P0 錢包/資料不一致?&quot;}}
+    P1{{&quot;P1 服務中斷?&quot;}}
+    Escalate[&quot;升級：呼叫 Incident Commander + 通知 stakeholders&quot;]
+    Mitigate[&quot;止血：凍結寫入 / 回滾 / 流量切換 / 降級&quot;]
+    MitigateP2[&quot;處置 P2/P3：排程修復、開 ticket&quot;]
+    Resolve[&quot;解決：root cause 修復，觀察 30 分鐘&quot;]
+    Postmortem[&quot;Post-Mortem：blameless RCA（P0/P1 必做）&quot;]
+    Close[&quot;關閉：更新狀態頁、發送 all-clear&quot;]
+
+    Alert --&gt; Detect --&gt; Triage --&gt; P0
+    P0 --&gt;|Yes| Escalate
+    P0 --&gt;|No| P1
+    P1 --&gt;|Yes| Escalate
+    P1 --&gt;|No| MitigateP2
+    Escalate --&gt; Mitigate --&gt; Resolve --&gt; Close --&gt; Postmortem
+    MitigateP2 --&gt; Resolve</pre></div>
+<h3 id="62-嚴重度分級severity-classification">6.2 嚴重度分級（Severity Classification）</h3>
+<table>
+<tr><th>嚴重度</th><th>判準</th><th>回應目標（來源 EDD §13.7 / PRD §9.2）</th><th>範例</th></tr>
+<tr><td><strong>P0 — 最高</strong></td><td>錢包對帳不一致、資料遺失/毀損、資安外洩</td><td>首次回應 ≤ 15 分鐘；15 分鐘未解 → 通知 Engineering Manager</td><td><code>wallet_ledger_mismatch_total &gt; 0</code>、DB 毀損</td></tr>
+<tr><td><strong>P1 — 嚴重</strong></td><td>使用者面服務完全不可用</td><td>首次回應 ≤ 30 分鐘</td><td>總中斷、5xx &gt; 1%、Pod 全滅</td></tr>
+<tr><td><strong>P2 — 高</strong></td><td>降級（延遲/錯誤升高）影響 &gt; 10% 用戶</td><td>首次回應 ≤ 2 小時</td><td>P99 &gt; 2×SLO、Outbox 積壓、Redis failover</td></tr>
+<tr><td><strong>P3 — 中</strong></td><td>次要降級，無使用者可見影響</td><td>次一工作日</td><td>磁碟告警、憑證到期預警</td></tr>
+</table>
+<h3 id="63-phase-1偵測detection">6.3 Phase 1：偵測（Detection）</h3>
+<p>on-call 於首 5 分鐘：</p>
+<pre><code class="language-bash">kubectl get pods -n yocat-prod                                   # pod 是否 Running？
+kubectl rollout history deployment/yocat-office-backend-api -n yocat-prod   # 近期是否有部署？
+# Expected: 掌握 pod 狀態與最近變更；若剛部署，優先懷疑新版本 → 回滾（§9）。</code></pre>
+<p>於 <code>#incidents-yocat-office-backend</code> 發初始訊息：</p>
+<pre><code class="">[INCIDENT DETECTED] yocat-office-backend — &lt;症狀簡述&gt;
+Severity: P? (assessing)
+Impact: &lt;受影響用戶數或 &quot;unknown — investigating&quot;&gt;
+On-call: @&lt;your-name&gt;
+Dashboard: https://grafana.{{COMPANY_DOMAIN}}/d/{{OVERVIEW_DASHBOARD_ID}}/overview</code></pre>
+<h3 id="64-phase-2分級triage">6.4 Phase 2：分級（Triage）</h3>
+<p>依 §6.2 判定嚴重度；確認範圍（全部用戶 / 單一 BC / 單一帳號）。錢包相關一律先懷疑 P0 並查 <code>wallet_ledger_mismatch_total</code>（§7.8）。</p>
+<h3 id="65-phase-3升級escalation">6.5 Phase 3：升級（Escalation）</h3>
+<p>P0/P1 呼叫 Incident Commander（見 §12）；15 分鐘未解通知 Engineering Manager（EDD §13.7）。開 war room、指定獨立 IC（與技術 lead 分離）。</p>
+<h3 id="66-phase-4止血與解決mitigation--resolution">6.6 Phase 4：止血與解決（Mitigation &amp; Resolution）</h3>
+<p>止血 ≠ 解決：止血先停止使用者影響（回滾 §9 / 流量切換 / 降級 / 凍結寫入）；解決為修復 root cause。止血後觀察 30 分鐘確認穩定再降級事故等級。</p>
+<h3 id="67-客戶溝通">6.7 客戶溝通</h3>
+<p>使用者面事故（P0/P1）更新狀態頁 <code>{{STATUS_PAGE_URL}}</code>；每 30 分鐘或狀態變更時更新一次，直到 all-clear。</p>
+<h3 id="68-post-mortemp0p1-必做blameless">6.8 Post-Mortem（P0/P1 必做，blameless）</h3>
+<ul><li><strong>草稿截止</strong>：事故關閉後 <strong>2 個工作日</strong>內完成 RCA 草稿。</li><li><strong>分發對象</strong>：分發給所有事故參與者、Engineering Manager 與相關 BC owner。</li><li><strong>30 天 check-in</strong>：於 incident date + 30 天排程追蹤 action items 完成度。</li></ul>
+<hr>
+<h2 id="7-故障排除-troubleshooting">7. 故障排除 Troubleshooting</h2>
+<blockquote><p>每個情境附決策樹；每個診斷命令均有 <code># Expected:</code> 與 <code># If this fails:</code>。所有命令以真實 namespace <code>yocat-prod</code>、deployment <code>yocat-office-backend-api</code> 示範（本機替換為 <code>yocat-office-backend-local</code>）。</p></blockquote>
+<h3 id="71-api-server-5xx-錯誤">7.1 API Server 5xx 錯誤</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  A[&quot;5xx &gt; 1% 告警&quot;] --&gt; B{&quot;近 15 分鐘有部署?&quot;}
+  B --&gt;|Yes| C[&quot;回滾至前一 revision（§9.1）&quot;]
+  B --&gt;|No| D{&quot;health/ready 回 200?&quot;}
+  D --&gt;|No| E{&quot;checks.db 或 checks.redis fail?&quot;}
+  E --&gt;|db fail| F[&quot;見 §7.5 DB 問題&quot;]
+  E --&gt;|redis fail| G[&quot;見 §7.7 Redis Sentinel&quot;]
+  D --&gt;|Yes| H{&quot;log 出現 HikariCP timeout?&quot;}
+  H --&gt;|Yes| I[&quot;連線池耗盡 → §7.5.1&quot;]
+  H --&gt;|No| J[&quot;讀 log 找 stack trace，辨識例外來源 BC&quot;]</pre></div>
+<pre><code class="language-bash">kubectl get pods -n yocat-prod -l app=yocat-office-backend-api
+# Expected: 全部 Running、READY=1/1；If this fails：見 §7.6。
+kubectl logs -n yocat-prod -l app=yocat-office-backend-api --tail=200 | grep -E &#x27;ERROR|Exception&#x27;
+# Expected: 可見具體例外與 trace_id；If this fails（無 ERROR 卻仍 5xx）：查 Ingress/Traefik log 與 LB 5xx（kubectl logs -n yocat-prod -l app=traefik）。
+kubectl rollout history deployment/yocat-office-backend-api -n yocat-prod
+# Expected: 列出 revision；若最新 revision 時間與事故起點吻合 → 回滾（§9.1）。If this fails：確認 deployment 名稱無誤。</code></pre>
+<h3 id="72-服務完全不可用">7.2 服務完全不可用</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  A[&quot;availability_breach / 全面 5xx&quot;] --&gt; B{&quot;pod READY ≥ 2?&quot;}
+  B --&gt;|No, 0 Running| C[&quot;§7.6 CrashLoopBackOff / 查節點&quot;]
+  B --&gt;|Yes| D{&quot;health/ready checks.db=ok?&quot;}
+  D --&gt;|No| E[&quot;§7.5 DB；確認 Patroni Primary&quot;]
+  D --&gt;|Yes| F{&quot;Ingress/Traefik 健康?&quot;}
+  F --&gt;|No| G[&quot;重啟 Ingress，查 LB target&quot;]
+  F --&gt;|Yes| H[&quot;查上游 DNS / 憑證到期（§11.2）&quot;]</pre></div>
+<pre><code class="language-bash">kubectl get pods -n yocat-prod -o wide
+# Expected: api pod ≥2 Running 分佈於 ≥2 節點；If this fails（0 Running）：kubectl get nodes 查節點 NotReady，見 §7.6。
+curl -sf https://api.yocat.sayyogames.com/health/ready | jq .
+# Expected: {&quot;status&quot;:&quot;ok&quot;,&quot;checks&quot;:{&quot;db&quot;:&quot;ok&quot;,&quot;redis&quot;:&quot;ok&quot;}}；If this fails：依 checks 中 fail 項分流至 §7.5（db）或 §7.7（redis）。
+kubectl get endpoints yocat-office-backend-api -n yocat-prod
+# Expected: 列出 ≥2 個 Pod IP:8080；If this fails（&lt;none&gt;）：Service selector 與 Pod label 不符或全部 NotReady。</code></pre>
+<h3 id="73-high-latency-高延遲">7.3 High Latency 高延遲</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  A[&quot;P99 &gt; 1000ms&quot;] --&gt; B{&quot;QPS 暴增?&quot;}
+  B --&gt;|Yes| C[&quot;HPA 是否擴容? 否則手動 scale（§8.4，下限 2）&quot;]
+  B --&gt;|No| D{&quot;DB 慢查詢?&quot;}
+  D --&gt;|Yes| E[&quot;pg_stat_activity 查長交易 / 鎖等待 → §7.5&quot;]
+  D --&gt;|No| F{&quot;Redis cache 命中率低?&quot;}
+  F --&gt;|Yes| G[&quot;查 Redis Sentinel 切換後回源 DB（§7.7）&quot;]
+  F --&gt;|No| H{&quot;Outbox 積壓拖慢交易?&quot;}
+  H --&gt;|Yes| I[&quot;§7.4 Outbox 積壓&quot;]
+  H --&gt;|No| J[&quot;查 GC pause / CPU throttle（Infra Dashboard）&quot;]</pre></div>
+<pre><code class="language-bash">kubectl top pods -n yocat-prod -l app=yocat-office-backend-api
+# Expected: CPU &lt; 70%、記憶體 &lt; 75%；If this fails（CPU 高）：確認 HPA kubectl get hpa -n yocat-prod 是否擴容，否則手動 scale（§8.4）。
+kubectl exec -n yocat-prod deploy/yocat-office-backend-api -- \
+  curl -s localhost:8080/actuator/prometheus | grep -E &#x27;hikaricp_connections_active|http_server_requests_seconds&#x27;
+# Expected: hikaricp_connections_active 遠低於 pool max(10/pod)；If this fails（逼近 max）：連線池耗盡，見 §7.5.1。</code></pre>
+<h3 id="74-outbox-事件積壓">7.4 Outbox 事件積壓</h3>
+<blockquote><p>Spring Modulith Event Publication Registry（<code>event_publication</code> 表）= Transactional Outbox。積壓代表事件寫入成功但未投遞/消費。</p></blockquote>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  A[&quot;outbox_backlog: pending &gt; 100&quot;] --&gt; B{&quot;api pod ≥2 Running?&quot;}
+  B --&gt;|No| C[&quot;§7.6 恢復 Pod（Outbox worker 內嵌 API pod）&quot;]
+  B --&gt;|Yes| D{&quot;消費端持續拋例外?&quot;}
+  D --&gt;|Yes| E[&quot;修復消費端 bug；冪等重投（event_id 去重）&quot;]
+  D --&gt;|No| F{&quot;DB 可寫?&quot;}
+  F --&gt;|No| G[&quot;§7.5 DB；Outbox 投遞需寫 completion&quot;]
+  F --&gt;|Yes| H[&quot;查 SKIP LOCKED 是否被長交易卡住 → pg_stat_activity&quot;]</pre></div>
+<pre><code class="language-bash">kubectl exec -n yocat-prod deploy/yocat-office-backend-api -- \
+  curl -s localhost:8080/actuator/prometheus | grep &#x27;^outbox_pending_count&#x27;
+# Expected: outbox_pending_count &lt; 100；If this fails（持續上升）：進入下一步查未完成事件。
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT completion_date IS NULL AS pending, count(*) FROM event_publication GROUP BY 1;&quot;
+# Expected: pending=true 的筆數穩定下降；If this fails（持續累積）：查消費端 log 的 Exception（§7.1），修復後 Outbox 以 event_id 冪等自動重投，不得手動刪 event_publication。</code></pre>
+<h3 id="75-database-issues-資料庫問題">7.5 Database Issues 資料庫問題</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  A[&quot;DB 相關告警&quot;] --&gt; B{&quot;Primary 可連線?&quot;}
+  B --&gt;|No| C[&quot;確認 Patroni failover：patronictl list；Standby 應已提升&quot;]
+  B --&gt;|Yes| D{&quot;連線池耗盡?&quot;}
+  D --&gt;|Yes| E[&quot;§7.5.1 連線池耗盡&quot;]
+  D --&gt;|No| F{&quot;複製延遲過大?&quot;}
+  F --&gt;|Yes| G[&quot;§7.5.2 複製延遲&quot;]
+  F --&gt;|No| H[&quot;查慢查詢 pg_stat_statements / 鎖等待&quot;]</pre></div>
+<p><strong>§7.5.1 連線池耗盡（HikariCP / PostgreSQL）</strong></p>
+<pre><code class="language-bash">kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT count(*), state FROM pg_stat_activity GROUP BY state;&quot;
+# Expected: active + idle 總數遠低於 max_connections(200)；If this fails（逼近 200）：查 idle in transaction 長交易。
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT pid, now()-xact_start AS dur, query FROM pg_stat_activity WHERE state=&#x27;idle in transaction&#x27; ORDER BY dur DESC LIMIT 10;&quot;
+# Expected: 無超過數分鐘的 idle in transaction；If this fails：記下 pid，必要時 SELECT pg_terminate_backend(&lt;pid&gt;)；接著滾動重啟 api-server 釋放連線洩漏。
+kubectl rollout restart deployment/yocat-office-backend-api -n yocat-prod
+kubectl rollout status deployment/yocat-office-backend-api -n yocat-prod --timeout=300s
+# Expected: &quot;successfully rolled out&quot;；If this fails：見 §7.6。</code></pre>
+<p><strong>§7.5.2 Patroni Failover 與複製延遲</strong></p>
+<pre><code class="language-bash">kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- patronictl list
+# Expected: 一個 Leader(running) + 至少一個 Replica(running)，Lag in MB 接近 0；If this fails（無 Leader）：Patroni 正在選主，等待 ≤30s（RTO）；逾時執行 patronictl failover 手動切換。
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT client_addr, state, replay_lag FROM pg_stat_replication;&quot;
+# Expected: state=streaming、replay_lag &lt; 1s（同步複本 RPO=0）；If this fails（replay_lag 大）：暫停對 Standby 的手動提升，先讓其追上，避免資料遺失。</code></pre>
+<h3 id="76-pod-crashloopbackoff">7.6 Pod CrashLoopBackOff</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  A[&quot;pod_crashloopbackoff / oom_killed&quot;] --&gt; B{&quot;last state = OOMKilled?&quot;}
+  B --&gt;|Yes| C[&quot;暫調高 memory limit（≥2 副本不變），查記憶體洩漏&quot;]
+  B --&gt;|No| D{&quot;readiness 失敗?&quot;}
+  D --&gt;|Yes| E[&quot;health/ready checks 指出 db/redis → §7.5 / §7.7&quot;]
+  D --&gt;|No| F{&quot;啟動即崩?&quot;}
+  F --&gt;|Yes| G[&quot;讀 --previous log：設定錯誤 / Flyway migration 失敗 / secret 缺漏&quot;]</pre></div>
+<pre><code class="language-bash">kubectl get pods -n yocat-prod -l app=yocat-office-backend-api
+# Expected: READY=1/1；If this fails（CrashLoopBackOff）：進入下一步。
+kubectl describe pod &lt;pod-name&gt; -n yocat-prod | grep -A5 &#x27;Last State&#x27;
+# Expected: 若 Reason=OOMKilled → 暫時調高 limit：kubectl set resources deploy/yocat-office-backend-api -n yocat-prod --limits=memory=1Gi，並查記憶體洩漏。
+# If this fails（非 OOM）：讀崩潰 log。
+kubectl logs &lt;pod-name&gt; -n yocat-prod --previous --tail=100
+# Expected: 可見啟動失敗根因（Flyway migration / 缺 secret / DB 連線）；If this fails：secret 缺漏見 §11.3；Flyway 失敗見 §7.10。</code></pre>
+<h3 id="77-redis-sentinel-故障切換">7.7 Redis Sentinel 故障切換</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  A[&quot;redis_sentinel_failover&quot;] --&gt; B{&quot;Sentinel quorum ≥2 存活?&quot;}
+  B --&gt;|No| C[&quot;恢復 Sentinel pod（§7.6）；quorum&lt;2 無法選主&quot;]
+  B --&gt;|Yes| D{&quot;新 Master 已選出?&quot;}
+  D --&gt;|Yes| E[&quot;確認應用在 500ms timeout 內重連；session cache miss 回源 DB（降級非 500）&quot;]
+  D --&gt;|No| F[&quot;sentinel failover &lt;master-name&gt; 手動觸發&quot;]</pre></div>
+<pre><code class="language-bash">kubectl get pods -n yocat-prod -l app=redis-sentinel
+# Expected: 3 個 Sentinel pod Running（quorum ≥ 2）；If this fails（&lt;2）：先恢復 Sentinel pod（§7.6）。
+kubectl exec -n yocat-prod -it &lt;sentinel-pod&gt; -- redis-cli -p 26379 sentinel masters
+# Expected: 回傳目前 master 的 ip/port（已選新主）；If this fails（no master）：redis-cli -p 26379 sentinel failover &lt;master-name&gt; 手動切換。
+curl -sf https://api.yocat.sayyogames.com/health/ready | jq &#x27;.checks.redis&#x27;
+# Expected: &quot;ok&quot;；If this fails：cache miss 期間 session 應回源 DB 而非 500，若出現 500 則查應用 Redis timeout 設定（500ms）。</code></pre>
+<h3 id="78-錢包餘額異常對帳">7.8 錢包餘額異常對帳</h3>
+<blockquote><p><strong>零容忍 P0</strong>：<code>wallet_ledger_mismatch_total &gt; 0</code> 代表 <code>wallets</code> 餘額與 <code>wallet_ledger</code> append-only 累計不符。</p></blockquote>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  A[&quot;wallet_ledger_mismatch P0&quot;] --&gt; B[&quot;立即以 ops flag 凍結該帳號寫入（ops.wallet.disable_topup 或鎖定帳號）&quot;]
+  B --&gt; C[&quot;對帳稽核：比對 wallets vs SUM(ledger delta)&quot;]
+  C --&gt; D{&quot;差異帳號可定位?&quot;}
+  D --&gt;|Yes| E[&quot;保留證據：匯出該帳號 ledger；人工裁定以 ledger 為權威修正 wallet&quot;]
+  D --&gt;|No| F[&quot;擴大稽核全表；凍結全域儲值（ops flag）直至定位&quot;]
+  E --&gt; G[&quot;RCA：查併發 spend 行鎖 / Outbox 重複消費 / 半筆交易&quot;]</pre></div>
+<pre><code class="language-bash">kubectl exec -n yocat-prod deploy/yocat-office-backend-api -- \
+  curl -s localhost:8080/actuator/prometheus | grep &#x27;^wallet_ledger_mismatch_total&#x27;
+# Expected: wallet_ledger_mismatch_total 0.0；If this fails（&gt; 0）：立即宣告 P0，執行下一步對帳。
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT w.account_id, w.cash, w.gems, l.cash_sum, l.gems_sum
+   FROM wallet.wallets w JOIN (
+     SELECT account_id,
+            SUM(CASE WHEN currency=&#x27;cash&#x27; THEN delta ELSE 0 END) cash_sum,
+            SUM(CASE WHEN currency=&#x27;gems&#x27; THEN delta ELSE 0 END) gems_sum
+     FROM wallet.wallet_ledger GROUP BY account_id) l ON l.account_id=w.account_id
+   WHERE w.cash &lt;&gt; l.cash_sum OR w.gems &lt;&gt; l.gems_sum;&quot;
+# Expected: 0 rows（完全相符）；If this fails（有 row）：記下 account_id，ledger 為權威真相來源，人工裁定修正 wallet 餘額；RCA 查併發 spend（行鎖）、Outbox 重複消費（event_id 冪等）、或 500 半筆交易（應已回滾）。絕不自動覆寫 ledger。</code></pre>
+<h3 id="79-disk-pressure-磁碟壓力">7.9 Disk Pressure 磁碟壓力</h3>
+<pre><code class="language-bash">kubectl get nodes -o custom-columns=&#x27;NODE:.metadata.name,DISK:.status.conditions[?(@.type==&quot;DiskPressure&quot;)].status&#x27;
+# Expected: 全部 False；If this fails（True）：下一步定位消耗者。
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- df -h /var/lib/postgresql/data
+# Expected: 使用率 &lt; 85%；If this fails：檢查 WAL 堆積（複製延遲導致 WAL 無法回收 → §7.5.2）、擴容 PVC，或清理舊備份。log 輸出至 stdout 由 containerd 管理，無需手動輪換（見 §8.3）。</code></pre>
+<h3 id="710-備份batch-失敗">7.10 備份/Batch 失敗</h3>
+<blockquote><p>本系統無應用層 CronJob；排程任務為 PostgreSQL 備份（每日全量 + 每小時 WAL）與 Flyway migration Job（部署期）。</p></blockquote>
+<pre><code class="language-bash">kubectl get jobs -n yocat-prod -l app=pg-backup --sort-by=.status.startTime | tail -5
+# Expected: 最新 job COMPLETIONS=1/1；If this fails（Failed）：kubectl logs job/&lt;name&gt; -n yocat-prod 讀錯誤。
+kubectl logs -n yocat-prod -l app=pg-backup --tail=50
+# Expected: 可見 &quot;backup completed&quot; 與上傳異地物件儲存成功；If this fails：確認物件儲存憑證/容量，手動重跑 kubectl create job --from=cronjob/pg-backup pg-backup-manual -n yocat-prod。
+# Flyway migration 失敗（部署期 initContainer/Job）：
+kubectl logs -n yocat-prod -l job-name=flyway-migrate --tail=50
+# Expected: &quot;Successfully applied N migrations&quot;；If this fails：migration 採 expand-contract 向後相容，回滾 code 版本（§9）但保留已套用 schema；禁止 drop 欄位。</code></pre>
+<hr>
+<h2 id="8-例行維護-routine-maintenance">8. 例行維護 Routine Maintenance</h2>
+<h3 id="81-維護排程maintenance-schedule">8.1 維護排程（Maintenance Schedule）</h3>
+<table>
+<tr><th>任務</th><th>頻率</th><th>需停機</th><th>負責</th></tr>
+<tr><td>DB VACUUM / ANALYZE</td><td>每週（autovacuum 常駐，手動補 <code>VACUUM ANALYZE</code>）</td><td>否</td><td>Platform</td></tr>
+<tr><td>Secret 輪換（DB/Redis 密碼）</td><td>每 90 天（自動，無停機）</td><td>否</td><td>Security team — 見 §11.1</td></tr>
+<tr><td>備份還原演練</td><td>每季（Staging）</td><td>否</td><td>SRE</td></tr>
+<tr><td>容量審查（Capacity Review）</td><td>每月</td><td>否</td><td>SRE — 見 §8.4</td></tr>
+<tr><td>依賴更新 / SAST</td><td>每次 PR（CI OWASP Dependency-Check）</td><td>否</td><td>Backend</td></tr>
+</table>
+<blockquote><p>所有維護任務皆有不停機替代方案（滾動更新、Patroni failover、Sentinel 切換）；無 &quot;Requires Downtime: Yes&quot; 任務。</p></blockquote>
+<h3 id="82-資料庫維護database-maintenance">8.2 資料庫維護（Database Maintenance）</h3>
+<pre><code class="language-bash">kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c &quot;VACUUM ANALYZE;&quot;
+# Expected: VACUUM；If this fails：查磁碟空間（§7.9）與長交易（§7.5.1）。
+# 確認關鍵索引健康（SCHEMA 複合索引，如排行榜 idx_lb_mode_score）
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT indexrelname, idx_scan FROM pg_stat_user_indexes WHERE schemaname=&#x27;leaderboard&#x27;;&quot;
+# Expected: idx_lb_mode_score idx_scan 持續增長（被使用中）；If this fails（idx_scan=0）：查詢未命中索引，檢視查詢計畫 EXPLAIN。</code></pre>
+<h3 id="83-log-輪換與清理">8.3 Log 輪換與清理</h3>
+<p>所有 pod log 輸出至 <strong>stdout</strong>（K8s 標準），由 containerd log driver 管理，<strong>無需手動輪換</strong>。集中式查詢於 Loki（<code>https://logs.{{COMPANY_DOMAIN}}</code>），保留：熱 90 天 / 冷 365 天（Prod）、Staging 14 天（CONSTANTS §8）。Audit Log 另串流 WORM 保留 7 年。</p>
+<pre><code class="language-bash">kubectl logs -n yocat-prod -l app=yocat-office-backend-api --tail=10
+# Expected: 結構化 JSON log 正常輸出；If this fails（無輸出）：查 pod 是否 Running（§7.6）。</code></pre>
+<h3 id="84-容量審查capacity-reviewiron-constraint--replicas--2">8.4 容量審查（Capacity Review，Iron Constraint — Replicas ≥ 2）</h3>
+<p>每月執行並留存紀錄於 <code>{{ISSUE_TRACKER}}/capacity-review</code>。</p>
+<pre><code class="language-bash">kubectl get hpa yocat-office-backend-api -n yocat-prod
+# Expected: MINPODS=2 MAXPODS=8，當前 REPLICAS ≥ 2；If this fails（MINPODS&lt;2）：立即修正 kubectl patch hpa yocat-office-backend-api -n yocat-prod -p &#x27;{&quot;spec&quot;:{&quot;minReplicas&quot;:2}}&#x27;。
+kubectl top pods -n yocat-prod -l app=yocat-office-backend-api
+# Expected: 平均 CPU &lt; 70%、記憶體 &lt; 75%；If this fails：評估調高 HPA maxReplicas 或 DB 讀寫分離（EDD §10.2）。
+# 手動擴容（流量成長時；下限恆為 2，禁止縮到 1）
+kubectl scale deployment/yocat-office-backend-api -n yocat-prod --replicas=4
+# Expected: deployment scaled；故障演練後縮容目標下限亦為 2：--replicas=2。</code></pre>
+<table>
+<tr><th>元件</th><th>當前副本</th><th>建議</th><th>依據</th></tr>
+<tr><td>yocat-office-backend-api</td><td>2–8（HPA）</td><td>維持（峰值 QPS ~35，單 pod 50 req/s）</td><td>EDD §11.2</td></tr>
+<tr><td>PostgreSQL</td><td>Primary + 1 Standby</td><td>成長期加 Read Replica</td><td>EDD §10.2</td></tr>
+<tr><td>Redis Sentinel</td><td>3 nodes</td><td>成長期轉 Cluster</td><td>EDD §10.2</td></tr>
+</table>
+<hr>
+<h2 id="9-回滾程序-rollback-procedures">9. 回滾程序 Rollback Procedures</h2>
+<blockquote><p><strong>各子章節完整自包含</strong>，不引用「見上方」。每個狀態變更步驟後均有驗證。</p></blockquote>
+<h3 id="91-應用版本回滾deployment-rollback">9.1 應用版本回滾（Deployment Rollback）</h3>
+<pre><code class="language-bash">kubectl config current-context
+# Expected: prod-k8s；If this fails：kubectl config use-context prod-k8s。
+kubectl rollout history deployment/yocat-office-backend-api -n yocat-prod
+# Expected: 列出 revisions；記下前一個 healthy revision 號碼。If this fails：確認 deployment 名稱。
+kubectl rollout undo deployment/yocat-office-backend-api -n yocat-prod
+# （或指定 revision：kubectl rollout undo deployment/yocat-office-backend-api -n yocat-prod --to-revision=&lt;N&gt;）
+# Expected: &quot;deployment.apps/yocat-office-backend-api rolled back&quot;
+kubectl rollout status deployment/yocat-office-backend-api -n yocat-prod --timeout=300s
+# Expected: &quot;successfully rolled out&quot;；If this fails：kubectl describe 查 Warning（§7.6）。
+kubectl get pods -n yocat-prod -l app=yocat-office-backend-api
+# Expected: 全部 Running、READY=1/1、數量 ≥ 2；If this fails：見 §7.6。
+curl -sf https://api.yocat.sayyogames.com/health/ready | jq .
+# Expected: {&quot;status&quot;:&quot;ok&quot;,&quot;checks&quot;:{&quot;db&quot;:&quot;ok&quot;,&quot;redis&quot;:&quot;ok&quot;}}；If this fails：依 checks fail 項分流 §7.5 / §7.7。</code></pre>
+<h3 id="92-db-migration-回滾expand-contract">9.2 DB Migration 回滾（expand-contract）</h3>
+<p>Flyway migration 採 expand-contract，<strong>不做破壞性 drop</strong>，故 code 回滾時 schema 向後相容，無需 schema 回滾。</p>
+<pre><code class="language-bash">kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 5;&quot;
+# Expected: 最新 migration success=t 且與回滾後 code 相容（additive）；If this fails（有 success=f）：該 migration 未完成，依 §7.10 處理；禁止手動 drop 欄位。</code></pre>
+<h3 id="93-regional-failover跨-region-回滾--dr-切換">9.3 Regional Failover（跨 Region 回滾 / DR 切換）</h3>
+<blockquote><p><strong>Replication Lag 量化警告</strong>：跨 Region 為非同步複本（RPO ≤ 5 分鐘）。lag 過大時切換會遺失資料，切換前<strong>必須</strong>檢查 lag。</p></blockquote>
+<pre><code class="language-bash"># 切換前檢查 DR Region 複製延遲（必做）
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT client_addr, state, write_lag, flush_lag, replay_lag FROM pg_stat_replication;&quot;
+# Expected: DR replica state=streaming、replay_lag ≤ 5 分鐘（RPO 上限）；
+# If this fails（replay_lag &gt; 5 分鐘）：切換將遺失 &gt; RPO 的資料，暫停自動 failover，先讓 DR 追上或接受並記錄資料遺失範圍後由 IC 裁定。
+# 確認後手動觸發 DR（Region 級 RTO ≤ 30 分鐘）
+kubectl config use-context dr-k8s
+# Expected: context 切至 DR region；提升 DR DB 為 Primary、切換 GeoDNS。
+kubectl get pods -n yocat-prod -l app=yocat-office-backend-api
+# Expected: DR region pod ≥2 Running；If this fails：於 DR 執行 §4.2 標準部署。</code></pre>
+<h3 id="94-回滾後全套驗證rollback-完成標準">9.4 回滾後全套驗證（Rollback 完成標準）</h3>
+<p>Pod Running 不等於功能正常。回滾後必須執行全套測試閉環，全部通過才視為完成並觸發 On-Call Handoff（§14）：</p>
+<pre><code class="language-bash"># Unit test
+./mvnw -q test
+# Expected: BUILD SUCCESS，0 failures；If this fails：回滾版本本身有問題，升級處置。
+# Integration test（Testcontainers：真實 PostgreSQL + Redis）
+./mvnw -q verify -Pintegration
+# Expected: BUILD SUCCESS（含 @ApplicationModuleTest 模組邊界驗證）；If this fails：查 DB schema 與回滾 code 相容性（§9.2）。
+# E2E smoke test（關鍵路徑）
+./scripts/smoke-test.sh --env production
+# Expected: exit 0（register→login→topup→spend→buy→save→leaderboard 全通過）；If this fails（exit 2）：關鍵流程仍故障，重新評估事故處置。
+# 錢包對帳確認
+kubectl exec -n yocat-prod deploy/yocat-office-backend-api -- \
+  curl -s localhost:8080/actuator/prometheus | grep &#x27;^wallet_ledger_mismatch_total&#x27;
+# Expected: 0.0；If this fails：見 §7.8。</code></pre>
+<hr>
+<h2 id="10-備份與還原-backup-and-restore">10. 備份與還原 Backup and Restore</h2>
+<h3 id="101-rto--rpo-目標來源-edd-135--arch-8">10.1 RTO / RPO 目標（來源 EDD §13.5 / ARCH §8）</h3>
+<table>
+<tr><th>指標</th><th>目標值</th><th>說明</th></tr>
+<tr><td>RTO（API Pod）</td><td>≤ 30s</td><td>Pod 重啟到接流量</td></tr>
+<tr><td>RTO（DB Failover，Patroni）</td><td>≤ 30s</td><td>Standby 提升</td></tr>
+<tr><td>RTO（Region 級 DR）</td><td>≤ 30 分鐘</td><td>DR Region 提升（手動觸發，§9.3）</td></tr>
+<tr><td><strong>RPO（同 Region）</strong></td><td><strong>0</strong>（同步複本 WAL）</td><td>已確認寫入不遺失（錢包交易 0 丟失，PRD §9.1）</td></tr>
+<tr><td>RPO（Region 級）</td><td>≤ 5 分鐘</td><td>跨 Region 非同步複本</td></tr>
+<tr><td>MTTR</td><td>≤ 2 小時</td><td>Incident 分析</td></tr>
+</table>
+<p><strong>備份策略：</strong></p>
+<table>
+<tr><th>資料類型</th><th>頻率</th><th>保留</th><th>位置</th><th>驗證</th></tr>
+<tr><td>PostgreSQL 全量</td><td>每日</td><td>30 天</td><td>異地物件儲存</td><td>每季 DR 演練還原</td></tr>
+<tr><td>PostgreSQL 增量 / WAL</td><td>每小時（持續串流）</td><td>30 天</td><td>異地物件儲存</td><td>—</td></tr>
+<tr><td>Audit Log</td><td>持續串流</td><td>7 年</td><td>WORM / S3 Object Lock</td><td>—</td></tr>
+<tr><td>設定 / Secrets</td><td>每次變更</td><td>Git 全歷史</td><td>Git + Sealed Secrets</td><td>—</td></tr>
+</table>
+<h3 id="102-db-還原程序db-restore">10.2 DB 還原程序（DB Restore）</h3>
+<blockquote><p><strong>Credentials 不得以明文出現在命令中</strong>：密碼由 K8s Secret 經 <code>PGPASSWORD</code> env 或 <code>.pgpass</code> 注入，命令行只帶 <code>-U &lt;user&gt;</code>。</p></blockquote>
+<pre><code class="language-bash"># Step 1：建立隔離的還原目標（避免覆寫現役 Primary）
+kubectl exec -n yocat-prod -it &lt;restore-target-pod&gt; -- bash
+# 於 pod 內，密碼已由 Secret 注入環境變數 PGPASSWORD（不出現在命令行）
+# Step 2：還原最近全量 + WAL replay 至指定時間點（PITR）
+pg_restore -U yocat -d yocat --clean --if-exists /backup/yocat-daily-latest.dump
+# Expected: 無 error，所有 schema（member/wallet/.../game_save）還原完成；If this fails：確認 dump 完整性與版本相容。
+# Step 3：驗證還原後對帳一致
+psql -U yocat -d yocat -c &quot;SELECT count(*) FROM wallet.wallet_ledger;&quot;
+# Expected: 筆數與備份點一致；If this fails：改用前一個全量備份點重試。</code></pre>
+<h3 id="103-還原後驗證">10.3 還原後驗證</h3>
+<pre><code class="language-bash">pg_isready -h &lt;restore-target&gt; -p 5432 -U yocat     # Expected: accepting connections
+curl -sf https://api.yocat.sayyogames.com/health/ready | jq &#x27;.checks.db&#x27;   # Expected: &quot;ok&quot;
+# 錢包對帳（§7.8 查詢）必須 0 rows 不一致後，方可將還原目標提升為 Primary。</code></pre>
+<hr>
+<h2 id="11-安全程序-security-procedures">11. 安全程序 Security Procedures</h2>
+<h3 id="111-secret-輪換正確順序順序錯誤會中斷服務">11.1 Secret 輪換（正確順序，順序錯誤會中斷服務）</h3>
+<blockquote><p>DB/Redis 密碼每 90 天輪換（EDD §9.3）。<strong>必須</strong>依下列順序，先改 DB 再改 K8s Secret，最後重啟 Pod：</p></blockquote>
+<pre><code class="language-bash"># Step 1（先）：於 PostgreSQL 更新密碼
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;ALTER USER yocat WITH PASSWORD &#x27;&lt;new-password&gt;&#x27;;&quot;
+# Expected: ALTER ROLE；If this fails：確認具 SUPERUSER/rolpassword 權限。
+# Step 2（再）：更新 K8s Secret（Sealed Secret / Vault）
+kubectl create secret generic yocat-office-backend-db --from-literal=password=&#x27;&lt;new-password&gt;&#x27; \
+  -n yocat-prod --dry-run=client -o yaml | kubectl apply -f -
+# Expected: secret configured；If this fails：確認 secret 名稱與 deployment envFrom 一致。
+# Step 3（最後）：滾動重啟 Pod 載入新 Secret
+kubectl rollout restart deployment/yocat-office-backend-api -n yocat-prod
+kubectl rollout status deployment/yocat-office-backend-api -n yocat-prod --timeout=300s
+# Expected: &quot;successfully rolled out&quot; 且 health/ready checks.db=ok；
+# If this fails：若順序顛倒（先改 Secret 後改 DB），新 Pod 將因密碼不符無法連 DB → 立即回滾 Secret 並確認 DB 密碼一致。</code></pre>
+<h3 id="112-tls-憑證續期">11.2 TLS 憑證續期</h3>
+<pre><code class="language-bash">kubectl get certificate -n yocat-prod
+# Expected: READY=True，到期前 14 天 cert-manager 自動續期；If this fails（到期近且未續）：檢查 cert-manager pod 與 ACME challenge（kubectl describe certificate &lt;name&gt; -n yocat-prod）。</code></pre>
+<h3 id="113-credentials-洩漏處置compromised-credentials">11.3 Credentials 洩漏處置（Compromised Credentials）</h3>
+<blockquote><p><strong>撤銷 SLA：15 分鐘內完成</strong>（EDD §9.3 緊急輪換）。</p></blockquote>
+<pre><code class="language-bash"># Step 1：撤銷（delete）疑似外洩 Secret
+kubectl delete secret yocat-office-backend-db -n yocat-prod
+# Expected: secret deleted
+# Step 2：以新密碼重建（先已於 DB ALTER USER，見 §11.1 順序）
+kubectl create secret generic yocat-office-backend-db --from-literal=password=&#x27;&lt;rotated&gt;&#x27; -n yocat-prod
+# Expected: secret created
+# Step 3：滾動重啟使所有 Pod 載入新憑證
+kubectl rollout restart deployment/yocat-office-backend-api -n yocat-prod
+kubectl rollout status deployment/yocat-office-backend-api -n yocat-prod --timeout=300s
+# Expected: &quot;successfully rolled out&quot;；If this fails：見 §7.6。
+# Step 4：撤銷既有 session（若 token 外洩）— 清 Redis session 快取並使 DB session 失效
+kubectl exec -n yocat-prod -it &lt;sentinel-pod&gt; -- redis-cli -h redis-sentinel.yocat-prod --scan --pattern &#x27;member:session:*&#x27; | xargs -r redis-cli -h redis-sentinel.yocat-prod del
+# Expected: 清除快取（DB 為 session 權威 TTL）；接著查 Audit Log（§11.5）評估影響範圍。</code></pre>
+<h3 id="114-waf-緊急封鎖cloud-production本機以-networkpolicy">11.4 WAF 緊急封鎖（Cloud Production；本機以 NetworkPolicy）</h3>
+<p>Cloud Production 遭惡意流量時，於 WAF 新增封鎖規則（命令含 <code>--scope</code>、<code>--id</code>、<code>--default-action</code>、<code>--visibility-config</code> 四個必要 flag）：</p>
+<pre><code class="language-bash">aws wafv2 update-web-acl \
+  --name yocat-prod-waf \
+  --scope REGIONAL \
+  --id {{WAF_ACL_ID}} \
+  --lock-token {{WAF_LOCK_TOKEN}} \
+  --default-action Allow={} \
+  --rules file://block-rule.json \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=yocatProdWAF
+# Expected: 回傳新的 NextLockToken，規則生效；If this fails：以 aws wafv2 get-web-acl 取得最新 lock-token 後重試。</code></pre>
+<p>本機（local-first）無雲端 WAF，改用 NetworkPolicy 封鎖來源：</p>
+<pre><code class="language-bash">kubectl apply -f k8s/overlays/local/netpol-block.yaml -n yocat-office-backend-local
+# Expected: networkpolicy configured；If this fails：確認 CNI 支援 NetworkPolicy（Rancher Desktop 預設支援）。</code></pre>
+<h3 id="115-audit-log-查詢事後追查">11.5 Audit Log 查詢（事後追查）</h3>
+<pre><code class="language-bash"># 查特定時間窗內的錢包寫入與 OPS 查 PII（Audit Log 為 append-only WORM）
+# Loki 查詢：{service=&quot;yocat-office-backend&quot;, audit=&quot;true&quot;, event_type=~&quot;wallet..*|ops.pii.*&quot;}
+#   | json | actor_account_id=&quot;1001&quot; | __error__=&quot;&quot;
+# 時間窗：於 Loki UI 設定 start/end（如 2026-10-30T00:00:00Z ~ 2026-10-30T06:00:00Z）
+# Dashboard: https://logs.{{COMPANY_DOMAIN}}
+kubectl exec -n yocat-prod -it &lt;pg-primary-pod&gt; -- psql -U yocat -d yocat -c \
+  &quot;SELECT event_id, timestamp, event_type, actor FROM audit_log
+   WHERE timestamp BETWEEN &#x27;2026-10-30T00:00:00Z&#x27; AND &#x27;2026-10-30T06:00:00Z&#x27;
+     AND event_type LIKE &#x27;wallet.%&#x27; ORDER BY timestamp;&quot;
+# Expected: 回傳該窗口錢包操作稽核列（含 before/after）；If this fails：改查 WORM 串流儲存（S3 Object Lock）匯出。</code></pre>
+<hr>
+<h2 id="12-聯絡與升級-contacts-and-escalation">12. 聯絡與升級 Contacts and Escalation</h2>
+<blockquote><p>所有聯絡欄位為格式範例佔位符，不填入虛構姓名或電話。</p></blockquote>
+<table>
+<tr><th>角色</th><th>聯絡方式（格式範例）</th><th>升級時機</th></tr>
+<tr><td>Primary On-Call</td><td><code>{{ONCALL_PRIMARY}}</code>: PagerDuty <code>https://{{ORG}}.pagerduty.com/schedules/{{SCHEDULE_ID}}</code></td><td>所有告警第一響應</td></tr>
+<tr><td>Secondary On-Call</td><td><code>{{ONCALL_SECONDARY}}</code>: 填入次要值班 Email</td><td>Primary 15 分鐘未 ACK</td></tr>
+<tr><td>Incident Commander</td><td><code>{{IC_CONTACT}}</code>: 填入 IC 聯絡</td><td>P0/P1 事故</td></tr>
+<tr><td>Engineering Manager</td><td><code>{{EM_CONTACT}}</code>: 填入 EM 聯絡</td><td>15 分鐘未解（EDD §13.7）</td></tr>
+<tr><td>Security Team</td><td><code>{{SECURITY_CONTACT}}</code>: 填入資安聯絡</td><td>Credentials 洩漏、資安事件（§11）</td></tr>
+<tr><td>DBA / Platform</td><td><code>{{DBA_CONTACT}}</code>: 填入 DBA 聯絡</td><td>DB failover、對帳不一致（§7.5 / §7.8）</td></tr>
+</table>
+<p><strong>Escalation 路徑</strong>：On-Call Primary → (15 分鐘未 ACK) Secondary → (P0/P1) Incident Commander → (15 分鐘未解) Engineering Manager。事件頻道：<code>#incidents-yocat-office-backend</code>。狀態頁：<code>{{STATUS_PAGE_URL}}</code>。</p>
+<hr>
+<h2 id="13-變更紀錄-change-log">13. 變更紀錄 Change Log</h2>
+<table>
+<tr><th>版本</th><th>日期</th><th>作者</th><th>變更摘要</th></tr>
+<tr><td>v0.1</td><td>2026-10-30</td><td>gendoc gen runbook</td><td>初稿生成：涵蓋 7 BC 單體 HA 架構、部署/回滾、健康檢查、SLO/告警、DB/Redis/Pod/OOM/Outbox/對帳故障排除、BCP/DR、Secret 輪換、on-call escalation、local-first Rancher Desktop 操作</td></tr>
+</table>
+<hr>
+<h2 id="14-on-call-交接-on-call-handoff">14. On-Call 交接 On-Call Handoff</h2>
+<p>每次換班於 <code>#incidents-yocat-office-backend</code> 貼出下列 Slack 訊息範本（可直接複製貼上）：</p>
+<pre><code class="">[ON-CALL HANDOFF] yocat-office-backend
+日期：&lt;DATE&gt;
+值班接手：@&lt;INCOMING_ENGINEER&gt;
+值班交出：@&lt;OUTGOING_ENGINEER&gt;
+
+目前狀態：&lt;GREEN / DEGRADED / INCIDENT&gt;
+進行中事項：&lt;DESCRIPTION or &quot;無&quot;&gt;
+需注意：&lt;DESCRIPTION or &quot;無&quot;&gt;（如：Outbox 積壓觀察中、某帳號對帳人工追蹤）
+待處理 ticket：&lt;URL or &quot;無&quot;&gt;
+Error Budget 剩餘：&lt;% from SLO Dashboard&gt;
+錢包對帳：wallet_ledger_mismatch_total = &lt;0 or 值&gt;
+Grafana Overview：https://grafana.{{COMPANY_DOMAIN}}/d/{{OVERVIEW_DASHBOARD_ID}}/overview
+SLO Dashboard：https://grafana.{{COMPANY_DOMAIN}}/d/{{SLO_DASHBOARD_ID}}/slo</code></pre>
+<p>交接前接手者確認：<code>kubectl config current-context</code> 為 <code>prod-k8s</code>、<code>kubectl get pods -n yocat-prod</code> 全 Running、health/ready 回 ok。</p>
+<hr>
+<h2 id="15-runbook-驗證程序-runbook-validation-procedure">15. Runbook 驗證程序 Runbook Validation Procedure</h2>
+<blockquote><p>至少 3 個具體測試場景，每個含通過標準（命令 exit 0、執行時間 ≤ SLA）。非「定期測試」泛化。</p></blockquote>
+<p><strong>場景 1 — Monthly：DB 連線池耗盡演練</strong></p>
+<ul><li>動作：於 Staging 將 HikariCP pool 設為 1 注入故障，依 §7.5.1 診斷。</li><li>通過標準：§7.5.1 每個 <code>kubectl exec ... psql</code> 命令 exit 0；能於 10 分鐘內定位 <code>idle in transaction</code> 並恢復；恢復後 health/ready <code>checks.db=ok</code>。</li></ul>
+<p><strong>場景 2 — Quarterly：DR Drill（Patroni Failover + Regional）</strong></p>
+<ul><li>動作：於 Staging 執行 <code>patronictl failover</code>（§7.5.2）與 §9.3 Regional Failover，計時實際 RTO/RPO。</li><li>通過標準：DB Failover RTO ≤ 30s（§10.1）、同 Region RPO=0；Regional 切換前已執行 <code>pg_stat_replication</code> lag 檢查且 replay_lag ≤ 5 分鐘；全程 <code>wallet_ledger_mismatch_total</code> 維持 0。</li></ul>
+<p><strong>場景 3 — New On-Call：獨立走過標準部署</strong></p>
+<ul><li>動作：新工程師不經協助，依 §4.2（或本機 §4.4）完成一次部署與 §9.1 回滾。</li><li>通過標準：§4 每個 <code>kubectl rollout status</code> 回 &quot;successfully rolled out&quot;、health/ready 回 ok；§9.1 回滾後 §9.4 全套測試（unit/integration/e2e）全部 exit 0；全程無需詢問他人。</li></ul>
+<p><strong>通過總標準</strong>：每個場景在規定 SLA 內完成，每個 <code>kubectl</code> / 測試命令成功（exit 0），對帳不一致恆為 0。驗證結果記錄於文件控制表 &quot;最近演練&quot; 欄位。</p></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

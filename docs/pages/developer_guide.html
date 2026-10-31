@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer Guide — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">Developer Guide</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">Developer Guide</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link active" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control">Document Control</a></li><li><a class="toc__link" href="#1-日常開發工作流程">§1 日常開發工作流程</a></li><li><a class="toc__link toc__link--h3" href="#11-啟動開發環境">1.1 啟動開發環境</a></li><li><a class="toc__link toc__link--h3" href="#12-六大日常開發場景">1.2 六大日常開發場景</a></li><li><a class="toc__link" href="#2-cicd-診斷與修復">§2 CI/CD 診斷與修復</a></li><li><a class="toc__link toc__link--h3" href="#21-ci-pipeline-未觸發git-push-後無反應">2.1 CI Pipeline 未觸發（git push 後無反應）</a></li><li><a class="toc__link toc__link--h3" href="#22-pipeline-各-stage-失敗排查">2.2 Pipeline 各 Stage 失敗排查</a></li><li><a class="toc__link toc__link--h3" href="#23-argocd-同步失敗cd">2.3 ArgoCD 同步失敗（CD）</a></li><li><a class="toc__link" href="#3-quick-reference-指令表">§3 Quick Reference 指令表</a></li><li><a class="toc__link toc__link--h3" href="#31-最常用指令">3.1 最常用指令</a></li><li><a class="toc__link toc__link--h3" href="#32-dev-tools-指令gitea--argocd">3.2 Dev-Tools 指令（Gitea / ArgoCD）</a></li><li><a class="toc__link" href="#4-本地環境常見問題faq">§4 本地環境常見問題（FAQ）</a></li><li><a class="toc__link toc__link--h3" href="#q-pod-一直-pending怎麼處理">Q: Pod 一直 Pending，怎麼處理？</a></li><li><a class="toc__link toc__link--h3" href="#q-所有-namespace-都要加--local-suffix-嗎">Q: 所有 namespace 都要加 -local suffix 嗎？</a></li><li><a class="toc__link toc__link--h3" href="#q-如何確認-db-migration-已執行flyway">Q: 如何確認 DB Migration 已執行？（Flyway）</a></li><li><a class="toc__link toc__link--h3" href="#q-secret-過期或遺失怎麼辦">Q: Secret 過期或遺失怎麼辦？</a></li><li><a class="toc__link" href="#5-環境維護">§5 環境維護</a></li><li><a class="toc__link toc__link--h3" href="#51-定期維護項目">5.1 定期維護項目</a></li><li><a class="toc__link toc__link--h3" href="#52-rancher-desktop-資源建議">5.2 Rancher Desktop 資源建議</a></li><li><a class="toc__link toc__link--h3" href="#53-升級-dev-tools">5.3 升級 Dev-Tools</a></li><li><a class="toc__link" href="#6-文件邊界說明">§6 文件邊界說明</a></li><li><a class="toc__link" href="#7-clean-architecture-分層說明">§7 Clean Architecture 分層說明</a></li><li><a class="toc__link toc__link--h3" href="#依賴方向dependency-rule">依賴方向（Dependency Rule）</a></li><li><a class="toc__link toc__link--h3" href="#各層職責與-import-規則">各層職責與 Import 規則</a></li><li><a class="toc__link toc__link--h3" href="#solid-快速對照本系統">SOLID 快速對照（本系統）</a></li><li><a class="toc__link toc__link--h3" href="#常見違規案例faq">常見違規案例（FAQ）</a></li><li><a class="toc__link" href="#8-專案結構spring-modulith-7-bc-套件結構">§8 專案結構（Spring Modulith 7 BC 套件結構）</a></li><li><a class="toc__link toc__link--h3" href="#81-目錄結構mavenbase-package--comsayyogamesyocat">8.1 目錄結構（Maven，base-package = com.sayyogames.yocat）</a></li><li><a class="toc__link toc__link--h3" href="#82-七個-bounded-context模組名職責權威資料表">8.2 七個 Bounded Context（模組名、職責、權威資料表）</a></li><li><a class="toc__link toc__link--h3" href="#83-模組依賴-daghc-5">8.3 模組依賴 DAG（HC-5）</a></li><li><a class="toc__link" href="#9-如何新增--修改一個-bc-的功能clean-architecture-分層放哪">§9 如何新增 / 修改一個 BC 的功能（Clean Architecture 分層放哪）</a></li><li><a class="toc__link toc__link--h3" href="#步驟-1domain-層最先純邏輯零技術依賴">步驟 1：Domain 層（最先，純邏輯零技術依賴）</a></li><li><a class="toc__link toc__link--h3" href="#步驟-2application-層usecase-編排">步驟 2：Application 層（UseCase 編排）</a></li><li><a class="toc__link toc__link--h3" href="#步驟-3infrastructure-層實作-domain-介面">步驟 3：Infrastructure 層（實作 Domain 介面）</a></li><li><a class="toc__link toc__link--h3" href="#步驟-4presentation-層對外-rest">步驟 4：Presentation 層（對外 REST）</a></li><li><a class="toc__link toc__link--h3" href="#步驟-5測試與驗證缺一不可">步驟 5：測試與驗證（缺一不可）</a></li><li><a class="toc__link" href="#10-跨模組通訊規範hc-1hc-5">§10 跨模組通訊規範（HC-1~HC-5）</a></li><li><a class="toc__link toc__link--h3" href="#101-hard-constraint-清單hc-1--hc-5">10.1 Hard Constraint 清單（HC-1 ~ HC-5）</a></li><li><a class="toc__link toc__link--h3" href="#102-同步通訊public-namedinterface">10.2 同步通訊：Public @NamedInterface</a></li><li><a class="toc__link toc__link--h3" href="#103-非同步通訊domain-eventoutbox">10.3 非同步通訊：Domain Event（Outbox）</a></li><li><a class="toc__link toc__link--h3" href="#104-跨-bc-身分參照conformist">10.4 跨 BC 身分參照（Conformist）</a></li><li><a class="toc__link" href="#11-把一個-bc-抽成獨立微服務in-process-event--broker不改-domain-碼">§11 把一個 BC 抽成獨立微服務（in-process event → broker，不改 Domain 碼）</a></li><li><a class="toc__link toc__link--h3" href="#111-兩種拓撲對照">11.1 兩種拓撲對照</a></li><li><a class="toc__link toc__link--h3" href="#112-抽離步驟以-leaderboard-為例純讀寫無同步跨-bc-扣款最易拆">11.2 抽離步驟（以 leaderboard 為例，純讀寫、無同步跨 BC 扣款，最易拆）</a></li><li><a class="toc__link toc__link--h3" href="#113-為什麼-domain-不用改">11.3 為什麼 Domain 不用改</a></li><li><a class="toc__link" href="#12-編碼規範">§12 編碼規範</a></li><li><a class="toc__link" href="#13-測試撰寫archunit--applicationmodulesverify">§13 測試撰寫（ArchUnit / ApplicationModules.verify）</a></li><li><a class="toc__link toc__link--h3" href="#131-測試分層與指令">13.1 測試分層與指令</a></li><li><a class="toc__link toc__link--h3" href="#132-spring-modulith-邊界驗證骨架">13.2 Spring Modulith 邊界驗證骨架</a></li><li><a class="toc__link toc__link--h3" href="#133-bc-隔離測試applicationmoduletest">13.3 BC 隔離測試（@ApplicationModuleTest）</a></li><li><a class="toc__link toc__link--h3" href="#134-測試追蹤rtm">13.4 測試追蹤（RTM）</a></li><li><a class="toc__link" href="#14-提交與-pr-流程">§14 提交與 PR 流程</a></li><li><a class="toc__link toc__link--h3" href="#141-分支與提交">14.1 分支與提交</a></li><li><a class="toc__link toc__link--h3" href="#142-pr-gates1s6提交-pr-前本機預跑">14.2 PR Gate（S1~S6，提交 PR 前本機預跑）</a></li><li><a class="toc__link toc__link--h3" href="#143-合併與部署cd">14.3 合併與部署（CD）</a></li><li><a class="toc__link toc__link--h3" href="#144-回滾">14.4 回滾</a></li><li><a class="toc__link" href="#15-常見陷阱pitfalls">§15 常見陷阱（Pitfalls）</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="developer-guide--yocat-office-backendyocat-office-後端信任層">Developer Guide — yocat-office-backend（yoCat Office 後端信任層）</h1>
+<blockquote><p><strong>本文件描述</strong> yocat-office-backend 的日常開發操作與模組化開發規範。前提：已按 <a href="local_deploy.html" target="_blank" rel="noopener">LOCAL_DEPLOY.md</a> 完成初始環境建置。</p></blockquote>
+<p>&gt;</p>
+<blockquote><p><strong>適用對象</strong>：已完成 LOCAL_DEPLOY.md 建置的後端工程師，需要快速查找日常操作、理解 Spring Modulith 7 BC 模組邊界、並依 Clean Architecture + HC-1~HC-5 規範新增/修改功能。</p></blockquote>
+<p>&gt;</p>
+<blockquote><p><strong>技術棧</strong>：Java 21 (LTS) + Spring Boot 3.3 + Spring Modulith 1.3 + PostgreSQL 16 + Redis 7.2；base-package = <code>com.sayyogames.yocat</code>；repo root = <code>&lt;project-root&gt;</code>。</p></blockquote>
+<p>&gt;</p>
+<blockquote><p><strong>NOTE（CI/CD 工具對齊）</strong>：本專案 CI = GitHub Actions / 本機 Gitea Actions（<code>act_runner</code>），CD = ArgoCD 2.12（GitOps）。本文件 §2 CI 診斷依此實際工具撰寫（<strong>非 Jenkins</strong>），來源 <a href="cicd.html" target="_blank" rel="noopener">CICD.md</a> §1.1/§6/§8。</p></blockquote>
+<blockquote><p><strong>NOTE（Make target 來源）</strong>：Make target 名稱以 <a href="local_deploy.html" target="_blank" rel="noopener">LOCAL_DEPLOY.md</a> §6 為主、CI 包裝（<code>ci-*</code>）以 <a href="cicd.html" target="_blank" rel="noopener">CICD.md</a> §4 為 Source of Truth。</p></blockquote>
+<blockquote><p><strong>NOTE（DB Migration 工具）</strong>：<a href="schema.html" target="_blank" rel="noopener">SCHEMA.md</a> §8 明定 migration-tool = <strong>Flyway</strong>，故本文件 §1 場景 B 與 §4 FAQ 僅保留 Flyway 指令。</p></blockquote>
+<hr>
+<h2 id="document-control">Document Control</h2>
+<table>
+<tr><th>欄位</th><th>值</th></tr>
+<tr><td><strong>產品名稱</strong></td><td>yocat-office-backend（yoCat Office 後端信任層）</td></tr>
+<tr><td><strong>適用環境</strong></td><td>Local（Rancher Desktop k3s，namespace <code>yocat-office-backend-local</code>）</td></tr>
+<tr><td><strong>前置條件</strong></td><td>LOCAL_DEPLOY.md 初始建置已完成（JDK 21 / Rancher Desktop / Secret Bootstrap）</td></tr>
+<tr><td><strong>技術棧</strong></td><td>Java 21 + Spring Boot 3.3 + Spring Modulith 1.3 + PostgreSQL 16 + Redis 7.2</td></tr>
+<tr><td><strong>base-package</strong></td><td><code>com.sayyogames.yocat</code></td></tr>
+<tr><td><strong>Author</strong></td><td>Evans Tseng</td></tr>
+<tr><td><strong>Last Updated</strong></td><td>2026-10-30</td></tr>
+<tr><td><strong>Status</strong></td><td>draft</td></tr>
+</table>
+<hr>
+<h2 id="1-日常開發工作流程">§1 日常開發工作流程</h2>
+<h3 id="11-啟動開發環境">1.1 啟動開發環境</h3>
+<pre><code class="language-bash"># 從 repo root 執行（&lt;project-root&gt;），Git Bash
+# 0. 確認 Rancher Desktop 已執行（kubectl 可連 k3s）
+kubectl cluster-info
+
+# 1. 確保 PostgreSQL（既有 yocat namespace）
+make db-up
+
+# 2. 部署 Redis + API + Service + Ingress（namespace yocat-office-backend-local）
+make k8s-apply
+
+# 3. 確認所有 Pod 就緒
+kubectl get pods -n yocat-office-backend-local
+
+# 4. Port-forward 到本地（API 8080 / DB 5432 / Redis 6379；背景執行並記 PID）
+make pf-api
+
+# 5. 健康檢查
+make health-check   # 檢查 GET /health/ready（member/wallet 所用 DB + Redis 連線）</code></pre>
+<h3 id="12-六大日常開發場景">1.2 六大日常開發場景</h3>
+<h4 id="場景-a修改-api-邏輯並驗證">場景 A：修改 API 邏輯並驗證</h4>
+<pre><code class="language-bash"># 1. 修改程式碼（例：wallet/application/SpendWalletUseCase.java）
+# 2. 執行單元測試（JUnit 5 + Mockito，不需 K8s）
+make ci-test-unit
+
+# 3. 重新建置 image + 重啟部署
+make image-build-api            # nerdctl build -t yocat-office-backend/api:local
+make k8s-restart-api            # kubectl rollout restart deploy/yocat-office-backend-api
+
+# 4. 確認部署成功
+kubectl rollout status deployment/yocat-office-backend-api -n yocat-office-backend-local
+
+# 5. 執行 smoke test
+make ci-smoke</code></pre>
+<h4 id="場景-b新增資料庫-migrationflyway">場景 B：新增資料庫 Migration（Flyway）</h4>
+<pre><code class="language-bash"># migration-tool = Flyway（SCHEMA.md §8）。命名規則：V{n}__{description}.sql
+# 1. 新增 migration 檔案（置於對應 BC schema；各 BC 獨佔 schema，HC-1）
+#    路徑：apps/api/src/main/resources/db/migration/V{n}__{description}.sql
+#    範例：V12__wallet_add_idempotency_key.sql
+#    注意：禁止跨 BC FK；跨 BC 參照以 account_id BIGINT（application-layer ID，無跨 schema FK）
+
+# 2. 執行 migration（更新 DB Schema）
+make db-migrate
+
+# 3. 驗證 migration 狀態
+make db-status
+
+# 4. 重新部署
+make k8s-restart-api</code></pre>
+<h4 id="場景-c執行完整-ci-pipeline本地模擬">場景 C：執行完整 CI Pipeline（本地模擬）</h4>
+<pre><code class="language-bash"># 以 act / Gitea Actions 跑同一份 .github/workflows（Local-First，消除「本地 OK、CI 炸掉」）
+make ci-dry-run                 # act pull_request -W .github/workflows/ci.yml
+
+# 或單步執行（對齊 CICD.md §4 Shared Make Targets）
+make ci-lint &amp;&amp; make ci-archunit         # spotless + ArchUnit（Domain 不得 import spring/java.sql）
+make ci-test-unit                        # JUnit + JaCoCo gate（≥80%）
+make ci-test-integration                 # REST-assured + Testcontainers
+make ci-test-modulith                    # HC-1~HC-5：0 循環依賴、BC 邊界完整
+make ci-contract-test                    # WalletService.debit() 等合約
+make ci-smoke</code></pre>
+<h4 id="場景-d查看-log-和除錯">場景 D：查看 Log 和除錯</h4>
+<pre><code class="language-bash"># 查看 API 服務 log
+kubectl logs -f deployment/yocat-office-backend-api -n yocat-office-backend-local
+
+# 進入 API Pod debug
+kubectl exec -it deployment/yocat-office-backend-api -n yocat-office-backend-local -- /bin/sh
+
+# 使用 k9s（互動式 K8s UI）
+k9s -n yocat-office-backend-local</code></pre>
+<h4 id="場景-e重設開發環境出問題時">場景 E：重設開發環境（出問題時）</h4>
+<pre><code class="language-bash"># 軟重設（重新部署，保留 PostgreSQL / PVC 資料）
+make k8s-delete &amp;&amp; make k8s-apply
+
+# 硬重設（清除 app namespace，完全重建；不動既有 yocat DB）
+make k8s-clean &amp;&amp; make k8s-init &amp;&amp; make k8s-apply
+./scripts/bootstrap-secrets.sh          # k8s-clean / db-reset 後必須重跑（LOCAL_DEPLOY.md §3.5）
+
+# 只重設資料庫（銷毀資料重跑 migration）
+make db-reset &amp;&amp; ./scripts/bootstrap-secrets.sh</code></pre>
+<h4 id="場景-f提交-pr-前的自我檢查">場景 F：提交 PR 前的自我檢查</h4>
+<pre><code class="language-bash"># 對齊 CICD.md §5.3 Pre-PR Checklist（S1~S6 PR Gate 本機預跑）
+make ci-lint &amp;&amp; make ci-archunit                 # S1 lint + 架構守護
+make ci-test-unit                                # S2 unit + JaCoCo ≥80%
+make ci-test-integration                         # S3 integration（Testcontainers）
+make ci-test-modulith &amp;&amp; make ci-contract-test   # S4 Modulith 邊界 + 合約
+make ci-spotbugs &amp;&amp; make ci-semgrep &amp;&amp; make ci-dependency-scan   # S5 靜態分析（High/Critical=0）
+make ci-dry-run                                  # S6 完整 PR Gate 模擬</code></pre>
+<hr>
+<h2 id="2-cicd-診斷與修復">§2 CI/CD 診斷與修復</h2>
+<blockquote><p>本專案 CI = GitHub Actions（雲端）/ Gitea Actions <code>act_runner</code>（本機，<code>dev-tools</code> ns），CD = ArgoCD（GitOps）。Runner namespace 統一為 <code>yocat-office-backend-ci</code>（CICD.md §6）。</p></blockquote>
+<h3 id="21-ci-pipeline-未觸發git-push-後無反應">2.1 CI Pipeline 未觸發（git push 後無反應）</h3>
+<table>
+<tr><th>症狀</th><th>可能原因</th><th>診斷步驟</th></tr>
+<tr><td>push 後 Gitea Actions 無反應</td><td>Webhook 未送達 runner</td><td><code>curl -X POST http://runner.yocat-office-backend-ci.svc.cluster.local:8080/gitea-webhook/post</code> 測試 # Webhook URL 來源 CICD.md §8.4</td></tr>
+<tr><td>Webhook 回 200 但 workflow 不跑</td><td><code>act_runner</code> 未註冊或離線</td><td><code>kubectl get pods -n yocat-office-backend-ci</code>；確認 runner Pod Running，否則 <code>kubectl logs -n yocat-office-backend-ci deploy/act-runner</code></td></tr>
+<tr><td>runner namespace 不存在</td><td>自架 runner 未安裝</td><td><code>helm upgrade --install act-runner ... -n yocat-office-backend-ci -f k8s/dev-tools/gitea-values.yaml</code>（CICD.md §6.1）</td></tr>
+<tr><td>GitHub Actions 雲端不跑</td><td>self-hosted runner 標籤不符</td><td>確認 workflow <code>runs-on: [self-hosted, k3s]</code> 與 ARC runner label 一致（CICD.md §1.2）</td></tr>
+</table>
+<h3 id="22-pipeline-各-stage-失敗排查">2.2 Pipeline 各 Stage 失敗排查</h3>
+<table>
+<tr><th>Stage</th><th>常見錯誤</th><th>修復方法</th></tr>
+<tr><td>Lint</td><td>spotless 格式不符</td><td>本機 <code>make ci-lint</code>（<code>./mvnw -pl apps/api spotless:check</code>）；自動修復 <code>./mvnw spotless:apply</code></td></tr>
+<tr><td>ArchUnit</td><td>Domain 違規 import</td><td><code>make ci-archunit</code>；移除 <code>domain/</code> 中的 <code>org.springframework.<em></code> / <code>java.sql.</em></code>（EDD §3.1b 禁止清單）</td></tr>
+<tr><td>Unit Test</td><td>測試失敗 / JaCoCo &lt; 80%</td><td><code>make ci-test-unit</code> 本機重現；補測試至覆蓋率門檻</td></tr>
+<tr><td>Integration Test</td><td>Testcontainers 連線失敗</td><td>確認 Docker/containerd 可用；<code>make ci-test-integration</code>（REST-assured + Testcontainers）</td></tr>
+<tr><td>Modulith Test</td><td>HC-1~HC-5 邊界/循環違規</td><td><code>make ci-test-modulith</code>（<code>ApplicationModules.verify()</code> 擲 AssertionError）；見 §10 消除跨 BC 違規</td></tr>
+<tr><td>Image Build</td><td>Kaniko 失敗</td><td>確認 registry-credentials secret 存在：<code>kubectl get secret registry-credentials -n yocat-office-backend-ci</code>（self-hosted 禁 DinD，用 Kaniko）</td></tr>
+<tr><td>Deploy</td><td>Pod 起不來</td><td><code>kubectl describe pod -n yocat-office-backend-local</code>；查 Event / image pull / 資源</td></tr>
+<tr><td>Smoke Test</td><td>endpoint 無回應</td><td>確認 <code>make pf-api</code> port-forward 執行中；<code>make health-check</code></td></tr>
+</table>
+<h3 id="23-argocd-同步失敗cd">2.3 ArgoCD 同步失敗（CD）</h3>
+<pre><code class="language-bash"># 查看 ArgoCD 同步狀態
+argocd app get yocat-office-backend
+
+# 強制重新同步
+argocd app sync yocat-office-backend
+
+# 查看期望態 vs 實際態 diff
+argocd app diff yocat-office-backend
+
+# 本機透過 port-forward 進 ArgoCD UI（LOCAL_DEPLOY.md §外部存取）
+kubectl port-forward svc/argocd-server -n argocd 8443:443   # → https://localhost:8443</code></pre>
+<hr>
+<h2 id="3-quick-reference-指令表">§3 Quick Reference 指令表</h2>
+<h3 id="31-最常用指令">3.1 最常用指令</h3>
+<table>
+<tr><th>目的</th><th>指令</th></tr>
+<tr><td>確保 PostgreSQL</td><td><code>make db-up</code></td></tr>
+<tr><td>部署所有服務</td><td><code>make k8s-apply</code></td></tr>
+<tr><td>重建 image 並套用</td><td><code>make image-build-api &amp;&amp; make k8s-restart-api</code></td></tr>
+<tr><td>執行單元測試</td><td><code>make ci-test-unit</code></td></tr>
+<tr><td>執行 Modulith 邊界驗證</td><td><code>make ci-test-modulith</code></td></tr>
+<tr><td>查看服務狀態</td><td><code>kubectl get pods -n yocat-office-backend-local</code></td></tr>
+<tr><td>查看 API log</td><td><code>kubectl logs -f deploy/yocat-office-backend-api -n yocat-office-backend-local</code></td></tr>
+<tr><td>重設環境（硬）</td><td><code>make k8s-clean &amp;&amp; make k8s-init &amp;&amp; make k8s-apply</code></td></tr>
+<tr><td>重設資料庫</td><td><code>make db-reset &amp;&amp; ./scripts/bootstrap-secrets.sh</code></td></tr>
+<tr><td>模擬 CI Pipeline</td><td><code>make ci-dry-run</code></td></tr>
+<tr><td>Port-forward API</td><td><code>make pf-api</code>（停止：<code>make pf-stop</code>）</td></tr>
+<tr><td>K8s 互動 UI</td><td><code>k9s -n yocat-office-backend-local</code></td></tr>
+</table>
+<h3 id="32-dev-tools-指令gitea--argocd">3.2 Dev-Tools 指令（Gitea / ArgoCD）</h3>
+<table>
+<tr><th>目的</th><th>指令</th></tr>
+<tr><td>查看 Gitea（CI runner host）</td><td><code>kubectl get pods -n dev-tools</code></td></tr>
+<tr><td>查看 CI runner 狀態</td><td><code>kubectl get pods -n yocat-office-backend-ci</code></td></tr>
+<tr><td>Port-forward Gitea</td><td><code>kubectl port-forward svc/gitea -n dev-tools 3000:3000</code> → http://localhost:3000</td></tr>
+<tr><td>Port-forward ArgoCD</td><td><code>kubectl port-forward svc/argocd-server -n argocd 8443:443</code> → https://localhost:8443</td></tr>
+<tr><td>進入 Gitea（本機 repo）</td><td>http://localhost:3000/dev/yocat-office-backend.git</td></tr>
+<tr><td>進入 ArgoCD</td><td>https://localhost:8443</td></tr>
+</table>
+<hr>
+<h2 id="4-本地環境常見問題faq">§4 本地環境常見問題（FAQ）</h2>
+<h3 id="q-pod-一直-pending怎麼處理">Q: Pod 一直 Pending，怎麼處理？</h3>
+<pre><code class="language-bash"># 查看 Event
+kubectl describe pod &lt;pod-name&gt; -n yocat-office-backend-local
+
+# 常見原因：資源不足
+kubectl top nodes
+# 若記憶體不足：Rancher Desktop → Preferences → Virtual Machine → Hardware → 增加 Memory（見 §5.2）</code></pre>
+<h3 id="q-所有-namespace-都要加--local-suffix-嗎">Q: 所有 namespace 都要加 <code>-local</code> suffix 嗎？</h3>
+<p>是的（僅限應用 namespace）。本地環境規定：<strong>應用 namespace 加 <code>-local</code></strong>（本專案 K8S_NAMESPACE = <code>yocat-office-backend</code>，故本地為 <code>yocat-office-backend-local</code>）；<strong>CI runner namespace 固定為 <code>yocat-office-backend-ci</code>（不加 <code>-local</code>）</strong>；<strong>dev-tools namespace 固定為 <code>dev-tools</code></strong>；<strong>ArgoCD 固定 <code>argocd</code></strong>；既有 PostgreSQL 在 <code>yocat</code> namespace。這樣可避免與 staging/production（<code>yocat-staging</code> / <code>yocat-prod</code>，EDD §3.4）衝突。</p>
+<h3 id="q-如何確認-db-migration-已執行flyway">Q: 如何確認 DB Migration 已執行？（Flyway）</h3>
+<pre><code class="language-bash"># migration-tool = Flyway（SCHEMA.md §8）
+# 方式 1：Flyway info（在 API Pod 內執行）
+kubectl exec -it deploy/yocat-office-backend-api -n yocat-office-backend-local \
+  -- flyway -url=jdbc:postgresql://postgres.yocat.svc.cluster.local:5432/yocat info
+
+# 方式 2：直接查 Flyway history table（平台底座 schema，SCHEMA.md §8）
+kubectl exec -it sts/postgres -n yocat \
+  -- psql -U yocat -d yocat -c &quot;SELECT * FROM platform.schema_migrations ORDER BY installed_on DESC LIMIT 5;&quot;
+
+# 方式 3：make 包裝
+make db-status</code></pre>
+<blockquote><p><strong>連線值來源</strong>：DB url / user / db 取自 LOCAL_DEPLOY.md §外部存取與 bootstrap-secrets（user=<code>yocat</code> / db=<code>yocat</code>）；正式環境值見 EDD §3.5。</p></blockquote>
+<h3 id="q-secret-過期或遺失怎麼辦">Q: Secret 過期或遺失怎麼辦？</h3>
+<pre><code class="language-bash"># 重新執行 Secret Bootstrap（冪等；詳見 LOCAL_DEPLOY.md §3.5）
+./scripts/bootstrap-secrets.sh
+
+# 驗證 Secret 已建立
+kubectl get secret yocat-pg -n yocat-office-backend-local
+
+# 若需重建：k8s-clean / db-reset 後一律重跑 bootstrap（否則 secrets.env 遺失）
+make k8s-clean &amp;&amp; make k8s-init &amp;&amp; ./scripts/bootstrap-secrets.sh</code></pre>
+<hr>
+<h2 id="5-環境維護">§5 環境維護</h2>
+<h3 id="51-定期維護項目">5.1 定期維護項目</h3>
+<table>
+<tr><th>頻率</th><th>維護項目</th><th>指令</th></tr>
+<tr><td>每天</td><td>確認所有 Pod 就緒</td><td><code>kubectl get pods -n yocat-office-backend-local</code></td></tr>
+<tr><td>每週</td><td>清理舊 image</td><td><code>nerdctl --namespace k8s.io image prune -f</code></td></tr>
+<tr><td>每月</td><td>更新 Helm chart（dev-tools/ArgoCD）</td><td><code>helm repo update</code></td></tr>
+<tr><td>每次 pull</td><td>同步 DB Migration</td><td><code>make db-migrate</code></td></tr>
+<tr><td>每次 pull</td><td>重跑 Modulith 邊界驗證</td><td><code>make ci-test-modulith</code></td></tr>
+</table>
+<h3 id="52-rancher-desktop-資源建議">5.2 Rancher Desktop 資源建議</h3>
+<blockquote><p>來源：LOCAL_DEPLOY.md §1 Prerequisites（至少 8 GB RAM / 4 CPU，承載 API 2 副本 + PostgreSQL + Redis）。</p></blockquote>
+<table>
+<tr><th>資源</th><th>最低配置</th><th>建議配置</th></tr>
+<tr><td>CPU</td><td>4 cores</td><td>8 cores</td></tr>
+<tr><td>Memory</td><td>8 GB</td><td>16 GB</td></tr>
+<tr><td>Disk</td><td>40 GB</td><td>80 GB</td></tr>
+</table>
+<p>設定路徑：Rancher Desktop → Preferences → Virtual Machine → Hardware；Container Engine 選 containerd（nerdctl）；Kubernetes 版本 1.30。</p>
+<h3 id="53-升級-dev-tools">5.3 升級 Dev-Tools</h3>
+<pre><code class="language-bash">helm repo update
+# Gitea + act_runner（dev-tools / CI runner，CICD.md §6.1 / §8）
+helm upgrade --install gitea gitea-charts/gitea -n dev-tools -f k8s/dev-tools/gitea-values.yaml
+# 升級 chart repo 與 -f values 路徑必須與初次安裝一致（CICD.md §9）</code></pre>
+<hr>
+<h2 id="6-文件邊界說明">§6 文件邊界說明</h2>
+<table>
+<tr><th>問題</th><th>查找文件</th></tr>
+<tr><td>初次環境建置（安裝 k8s/DB/Redis、Secret Bootstrap）</td><td><a href="local_deploy.html" target="_blank" rel="noopener">LOCAL_DEPLOY.md</a></td></tr>
+<tr><td>CI/CD Pipeline 架構（GitHub/Gitea Actions、ArgoCD GitOps）</td><td><a href="cicd.html" target="_blank" rel="noopener">CICD.md</a></td></tr>
+<tr><td>生產環境 incident 處理（告警、回滾、對帳稽核）</td><td><a href="runbook.html" target="_blank" rel="noopener">runbook.md</a></td></tr>
+<tr><td>API 規格（16 端點、request/response）</td><td><a href="api.html" target="_blank" rel="noopener">API.md</a></td></tr>
+<tr><td>DB Schema 設計（8 表、schema-per-BC、Flyway）</td><td><a href="schema.html" target="_blank" rel="noopener">SCHEMA.md</a></td></tr>
+<tr><td>工程設計（7 BC、Clean Architecture、HC-1~HC-5、ADR）</td><td><a href="edd.html" target="_blank" rel="noopener">EDD.md</a></td></tr>
+<tr><td>架構決策與拓撲（單體 HA ↔ 微服務）</td><td><a href="arch.html" target="_blank" rel="noopener">ARCH.md</a></td></tr>
+<tr><td>全域常數 / 列舉 / 錯誤碼（SSOT）</td><td><a href="constants.html" target="_blank" rel="noopener">CONSTANTS.md</a></td></tr>
+<tr><td>日常開發操作（本文件）</td><td>DEVELOPER_GUIDE.md</td></tr>
+<tr><td>環境無法啟動 / Pod 異常</td><td>DEVELOPER_GUIDE.md §4 FAQ</td></tr>
+<tr><td>CI Pipeline 失敗</td><td>DEVELOPER_GUIDE.md §2</td></tr>
+</table>
+<hr>
+<h2 id="7-clean-architecture-分層說明">§7 Clean Architecture 分層說明</h2>
+<p>本專案採用 Clean Architecture 四層設計（詳見 EDD §3.1b）。新進工程師在寫任何代碼前，請先確認所在層次。</p>
+<h3 id="依賴方向dependency-rule">依賴方向（Dependency Rule）</h3>
+<pre><code class="">Presentation → Application → Domain ← Infrastructure</code></pre>
+<p><strong>核心原則</strong>：依賴方向只能由外向內。Domain 層不得引用 Infrastructure 具體類別，Infrastructure 反向實作 Domain 定義的介面。</p>
+<h3 id="各層職責與-import-規則">各層職責與 Import 規則</h3>
+<table>
+<tr><th>層次</th><th>Stereotype</th><th>代表 Class（本系統）</th><th>可以 import</th><th>禁止 import</th></tr>
+<tr><td>Domain</td><td>AggregateRoot / Entity / ValueObject / DomainEvent / Repository(interface)</td><td><code>Wallet</code>、<code>LedgerEntry</code>、<code>Account</code>、<code>Session</code>、<code>Money</code>、<code>AccountId</code>、<code>WalletRepository</code>、<code>MemberRepository</code>、<code>WalletBalanceChanged</code>、<code>MemberRegistered</code></td><td>同層 class、Java 21 標準庫</td><td>ORM Entity、JDBC（<code>java.sql.<em></code>）、HTTP Client、Spring（<code>org.springframework.</em></code>）、外部 SDK</td></tr>
+<tr><td>Application</td><td>UseCase / ApplicationService / Port(interface)</td><td><code>SpendWalletUseCase</code>、<code>TopUpWalletUseCase</code>、<code>BuyEntitlementUseCase</code>、<code>RegisterMemberUseCase</code>、<code>WalletService</code>、<code>DomainEventPublisher</code></td><td>Domain 層介面、DTO</td><td><code>RepositoryImpl</code>、Adapter、ORM；不得 <code>new</code> 任何 Infrastructure 具體類別</td></tr>
+<tr><td>Infrastructure</td><td>RepositoryImpl / Adapter</td><td><code>JdbcWalletRepository</code>、<code>ModulithEventPublisher</code>、<code>ScryptPasswordEncoder</code>、<code>BearerTokenFilter</code></td><td>Domain 介面（實作用）、JDBC、DB Driver、第三方 SDK、Spring</td><td>不得反向依賴 Application UseCase</td></tr>
+<tr><td>Presentation</td><td>Controller / RequestDTO / ResponseDTO</td><td><code>WalletController</code>、<code>AuthController</code></td><td>Application UseCase / Service</td><td>Domain Entity（直接回傳）、Infrastructure</td></tr>
+</table>
+<blockquote><p>Class 名稱來源：<a href="diagrams/class-inventory.html" target="_blank" rel="noopener">docs/diagrams/class-inventory.md</a>（提取自 EDD §4.5.2）。</p></blockquote>
+<h3 id="solid-快速對照本系統">SOLID 快速對照（本系統）</h3>
+<table>
+<tr><th>原則</th><th>本系統實作方式</th></tr>
+<tr><td>SRP（Single Responsibility）</td><td><code>WalletService</code> 只處理錢包加值/扣款與帳本；<code>MemberService</code> 只處理註冊/登入/會話；<code>LeaderboardService</code> 只處理上榜/查榜。每個 Service 對應單一 BC 單一職責。</td></tr>
+<tr><td>OCP（Open / Closed）</td><td>儲值包透過 <code>DepositPackCatalog</code>（介面）擴展：新增寶石包只需新增 <code>GemPackPolicy</code> 設定或實作，不改 <code>TopUpWalletUseCase</code>；新增破產救援策略只需實作 <code>RescueStrategy</code> 介面。</td></tr>
+<tr><td>LSP（Liskov Substitution）</td><td><code>WalletRepository</code> 所有子型別（正式 <code>JdbcWalletRepository</code>、測試 <code>InMemoryWalletRepository</code>）可互換，<code>WalletService</code> 行為不變；合約測試保證替換後語意一致。</td></tr>
+<tr><td>ISP（Interface Segregation）</td><td>讀寫分離：<code>WalletReadRepository</code>（<code>findBalance</code>）/ <code>WalletWriteRepository</code>（<code>debitWithLock</code>/<code>credit</code>）；<code>LedgerAppender</code> 僅暴露 <code>append(entry)</code>，不強迫實作無關方法。</td></tr>
+<tr><td>DIP（Dependency Inversion）</td><td>高層 <code>SpendWalletUseCase</code> 依賴 Domain 的 <code>WalletRepository</code>、<code>DomainEventPublisher</code> 介面；具體 <code>JdbcWalletRepository</code>、<code>ModulithEventPublisher</code>（Infrastructure）由 Spring DI 於組態注入，Domain/Application 不 import 任何 JDBC/Spring 類別。</td></tr>
+</table>
+<h3 id="常見違規案例faq">常見違規案例（FAQ）</h3>
+<p><strong>Q: 可以在 Domain 層 import Spring <code>@Repository</code> annotation 嗎？</strong></p>
+<p>A: 不行。<code>@Repository</code> 是 Infrastructure 的技術細節；Domain 層只定義 <code>WalletRepository</code> interface，不引用框架 annotation。此類違規由 <code>make ci-archunit</code> 於 CI 攔截。</p>
+<p><strong>Q: <code>SpendWalletUseCase</code> 可以直接 <code>new JdbcWalletRepository()</code> 嗎？</strong></p>
+<p>A: 不行，違反 DIP。UseCase 只依賴 <code>WalletRepository</code> interface，具體實作由 Spring DI Container 建構子注入；<code>new</code> 任何 Infrastructure 類別一律禁止（EDD §3.1b 禁止清單）。</p>
+<hr>
+<h2 id="8-專案結構spring-modulith-7-bc-套件結構">§8 專案結構（Spring Modulith 7 BC 套件結構）</h2>
+<p>本系統為 <strong>模組化單體（Modular Monolith）</strong>：單一可部署單元 <code>yocat-office-backend-api</code>（Spring Boot 3.3，Port 8080）內含 7 個 Spring Modulith 模組，每個模組 = 一個 Bounded Context = 一個 <code>@ApplicationModule</code>。</p>
+<h3 id="81-目錄結構mavenbase-package--comsayyogamesyocat">8.1 目錄結構（Maven，base-package = <code>com.sayyogames.yocat</code>）</h3>
+<pre><code class="">apps/api/src/main/java/com/sayyogames/yocat/
+├── YocatOfficeApplication.java      # @SpringBootApplication + @Modulithic 入口
+├── shared/                          # 橫切 SharedKernel：AccountId VO、Money、ApiError
+│   ├── AccountId.java
+│   └── Money.java
+├── member/                          # BC 1：身分權威
+│   ├── package-info.java            # @ApplicationModule(allowedDependencies={})
+│   ├── api/                         # Presentation：AuthController + @NamedInterface
+│   ├── application/                 # RegisterMemberUseCase / MemberService
+│   ├── domain/                      # Account(AR) / Session / MemberRepository(介面) / MemberRegistered(Event)
+│   └── infra/                       # JdbcMemberRepository / ScryptPasswordEncoder / SessionStore(Redis)
+├── wallet/                          # BC 2：伺服器權威錢包
+│   ├── package-info.java            # @ApplicationModule(allowedDependencies={&quot;member&quot;})
+│   ├── api/ application/ domain/ infra/
+├── deposit/   entitlement/   record/   leaderboard/   gamesave/   # BC 3~7，同四層結構
+└── platform/                        # 底座（非 BC）：SecurityConfig / RateLimitFilter / ObservabilityConfig / OutboxConfig
+apps/api/src/test/java/com/sayyogames/yocat/
+├── ModularityTests.java             # ApplicationModules.of(...).verify()（HC-1~HC-5）
+└── &lt;bc&gt;/...ModuleTest.java          # @ApplicationModuleTest 各 BC 隔離測試
+pom.xml  /  docker/api/Dockerfile（multi-stage）  /  k8s/</code></pre>
+<h3 id="82-七個-bounded-context模組名職責權威資料表">8.2 七個 Bounded Context（模組名、職責、權威資料表）</h3>
+<table>
+<tr><th>#</th><th>模組名（BC）</th><th>職責</th><th>權威 Schema / Tables</th><th>對外 Public Interface</th></tr>
+<tr><td>1</td><td><code>member</code></td><td>身分權威：註冊/登入/登出/我的資料（scrypt + session）</td><td><code>member</code>: <code>accounts</code>, <code>sessions</code></td><td>REST <code>/auth/*</code>；<code>MemberService.verifySession()</code>；Event <code>MemberRegistered</code></td></tr>
+<tr><td>2</td><td><code>wallet</code></td><td>伺服器權威錢包：topup / spend，append-only ledger</td><td><code>wallet</code>: <code>wallets</code>, <code>wallet_ledger</code></td><td>REST <code>/wallet/*</code>；<code>WalletService.debit()/credit()</code>；Event <code>WalletBalanceChanged</code></td></tr>
+<tr><td>3</td><td><code>deposit</code></td><td>儲值接口：假付費走 ledger，Phase B 真金流</td><td><code>deposit</code>: <code>deposit_pack</code></td><td>REST <code>/wallet/topup</code>（pack 解析）；Event <code>DepositConfirmed</code></td></tr>
+<tr><td>4</td><td><code>entitlement</code></td><td>已購權益：原子扣款+授予 / 列出</td><td><code>entitlement</code>: <code>entitlements</code></td><td>REST <code>/entitlements/*</code>；Event <code>EntitlementGranted</code></td></tr>
+<tr><td>5</td><td><code>record</code></td><td>經營史記錄：破產/成就/傳承（append-only）</td><td><code>record</code>: <code>records</code></td><td>REST <code>/records/*</code>；Event <code>BusinessRecordAdded</code></td></tr>
+<tr><td>6</td><td><code>leaderboard</code></td><td>全域排行：歸戶寫入 + 公開 Top N</td><td><code>leaderboard</code>: <code>leaderboard</code></td><td>REST <code>/leaderboard</code>；Event <code>RunScoreSubmitted</code></td></tr>
+<tr><td>7</td><td><code>game-save</code></td><td>跨裝置存檔：/save GET / PUT（slot upsert）</td><td><code>game_save</code>: <code>saves</code></td><td>REST <code>/save</code></td></tr>
+</table>
+<blockquote><p><strong>平台底座（<code>platform</code>，非 BC，橫切）</strong>：承載 7 BC 的 Spring Modulith 單體、Clean Architecture 4 層、Day1 HA（≥2 replicas / HPA / PodDisruptionBudget）、Event Publication Registry（JDBC Outbox）。來源 <a href="constants.html" target="_blank" rel="noopener">CONSTANTS.md</a> §12 / EDD §3.8。</p></blockquote>
+<h3 id="83-模組依賴-daghc-5">8.3 模組依賴 DAG（HC-5）</h3>
+<p>跨 BC 依賴必須為有向無環圖（DAG），<code>member</code> 為葉節點（被依賴），最長鏈 <code>entitlement → wallet → member</code>。任何循環依賴為缺陷，由 <code>ApplicationModules.verify()</code> 於 CI 阻斷 merge。</p>
+<hr>
+<h2 id="9-如何新增--修改一個-bc-的功能clean-architecture-分層放哪">§9 如何新增 / 修改一個 BC 的功能（Clean Architecture 分層放哪）</h2>
+<p>以「在 <code>wallet</code> BC 新增一個查詢 ledger 歷史的功能 <code>GET /wallet/ledger</code>」為例，說明四層放置順序（<strong>由內而外</strong>）。</p>
+<h3 id="步驟-1domain-層最先純邏輯零技術依賴">步驟 1：Domain 層（最先，純邏輯零技術依賴）</h3>
+<ul><li>位置：<code>wallet/domain/</code></li><li>若需要新的查詢行為，於 <code>WalletRepository</code>（或讀取介面 <code>WalletReadRepository</code>，ISP）新增方法簽章，例如 <code>List&lt;LedgerEntry&gt; findLedger(AccountId id, int limit)</code>。</li><li>新增/調整的 Entity / ValueObject（如 <code>LedgerEntry</code>、<code>Money</code>）保持零 import Spring / JDBC。</li><li><strong>禁止</strong>：在此層 import <code>org.springframework.<em></code> 或 <code>java.sql.</em></code>。</li></ul>
+<h3 id="步驟-2application-層usecase-編排">步驟 2：Application 層（UseCase 編排）</h3>
+<ul><li>位置：<code>wallet/application/</code></li><li>新增 <code>QueryLedgerUseCase</code>，建構子注入 Domain 的 <code>WalletReadRepository</code> 介面（DIP），不得 <code>new</code> 任何 Infrastructure 類別。</li><li>跨 BC 需求（如需 member display_name）只能呼叫對方 Public <code>@NamedInterface</code>（如 <code>MemberService</code>）或訂閱 Domain Event，<strong>不得</strong>直接存取他 BC 的 Repository / Table（HC-2）。</li></ul>
+<h3 id="步驟-3infrastructure-層實作-domain-介面">步驟 3：Infrastructure 層（實作 Domain 介面）</h3>
+<ul><li>位置：<code>wallet/infra/</code></li><li>在 <code>JdbcWalletRepository</code> 實作新方法 <code>findLedger(...)</code>，寫 SQL / 用 JDBC。此層可 import Spring、JDBC、DB Driver。</li><li>只能存取 <strong>本 BC 自己的 schema</strong>（<code>wallet</code>）；禁止跨 schema JOIN（HC-1）。</li></ul>
+<h3 id="步驟-4presentation-層對外-rest">步驟 4：Presentation 層（對外 REST）</h3>
+<ul><li>位置：<code>wallet/api/</code></li><li>在 <code>WalletController</code> 新增 <code>@GetMapping(&quot;/wallet/ledger&quot;)</code>，注入 Application 的 <code>QueryLedgerUseCase</code>。</li><li>回傳 <code>ResponseDTO</code>（不得直接回傳 Domain Entity）；錯誤碼依 <a href="constants.html" target="_blank" rel="noopener">CONSTANTS.md</a> §10（400/401/402/404/409/500）。</li><li>若此方法需供其他 BC 同步呼叫，於 <code>api/</code> 以 <code>@NamedInterface</code> 暴露介面（見 §10）。</li></ul>
+<h3 id="步驟-5測試與驗證缺一不可">步驟 5：測試與驗證（缺一不可）</h3>
+<pre><code class="language-bash">make ci-test-unit          # UseCase / Domain 單元測試（S/E/B 各 ≥ 1）
+make ci-test-modulith      # 確認未破壞 BC 邊界（HC-1~HC-5）
+make ci-archunit           # 確認 Domain 無違規 import</code></pre>
+<blockquote><p>1 Class → 1 src 檔 → 1 test 檔（class-inventory.md 規則）；每個 Public Method 至少 3 個測試案例（Success / Error / Boundary）。</p></blockquote>
+<hr>
+<h2 id="10-跨模組通訊規範hc-1hc-5">§10 跨模組通訊規範（HC-1~HC-5）</h2>
+<blockquote><p><strong>鐵律</strong>：跨 BC 只走 <strong>Public <code>@NamedInterface</code>（同步）</strong> 或 <strong>Domain Event（非同步，Outbox）</strong>。<strong>禁止</strong>跨 BC 直接呼叫對方內部類別、禁止跨 BC 存取他人 schema / JOIN、禁止跨 BC DB-level FK。</p></blockquote>
+<h3 id="101-hard-constraint-清單hc-1--hc-5">10.1 Hard Constraint 清單（HC-1 ~ HC-5）</h3>
+<table>
+<tr><th>編號</th><th>名稱</th><th>規則</th><th>CI 驗證</th></tr>
+<tr><td>HC-1</td><td>Schema Ownership</td><td>每 BC 獨佔自己的 DB schema；無兩 BC 擁有同一張 table；移除跨 BC DB-level FK，改以 <code>account_id BIGINT</code>（application-layer ID）參照</td><td><code>make ci-test-schema-isolation</code></td></tr>
+<tr><td>HC-2</td><td>Cross-BC Access</td><td>跨 BC 僅透過 Public <code>@NamedInterface</code> 或 Domain Event；禁止跨 BC 直呼 Repository / 存取他人 table / JOIN</td><td><code>make ci-archunit</code> / <code>make ci-test-modulith</code></td></tr>
+<tr><td>HC-3</td><td>Event-Driven</td><td>模組間非同步通訊走 Spring Modulith Event Publication Registry（JDBC Outbox，與業務寫入同一交易，at-least-once）</td><td><code>make ci-test-modulith</code></td></tr>
+<tr><td>HC-4</td><td>Shared State Isolation</td><td>無共享可變狀態；Redis key 以 BC 短名為 namespace 前綴（<code>member:<em></code> / <code>leaderboard:</em></code> / <code>rate:*</code>），前綴不重疊；強一致資料走 DB</td><td>檢視 EDD §21.3 Redis Key Namespace Table</td></tr>
+<tr><td>HC-5</td><td>Dependency DAG</td><td>所有模組間依賴構成有向無環圖，無循環</td><td><code>ApplicationModules.verify()</code>（<code>make ci-test-modulith</code>）</td></tr>
+</table>
+<h3 id="102-同步通訊public-namedinterface">10.2 同步通訊：Public <code>@NamedInterface</code></h3>
+<p>適用「需同交易原子性」的呼叫，例如 <code>entitlement</code> 購買時同交易扣款：</p>
+<pre><code class="language-java">// wallet/api/WalletService.java —— wallet BC 對外暴露的 Public NamedInterface
+public interface WalletService {
+    WalletView topUp(AccountId accountId, Currency currency, long amount, String reason, Map&lt;String,Object&gt; meta);
+    WalletView debit(AccountId accountId, Currency currency, long amount, String reason, Map&lt;String,Object&gt; meta); // 餘額不足擲 InsufficientBalanceException
+    WalletView findWallet(AccountId accountId);
+}
+
+// entitlement/application/BuyEntitlementUseCase.java —— 下游 BC 只依賴此介面，不碰 wallet 內部
+walletService.debit(accountId, Currency.GEMS, price, &quot;buy_&quot; + kind, meta); // 同交易原子扣款（EDD §3.4）</code></pre>
+<ul><li><code>entitlement</code> 的 <code>package-info.java</code> 須宣告 <code>@ApplicationModule(allowedDependencies={&quot;wallet&quot;, &quot;member&quot;})</code>，否則 <code>verify()</code> 失敗。</li><li>禁止 <code>entitlement</code> 直接注入 <code>JdbcWalletRepository</code> 或讀 <code>wallet.wallets</code> table。</li></ul>
+<h3 id="103-非同步通訊domain-eventoutbox">10.3 非同步通訊：Domain Event（Outbox）</h3>
+<p>適用「最終一致、解耦」的通知，例如註冊成功後 provision 錢包：</p>
+<pre><code class="language-java">// member/domain/MemberRegistered.java —— Domain Event（純資料，零框架依賴）
+public record MemberRegistered(AccountId accountId, String displayName) {}
+
+// member/application —— 發佈（Outbox 與業務寫入同一交易）
+domainEventPublisher.publish(new MemberRegistered(account.id(), account.displayName()));
+
+// wallet —— 訂閱（事件完成後 Outbox 標記 completion_date）
+@ApplicationModuleListener
+void on(MemberRegistered e) {
+    walletService.provision(e.accountId()); // 建錢包 + 寫 reason=&#x27;init&#x27; ledger（balance=0）
+}</code></pre>
+<ul><li>事件經 Spring Modulith Event Publication Registry（<code>spring.modulith.events.jdbc.enabled=true</code>）；delivery = at-least-once，重啟自動重投未完成事件（<code>completion_date IS NULL</code>）。</li><li>消費端須對 <code>event_id</code> 冪等去重（EDD §設計目標）。</li></ul>
+<h3 id="104-跨-bc-身分參照conformist">10.4 跨 BC 身分參照（Conformist）</h3>
+<p><code>wallet</code> / <code>entitlement</code> / <code>record</code> / <code>leaderboard</code> / <code>game-save</code> 皆以 <code>account_id BIGINT</code>（application-layer ID）參照 <code>member</code>，<strong>不設跨 schema FK</strong>。帳號刪除以 <code>MemberDeleted</code> 事件驅動各 BC 匿名化 / 級聯清理（EDD §3.4 / §6.3）。</p>
+<hr>
+<h2 id="11-把一個-bc-抽成獨立微服務in-process-event--broker不改-domain-碼">§11 把一個 BC 抽成獨立微服務（in-process event → broker，不改 Domain 碼）</h2>
+<p>本系統刻意保留「Day1 可分可合」：同一套 Domain / Application 程式碼，透過組態在 <strong>拓撲 A（單體 HA，最小成本）↔ 拓撲 B（獨立微服務，最大擴展）</strong> 之間切換，<strong>Domain 模型零改</strong>（ARCH §3.2.1 / EDD ADR-001）。</p>
+<h3 id="111-兩種拓撲對照">11.1 兩種拓撲對照</h3>
+<table>
+<tr><th>面向</th><th>拓撲 A（單體 HA，Day1）</th><th>拓撲 B（獨立微服務，成長期可選）</th><th>是否改 Domain 碼</th></tr>
+<tr><td>部署單元</td><td>單一 <code>yocat-office-backend-api</code>（7 BC 同 JVM）</td><td>每 BC 獨立 Container</td><td>否</td></tr>
+<tr><td>跨 BC 事件</td><td>in-process <code>@ApplicationModuleListener</code>（Outbox 本地訂閱）</td><td>Outbox 橋接至 Message Broker（NATS / Kafka）</td><td>否（Event class 不變）</td></tr>
+<tr><td>跨 BC 同步呼叫</td><td><code>@NamedInterface</code> in-JVM（同交易）</td><td>REST / gRPC + Saga 補償</td><td>Application 編排層變更，Domain 不變</td></tr>
+<tr><td>DB</td><td>共享 PostgreSQL 實例（schema-per-BC）</td><td>每服務獨立 DB 實例</td><td>否（schema 已隔離）</td></tr>
+</table>
+<h3 id="112-抽離步驟以-leaderboard-為例純讀寫無同步跨-bc-扣款最易拆">11.2 抽離步驟（以 <code>leaderboard</code> 為例，純讀寫、無同步跨 BC 扣款，最易拆）</h3>
+<ol><li><strong>前置確認（已由架構保證）</strong>：<code>leaderboard</code> 已獨佔 <code>leaderboard</code> schema（HC-1）、跨 BC 只靠 <code>account_id</code> + <code>RunScoreSubmitted</code> 事件（HC-2/HC-3）、依賴 DAG 無循環（HC-5）。這些是「可零改拆分」的前提。</li><li><strong>抽出模組</strong>：將 <code>leaderboard/</code> 套件連同其四層搬到新 Gradle/Maven module，產生獨立 <code>leaderboard-service</code> 可部署單元；Domain / Application 程式碼<strong>原封不動</strong>。</li><li><strong>替換 Infrastructure 傳輸層</strong>：把 <code>ModulithEventPublisher</code>（本地 Outbox 訂閱）換成 <strong>Outbox → Broker 橋接器</strong>（publish <code>RunScoreSubmitted</code> 到 NATS/Kafka topic）；消費端改為 broker subscriber。Event class（<code>RunScoreSubmitted</code>）不變。</li><li><strong>DB 遷移</strong>：將 <code>leaderboard</code> schema 遷到獨立 DB 實例（schema 已隔離，無跨 BC FK，遷移順序單純）。</li><li><strong>接合點調整（MD-05）</strong>：Service Discovery、Ingress 路由、ArgoCD Application 拆分、observability 重新佈線。</li><li><strong>同步跨 BC 扣款改 Saga（僅限 entitlement→wallet）</strong>：若拆的是 <code>entitlement</code>，原「同交易呼叫 <code>WalletService.debit()</code>」須改為 Saga（預授權 → 扣款 → 授予，失敗補償），屬 Application 編排層變更，Domain 不變（ARCH §3.2.1）。</li></ol>
+<h3 id="113-為什麼-domain-不用改">11.3 為什麼 Domain 不用改</h3>
+<p>Clean Architecture 讓 Domain / Application 只依賴介面（<code>WalletRepository</code>、<code>DomainEventPublisher</code>、<code>@NamedInterface</code>）；傳輸實作（in-process vs broker）全在 Infrastructure 層。切換拓撲 = 換 Infrastructure adapter + 打包方式，上層零改（EDD §3.1b DIP + ARCH §3.2.1）。</p>
+<hr>
+<h2 id="12-編碼規範">§12 編碼規範</h2>
+<table>
+<tr><th>項目</th><th>規範</th></tr>
+<tr><td>語言 / 版本</td><td>Java 21（善用 record、sealed、pattern matching、Virtual Threads）</td></tr>
+<tr><td>格式化</td><td>Spotless；提交前 <code>./mvnw -pl apps/api spotless:apply</code>，CI 以 <code>make ci-lint</code>（<code>spotless:check</code>）把關</td></tr>
+<tr><td>套件命名</td><td><code>com.sayyogames.yocat.&lt;bc&gt;.&lt;layer&gt;</code>；layer ∈ {api, application, domain, infra}</td></tr>
+<tr><td>命名慣例</td><td>Controller <code><em>Controller</code>、UseCase <code></em>UseCase</code>、Service <code><em>Service</code>、Repository 介面 <code></em>Repository</code>、實作 <code>Jdbc<em>Repository</code>、Adapter <code></em>Adapter</code>、Event 用過去式（<code>MemberRegistered</code>、<code>WalletBalanceChanged</code>）</td></tr>
+<tr><td>Domain 純淨</td><td><code>domain/</code> 禁止 import <code>org.springframework.<em></code> / <code>java.sql.</em></code> / ORM / HTTP / 外部 SDK（<code>make ci-archunit</code> 把關）</td></tr>
+<tr><td>依賴注入</td><td>一律建構子注入 Interface；禁止欄位注入、禁止 <code>new</code> Infrastructure 類別</td></tr>
+<tr><td>常數 / 列舉 / 錯誤碼</td><td>一律引用 <a href="constants.html" target="_blank" rel="noopener">CONSTANTS.md</a>（SSOT）；禁止自行定義未登記的量化值 / 列舉成員 / 錯誤碼</td></tr>
+<tr><td>錢包一致性</td><td>扣款走 <code>SELECT ... FOR UPDATE</code> 行鎖 + 冪等鍵；<code>wallet.cash/gems &gt;= 0</code> underflow guard；ledger append-only 不可改</td></tr>
+<tr><td>靜態分析</td><td>SpotBugs / Semgrep / Trivy（<code>make ci-spotbugs</code> / <code>ci-semgrep</code> / <code>ci-dependency-scan</code>）；High/Critical = 0</td></tr>
+</table>
+<hr>
+<h2 id="13-測試撰寫archunit--applicationmodulesverify">§13 測試撰寫（ArchUnit / ApplicationModules.verify）</h2>
+<h3 id="131-測試分層與指令">13.1 測試分層與指令</h3>
+<table>
+<tr><th>測試類型</th><th>指令</th><th>說明</th></tr>
+<tr><td>單元測試</td><td><code>make ci-test-unit</code>（<code>./mvnw -pl apps/api test</code> + JaCoCo check ≥80%）</td><td>JUnit 5 + Mockito，不需 K8s；每 Public Method ≥ 3 案例（S/E/B）</td></tr>
+<tr><td>整合測試</td><td><code>make ci-test-integration</code>（<code>./mvnw verify -Pintegration</code>）</td><td>REST-assured + Testcontainers（起真實 PostgreSQL / Redis）</td></tr>
+<tr><td>Modulith 邊界</td><td><code>make ci-test-modulith</code>（<code>./mvnw test -Dtest=ModularityTests</code>）</td><td><code>ApplicationModules.verify()</code> 驗 HC-1~HC-5</td></tr>
+<tr><td>架構守護</td><td><code>make ci-archunit</code></td><td>ArchUnit：Domain 不得 import spring/java.sql、分層依賴方向</td></tr>
+<tr><td>Schema 隔離</td><td><code>make ci-test-schema-isolation</code></td><td>驗各 BC 只存取自己的 schema（HC-1）</td></tr>
+<tr><td>合約測試</td><td><code>make ci-contract-test</code></td><td><code>WalletService.debit()</code> 等 Public API 合約（Pact）</td></tr>
+</table>
+<h3 id="132-spring-modulith-邊界驗證骨架">13.2 Spring Modulith 邊界驗證骨架</h3>
+<pre><code class="language-java">// apps/api/src/test/java/com/sayyogames/yocat/ModularityTests.java
+class ModularityTests {
+    @Test
+    void verify_modulith_module_structure() {
+        ApplicationModules modules = ApplicationModules.of(YocatOfficeApplication.class);
+        modules.verify(); // 違反 HC-1/HC-2 邊界或 HC-5 循環 → 擲 AssertionError，CI 阻斷 merge
+    }
+}</code></pre>
+<blockquote><p><code>verify()</code> 擲 <code>AssertionError</code> 代表 HC-5 循環或 HC-1/HC-2 邊界違規。遇到時：檢查 <code>package-info.java</code> 的 <code>@ApplicationModule(allowedDependencies={...})</code> 是否遺漏聲明，或是否出現跨 BC 直呼內部類別。</p></blockquote>
+<h3 id="133-bc-隔離測試applicationmoduletest">13.3 BC 隔離測試（@ApplicationModuleTest）</h3>
+<pre><code class="language-java">// 僅啟動單一 BC（如 wallet），驗證其可獨立運作（為拆微服務鋪路）
+@ApplicationModuleTest
+class WalletModuleTest { /* ... */ }</code></pre>
+<h3 id="134-測試追蹤rtm">13.4 測試追蹤（RTM）</h3>
+<p>class-inventory.md 定義 1 Class → 1 src → 1 test 檔；TC-ID 前綴（如 <code>TC-UNIT-SPENDWALLET</code>）後接 <code>-S01</code>/<code>-E01</code>/<code>-B01</code>。新增 Class 時同步新增對應測試檔，並更新 test-plan.md §15.2 Unit Test RTM。</p>
+<hr>
+<h2 id="14-提交與-pr-流程">§14 提交與 PR 流程</h2>
+<h3 id="141-分支與提交">14.1 分支與提交</h3>
+<ol><li>從 <code>main</code> 開 feature branch：<code>git switch -c feat/wallet-ledger-query</code>。</li><li>小步提交，commit message 用 Conventional Commits：<code>feat(wallet): add ledger history query</code>、<code>fix(member): ...</code>、<code>docs(...)</code>、<code>test(...)</code>。</li><li>推送到 Gitea（本機 <code>dev-tools</code> ns）或 GitHub，觸發 CI。</li></ol>
+<h3 id="142-pr-gates1s6提交-pr-前本機預跑">14.2 PR Gate（S1~S6，提交 PR 前本機預跑）</h3>
+<pre><code class="language-bash">make ci-lint &amp;&amp; make ci-archunit                 # S1 lint + 架構守護
+make ci-test-unit                                # S2 unit + JaCoCo ≥80%
+make ci-test-integration                         # S3 integration（Testcontainers）
+make ci-test-modulith &amp;&amp; make ci-contract-test   # S4 Modulith 邊界 + 合約
+make ci-spotbugs &amp;&amp; make ci-semgrep &amp;&amp; make ci-dependency-scan   # S5 靜態分析（High/Critical=0）
+make ci-dry-run                                  # S6 完整 PR Gate 本地模擬（act / Gitea Actions）</code></pre>
+<h3 id="143-合併與部署cd">14.3 合併與部署（CD）</h3>
+<ul><li>PR 通過 6 個 CI stage（PR Gate）+ Code Review 後 merge <code>main</code>。</li><li>merge 後 <code>deploy.yml</code> 推送 GitOps manifest，<strong>ArgoCD 自動同步</strong> dev → staging → prod（Canary via GitOps）。</li><li>部署須維持 Day1 HA：API ≥ 2 replicas、DB Primary+Standby、Redis Sentinel；Prod 不得排程停機或縮副本至 1。</li></ul>
+<h3 id="144-回滾">14.4 回滾</h3>
+<pre><code class="language-bash">make ci-rollback        # kubectl rollout undo + git revert → ArgoCD 重新同步</code></pre>
+<hr>
+<h2 id="15-常見陷阱pitfalls">§15 常見陷阱（Pitfalls）</h2>
+<table>
+<tr><th>陷阱</th><th>後果</th><th>正確做法</th></tr>
+<tr><td>在 Domain 層 import Spring / JDBC</td><td><code>make ci-archunit</code> 失敗、破壞可測性與可拆性</td><td>Domain 只定義介面；技術細節放 <code>infra/</code>（§7）</td></tr>
+<tr><td>跨 BC 直接注入他人 Repository 或查他人 table</td><td><code>make ci-test-modulith</code> / schema-isolation 失敗，架構腐化</td><td>走 Public <code>@NamedInterface</code> 或 Domain Event（HC-2，§10）</td></tr>
+<tr><td>跨 BC 加 DB-level FK</td><td>違反 HC-1，日後無法拆微服務</td><td>以 <code>account_id BIGINT</code>（application-layer ID）參照，無跨 schema FK</td></tr>
+<tr><td><code>package-info.java</code> 漏宣告 <code>allowedDependencies</code></td><td><code>verify()</code> 擲 AssertionError 擋 merge</td><td>明確宣告每個 BC 的 <code>@ApplicationModule(allowedDependencies={...})</code></td></tr>
+<tr><td>模組間產生循環依賴</td><td>違反 HC-5，<code>verify()</code> 失敗</td><td>維持 DAG；<code>member</code> 為葉節點，用事件反轉依賴方向</td></tr>
+<tr><td>錢包扣款未上行鎖 / 未冪等</td><td>併發對帳不一致（P0 護欄破線）</td><td><code>SELECT ... FOR UPDATE</code> + 冪等鍵；ledger append-only（§12）</td></tr>
+<tr><td>把遊戲模擬數值（<code>MAX_WORKERS</code> 等）搬進後端</td><td>違反「算力留本地」原則</td><td>本地算力常數留 client；信任層只透過 <code>wallet_ledger.reason</code>（如 <code>rescue</code>）感知結果（CONSTANTS.md §1）</td></tr>
+<tr><td>自行定義錯誤碼 / 列舉成員</td><td>下游契約破裂、客戶端無法預期處理</td><td>一律引用 CONSTANTS.md SSOT（§9 列舉、§10 錯誤碼）</td></tr>
+<tr><td>namespace 用錯（漏 <code>-local</code> 或誤用 <code>-local</code> 於 ci）</td><td>誤操作到錯誤環境</td><td>app = <code>yocat-office-backend-local</code>；CI = <code>yocat-office-backend-ci</code>；dev-tools = <code>dev-tools</code>（§4 FAQ）</td></tr>
+<tr><td><code>make k8s-clean</code> / <code>db-reset</code> 後忘了重跑 bootstrap</td><td>Secret 遺失、Pod 起不來</td><td>重設後一律 <code>./scripts/bootstrap-secrets.sh</code>（§1 場景 E）</td></tr>
+<tr><td>回傳 Domain Entity 給前端</td><td>洩漏內部模型、耦合 API 與 Domain</td><td>Presentation 層回傳 ResponseDTO（§7）</td></tr>
+</table></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

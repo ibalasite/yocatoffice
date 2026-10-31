@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/LeaderboardSubmitRequest",
+  "title": "LeaderboardSubmitRequest",
+  "description": "POST /leaderboard",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string",
+      "description": "upsert 鍵；空字串回400"
+    },
+    "mode": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "預設 sandbox"
+    },
+    "score": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "description": "預設 0"
+    },
+    "grade": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "detail": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "runId"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<RequestDTO>>"
+}

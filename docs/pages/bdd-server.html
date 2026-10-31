@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server BDD — yoCat Office</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">yoCat Office</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">Server BDD Scenarios</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">Server BDD Scenarios</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+<a class="sidebar__link active" href="bdd-server.html">🧪 Server BDD</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#deposit_checkoutfeature">deposit_checkout.feature</a></li><li><a class="toc__link" href="#domain_event_contractsfeature">domain_event_contracts.feature</a></li><li><a class="toc__link" href="#entitlement_purchasefeature">entitlement_purchase.feature</a></li><li><a class="toc__link" href="#game_save_syncfeature">game_save_sync.feature</a></li><li><a class="toc__link" href="#leaderboard_rankingfeature">leaderboard_ranking.feature</a></li><li><a class="toc__link" href="#member_authfeature">member_auth.feature</a></li><li><a class="toc__link" href="#modulith_boundariesfeature">modulith_boundaries.feature</a></li><li><a class="toc__link" href="#record_historyfeature">record_history.feature</a></li><li><a class="toc__link" href="#wallet_transactionsfeature">wallet_transactions.feature</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h2 id="deposit_checkoutfeature">deposit_checkout.feature</h2>
+<pre><code class="language-gherkin"># features/deposit/deposit_checkout.feature
+# 來源：PRD §4.4 / §5 deposit（US-DEP-001，P1）
+# 上游 API：API.md §3 BC: deposit（GET /deposit/packs、POST /deposit/checkout）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+# 核心：Phase A 假付費直接確認，經 DepositConfirmed 事件由 wallet BC 入帳；以 Idempotency-Key 冪等。
+
+@deposit @p1
+Feature: 儲值訂單建立與目錄查詢
+  作為代表玩家的客戶端整合工程師
+  我希望查詢可購買的儲值包並以冪等方式建立儲值訂單
+  以便讓玩家的儲值動作可信、可對帳且重試不重複入帳
+
+  Background:
+    Given 資料庫已初始化為乾淨狀態
+    And 儲值目錄已載入，包含寶石包與資本包
+
+  # ─── 正常路徑：公開查詢目錄 ─────────────────────────────
+  @p1 @smoke @contract @api @TC-E2E-DEP-001-S01 @US-DEP-001-AC1
+  Scenario: 未登入也能查詢儲值包目錄
+    Given 使用者未提供 session token
+    When 使用者查詢儲值包目錄
+    Then 系統回應 HTTP 200 並回傳所有可購買的儲值包
+    And 每個儲值包包含包 ID、幣別、入帳數量與顯示名稱
+
+  # ─── 正常路徑：建立訂單（假付費確認）───────────────────
+  @p1 @smoke @contract @api @TC-E2E-DEP-002-S01 @US-DEP-001-AC2
+  Scenario: 以有效儲值包與冪等鍵建立已確認的儲值訂單
+    Given 使用者持有有效的 session token
+    And 使用者提供一個全新的冪等鍵
+    When 使用者以大寶石包建立儲值訂單
+    Then 系統回應 HTTP 200 並回傳狀態為已確認的訂單
+    And 回應包含訂單 ID、包 ID、幣別與入帳數量
+
+  # ─── 冪等：重放相同鍵 ───────────────────────────────────
+  @p1 @regression @api @TC-INT-DEP-003-S01 @US-DEP-001-AC2
+  Scenario: 以相同冪等鍵重放儲值請求時回放原訂單且只入帳一次
+    Given 使用者持有有效的 session token
+    And 使用者已以某冪等鍵建立過一筆已確認的儲值訂單
+    When 使用者以相同的冪等鍵再次送出相同的儲值請求
+    Then 系統回放先前那筆訂單的結果
+    And 使用者的錢包僅入帳一次
+
+  # ─── 錯誤路徑：冪等鍵衝突（409）────────────────────────
+  @p1 @regression @contract @api @TC-INT-DEP-004-E01 @US-DEP-001-AC2
+  Scenario: 相同冪等鍵但請求內容不同時回應衝突
+    Given 使用者持有有效的 session token
+    And 使用者已以某冪等鍵建立過一筆儲值訂單
+    When 使用者以相同冪等鍵但不同的儲值包送出請求
+    Then 系統回應 HTTP 409 並提示冪等鍵衝突
+    And 系統不建立新的訂單
+
+  # ─── 錯誤路徑：儲值包不在目錄（400）───────────────────
+  @p1 @regression @contract @api @TC-INT-DEP-005-E01 @US-DEP-001-AC2
+  Scenario: 以不存在的儲值包建立訂單時被拒絕
+    Given 使用者持有有效的 session token
+    And 使用者提供一個全新的冪等鍵
+    When 使用者以不在目錄中的儲值包建立訂單
+    Then 系統回應 HTTP 400 並提示「儲值包不正確」
+    And 系統不建立任何訂單
+
+  # ─── 錯誤路徑：缺冪等鍵（400）──────────────────────────
+  @p1 @regression @api @TC-INT-DEP-006-E01 @US-DEP-001-AC2
+  Scenario: 未提供冪等鍵時拒絕建立儲值訂單
+    Given 使用者持有有效的 session token
+    When 使用者在未提供冪等鍵的情況下建立儲值訂單
+    Then 系統拒絕請求並要求提供冪等鍵
+    And 系統不建立任何訂單
+
+  # ─── 錯誤路徑：未認證（401）─────────────────────────────
+  @p1 @regression @contract @api @TC-INT-DEP-007-E01 @US-DEP-001-AC2
+  Scenario: 無有效 token 建立儲值訂單時拒絕存取
+    Given 使用者未提供有效的 session token
+    When 使用者嘗試建立儲值訂單
+    Then 系統回應 HTTP 401 並提示「請先登入」
+    And 系統不建立任何訂單
+</code></pre>
+<h2 id="domain_event_contractsfeature">domain_event_contracts.feature</h2>
+<pre><code class="language-gherkin"># features/cross-module/event/domain_event_contracts.feature
+# 來源：EDD §4.6.1 Domain Events / §3.4；API §1.3（Outbox 投遞）
+# 跨 BC Domain Event consumer pair：
+#   MemberRegistered（member → wallet）、DepositConfirmed（deposit → wallet）、
+#   WalletBalanceChanged（wallet → 下游）、EntitlementGranted（entitlement → 下游）、RunScoreSubmitted（leaderboard → 下游）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+
+@event-contract @modulith @p0 @api
+Feature: 跨有界上下文領域事件合約
+  作為各有界上下文的生產者與消費者
+  我希望發布並消費符合合約的領域事件
+  以便跨模組狀態保持一致且事件結構升版時不破壞消費端
+
+  Background:
+    Given 跨模組通訊一律透過交易式 Outbox 的領域事件進行
+
+  # ─── MemberRegistered 生產者 ───────────────────────────
+  @TC-INT-EVT-001-S01 @US-PLAT-001-AC4
+  Scenario: 註冊完成時 member 發布合規的會員註冊事件
+    Given member 已在同一交易建立新帳號
+    When 該交易提交完成
+    Then 系統發布會員註冊事件
+    And 事件內容包含帳號 ID 與 email
+    And 事件結構符合既有合約版本
+
+  # ─── MemberRegistered 消費者（wallet 開帳）─────────────
+  @TC-INT-EVT-002-S01 @US-WAL-001-AC1
+  Scenario: wallet 消費會員註冊事件後建立初始錢包與開帳帳本
+    Given wallet 尚未為該帳號建立錢包
+    When wallet 收到合規的會員註冊事件
+    Then wallet 為該帳號建立初始餘額為零的錢包
+    And wallet 寫入一筆原因為開帳的錢包異動記錄
+    And 整個過程不需呼叫 member 的任何 HTTP 介面
+
+  # ─── DepositConfirmed 生產者 ───────────────────────────
+  @TC-INT-EVT-003-S01 @US-DEP-001-AC2
+  Scenario: 儲值確認後 deposit 發布合規的儲值確認事件
+    Given deposit 已建立一筆已確認的儲值訂單
+    When 該訂單交易提交完成
+    Then 系統發布儲值確認事件
+    And 事件內容包含帳號 ID、訂單 ID、幣別與金額
+
+  # ─── DepositConfirmed 消費者（wallet 入帳，冪等）───────
+  @TC-INT-EVT-004-S01 @US-WAL-001-AC1
+  Scenario: wallet 消費儲值確認事件後入帳且重複投遞只入帳一次
+    Given wallet 尚未處理某筆儲值確認事件
+    When wallet 收到該儲值確認事件並再次收到相同事件
+    Then wallet 僅對該帳號入帳一次
+    And wallet 以事件 ID 去重避免重複入帳
+
+  # ─── EntitlementGranted 生產者 ─────────────────────────
+  @TC-INT-EVT-005-S01 @US-ENT-001-AC1
+  Scenario: 授予權益後 entitlement 發布合規的權益授予事件
+    Given entitlement 已在同一交易完成扣款與授予
+    When 該交易提交完成
+    Then 系統發布權益授予事件
+    And 事件內容包含帳號 ID、類別與項目 ID
+
+  # ─── RunScoreSubmitted 生產者 ──────────────────────────
+  @TC-INT-EVT-006-S01 @US-LB-001-AC1
+  Scenario: 上榜後 leaderboard 發布合規的分數提交事件
+    Given leaderboard 已以場次 ID upsert 寫入分數
+    When 該寫入完成
+    Then 系統發布分數提交事件
+    And 事件內容包含帳號 ID、場次 ID、模式與分數
+</code></pre>
+<h2 id="entitlement_purchasefeature">entitlement_purchase.feature</h2>
+<pre><code class="language-gherkin"># features/entitlement/entitlement_purchase.feature
+# 來源：PRD §5.3 entitlement（US-ENT-001，AC-1～AC-5）
+# 上游 API：API.md §3 BC: entitlement（POST /entitlements/buy、GET /entitlements）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+# 核心：原子扣款 + 授予同一交易；UNIQUE(account,kind,item) 防重複；破產不消失。
+
+@entitlement @p0
+Feature: 已購權益的原子購買與查詢
+  作為透過客戶端的辦公室模擬老闆
+  我希望以原子交易購買外觀、夢想員工或劇本，且已購權益不重複、不因破產消失
+  以便確保花錢買的與特聘的夢想員工永遠不會被搞丟
+
+  Background:
+    Given 資料庫已初始化為乾淨狀態
+    And 已存在登入中的帳號，其錢包餘額為 cash 18750、gems 330
+
+  # ─── 正常路徑：購買（AC-1）──────────────────────────────
+  @p0 @smoke @contract @api @TC-E2E-ENT-001-S01 @US-ENT-001-AC1
+  Scenario: 餘額足夠且未擁有時原子扣款並授予權益
+    Given 使用者尚未擁有外觀項目 &quot;suit_gold&quot;
+    And 使用者的寶石餘額足以支付該項目
+    When 使用者以寶石購買外觀項目 &quot;suit_gold&quot;
+    Then 系統回應 HTTP 200 並回傳扣款後的錢包與最新權益清單
+    And 系統在同一交易寫入一筆購買原因的錢包異動記錄
+    And 新權益出現在使用者的權益清單中
+
+  # ─── 正常路徑：免費授予（amount = 0）───────────────────
+  @p1 @regression @api @TC-INT-ENT-006-S01 @US-ENT-001-AC1
+  Scenario: 以零金額免費授予活動權益時僅插入權益不寫帳本
+    Given 使用者尚未擁有劇本項目 &quot;event_welcome&quot;
+    When 系統以零金額免費授予該劇本項目
+    Then 使用者取得該劇本權益
+    And 系統不寫入任何錢包異動記錄
+
+  # ─── 錯誤路徑：已擁有（AC-2）────────────────────────────
+  @p0 @regression @contract @api @TC-INT-ENT-002-E01 @US-ENT-001-AC2
+  Scenario: 重複購買已擁有的項目時回應衝突且不重複扣款
+    Given 使用者已擁有外觀項目 &quot;suit_gold&quot;
+    When 使用者再次購買相同的外觀項目 &quot;suit_gold&quot;
+    Then 系統回應 HTTP 409 並提示「已經擁有這個項目」
+    And 系統不重複扣款也不重複授予
+
+  # ─── 錯誤路徑：餘額不足（AC-3）──────────────────────────
+  @p0 @regression @contract @api @TC-INT-ENT-003-E01 @US-ENT-001-AC3
+  Scenario: 餘額不足時交易回滾不扣款也不授予
+    Given 使用者尚未擁有夢想員工 &quot;soul_einstein&quot;
+    And 使用者的餘額小於該項目價格
+    When 使用者嘗試購買該夢想員工
+    Then 系統回應 HTTP 402 並提示「餘額不足」
+    And 使用者未取得該權益且餘額維持不變
+
+  # ─── 邊界條件：項目驗證（AC-4）──────────────────────────
+  @p0 @regression @api @TC-UNIT-ENT-004-B01 @US-ENT-001-AC4
+  Scenario Outline: 類別非法或缺項目 ID 的購買被拒絕
+    Given 使用者持有有效的 session token
+    When 使用者以類別 &quot;&lt;kind&gt;&quot; 與項目 &quot;&lt;item_id&gt;&quot; 送出購買
+    Then 系統拒絕購買並提示「項目不正確」
+    And 系統不授予任何權益
+
+    Examples:
+      | kind      | item_id    |
+      | weapon    | suit_gold  |
+      | cosmetic  |            |
+      |           | suit_gold  |
+
+  # ─── 錯誤路徑：未認證（401）─────────────────────────────
+  @p0 @regression @contract @api @TC-INT-ENT-007-E01 @US-ENT-001-AC1
+  Scenario: 無有效 token 購買權益時拒絕存取
+    Given 使用者未提供有效的 session token
+    When 使用者嘗試購買外觀項目
+    Then 系統回應 HTTP 401 並提示「請先登入」
+    And 系統不授予任何權益
+
+  # ─── 正常路徑：查詢權益、破產不消失（AC-5）─────────────
+  @p0 @smoke @contract @api @TC-E2E-ENT-005-S01 @US-ENT-001-AC5
+  Scenario: 帳號破產重經營後已購權益仍完整列出
+    Given 使用者已擁有外觀項目 &quot;suit_gold&quot; 與夢想員工 &quot;soul_einstein&quot;
+    And 該帳號曾在遊戲內破產並重經營
+    When 使用者查詢已購權益清單
+    Then 系統回應 HTTP 200 並完整列出先前購買的所有權益
+    And 權益清單依取得時間排序
+
+  # ─── 錯誤路徑：查詢未認證（401）────────────────────────
+  @p1 @regression @api @TC-INT-ENT-008-E01 @US-ENT-001-AC5
+  Scenario: 無有效 token 查詢權益時拒絕存取
+    Given 使用者未提供有效的 session token
+    When 使用者嘗試查詢已購權益清單
+    Then 系統拒絕存取並提示「請先登入」
+    And 系統不回傳任何權益資料
+</code></pre>
+<h2 id="game_save_syncfeature">game_save_sync.feature</h2>
+<pre><code class="language-gherkin"># features/game-save/game_save_sync.feature
+# 來源：PRD §5.4 game-save（US-SAVE-001，AC-1～AC-5）
+# 上游 API：API.md §3 BC: game-save（PUT /save、GET /save）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+# 核心：以 (account_id, slot) upsert 跨裝置存檔；查無回 {save:null}（非 404）；body 上限 4MB。
+
+@game-save @p0
+Feature: 跨裝置辦公室存檔同步
+  作為透過客戶端的辦公室模擬老闆
+  我希望以帳號上傳辦公室存檔並在任何裝置還原
+  以便換手機或重灌後延續公司經營進度，不再因綁單一裝置而全失
+
+  Background:
+    Given 資料庫已初始化為乾淨狀態
+    And 已存在一個登入中的帳號
+
+  # ─── 正常路徑：上傳存檔（AC-1）──────────────────────────
+  @p0 @smoke @contract @api @TC-E2E-SAVE-001-S01 @US-SAVE-001-AC1
+  Scenario: 上傳存檔時以帳號與存檔槽 upsert 寫入
+    Given 使用者持有有效的 session token
+    When 使用者將辦公室存檔上傳至預設存檔槽
+    Then 系統回應 HTTP 200 並確認存檔已寫入
+    And 該存檔的最後更新時間被更新為當下
+
+  # ─── 邊界條件：缺 data（AC-4）───────────────────────────
+  @p0 @regression @contract @api @TC-UNIT-SAVE-004-B01 @US-SAVE-001-AC4
+  Scenario: 上傳存檔缺少資料欄位時被拒絕
+    Given 使用者持有有效的 session token
+    When 使用者在未提供存檔資料的情況下上傳存檔
+    Then 系統回應 HTTP 400 並提示「缺 data」
+    And 系統不寫入任何存檔
+
+  # ─── 邊界條件：空物件視為合法存檔 ──────────────────────
+  @p1 @regression @api @TC-INT-SAVE-006-B01 @US-SAVE-001-AC1
+  Scenario: 上傳空物件存檔時仍視為合法寫入
+    Given 使用者持有有效的 session token
+    When 使用者上傳一個內容為空物件的存檔
+    Then 系統確認存檔已寫入
+    And 後續查詢可取回該空物件存檔
+
+  # ─── 錯誤路徑：未認證（401）─────────────────────────────
+  @p0 @regression @contract @api @TC-INT-SAVE-007-E01 @US-SAVE-001-AC1
+  Scenario: 無有效 token 上傳存檔時拒絕存取
+    Given 使用者未提供有效的 session token
+    When 使用者嘗試上傳存檔
+    Then 系統回應 HTTP 401 並提示「請先登入」
+    And 系統不寫入任何存檔
+
+  # ─── 正常路徑：還原存檔（AC-2）──────────────────────────
+  @p0 @smoke @contract @api @TC-E2E-SAVE-002-S01 @US-SAVE-001-AC2
+  Scenario: 查詢已存在的存檔時回傳最新內容
+    Given 使用者持有有效的 session token
+    And 該帳號的預設存檔槽已有一份存檔
+    When 使用者查詢預設存檔槽
+    Then 系統回應 HTTP 200 並回傳最新存檔資料與更新時間
+
+  # ─── 邊界條件：無存檔回 null（AC-3）────────────────────
+  @p0 @regression @contract @api @TC-INT-SAVE-003-E01 @US-SAVE-001-AC3
+  Scenario: 查詢尚無存檔的存檔槽時回傳空存檔而非找不到
+    Given 使用者持有有效的 session token
+    And 該帳號的預設存檔槽尚無任何存檔
+    When 使用者查詢預設存檔槽
+    Then 系統回應 HTTP 200 且存檔內容為空
+    And 系統不回應資源不存在錯誤
+
+  # ─── 正常路徑：跨裝置還原（AC-5）───────────────────────
+  @p0 @smoke @api @TC-E2E-SAVE-005-S01 @US-SAVE-001-AC5
+  Scenario: 在一台裝置上傳後於另一台裝置登入可還原同一存檔
+    Given 使用者已在裝置 A 上傳了一份辦公室存檔
+    When 使用者在裝置 B 以同一帳號登入並查詢存檔
+    Then 系統回傳裝置 A 寫入的最新存檔內容
+    And 兩台裝置看到的存檔資料一致
+</code></pre>
+<h2 id="leaderboard_rankingfeature">leaderboard_ranking.feature</h2>
+<pre><code class="language-gherkin"># features/leaderboard/leaderboard_ranking.feature
+# 來源：PRD §5 leaderboard（US-LB-001，P1）；RTM TC-INT-LB-001
+# 上游 API：API.md §3 BC: leaderboard（GET /leaderboard、POST /leaderboard）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+# 核心：公開 Top N 查詢（不需登入）；上榜歸戶寫入，以 run_id upsert 冪等。
+
+@leaderboard @p1
+Feature: 全域排行榜查詢與上榜
+  作為代表玩家的客戶端整合工程師
+  我希望公開查詢全域排行榜並以歸戶方式上榜且重複提交只更新一筆
+  以便支撐社交參與同時確保分數由伺服器權威歸戶
+
+  Background:
+    Given 資料庫已初始化為乾淨狀態
+    And 排行榜已有若干筆沙盒模式的既有分數
+
+  # ─── 正常路徑：公開查詢 Top N ──────────────────────────
+  @p1 @smoke @contract @api @TC-INT-LB-001-S01 @US-LB-001-AC1
+  Scenario: 未登入也能依分數由高到低查詢排行榜
+    Given 使用者未提供 session token
+    When 使用者查詢排行榜前 20 名
+    Then 系統回應 HTTP 200 並依分數由高到低回傳上榜清單
+    And 每筆上榜資料包含場次 ID、顯示名稱、模式與分數
+
+  # ─── 邊界條件：limit 夾擠 ───────────────────────────────
+  @p1 @regression @api @TC-INT-LB-002-B01 @US-LB-001-AC1
+  Scenario Outline: 查詢筆數被夾擠於合法範圍內
+    Given 排行榜已有超過 100 筆分數
+    When 使用者以筆數 &quot;&lt;limit&gt;&quot; 查詢排行榜
+    Then 系統回傳的筆數不超過 &quot;&lt;max_returned&gt;&quot;
+
+    Examples:
+      | limit | max_returned |
+      | 1     | 1            |
+      | 20    | 20           |
+      | 500   | 100          |
+
+  # ─── 正常路徑：上榜歸戶寫入 ─────────────────────────────
+  @p1 @smoke @contract @api @TC-INT-LB-003-S01 @US-LB-001-AC1
+  Scenario: 已登入者上榜時以帳號顯示名稱歸戶寫入
+    Given 使用者持有有效的 session token
+    When 使用者以場次 &quot;run-7781&quot; 提交分數 982300
+    Then 系統回應 HTTP 200 並確認上榜成功
+    And 該場次以使用者的顯示名稱歸戶記錄
+
+  # ─── 冪等：同 run_id upsert ─────────────────────────────
+  @p1 @regression @api @TC-INT-LB-004-S01 @US-LB-001-AC1
+  Scenario: 以相同場次 ID 再次提交時只更新同一筆排行記錄
+    Given 使用者持有有效的 session token
+    And 使用者已以場次 &quot;run-7781&quot; 提交過分數
+    When 使用者以相同場次 &quot;run-7781&quot; 提交更高的分數
+    Then 該場次的排行記錄更新為最新分數
+    And 排行榜中該場次仍只有一筆記錄
+
+  # ─── 邊界條件：缺場次 ID（400）─────────────────────────
+  @p1 @regression @contract @api @TC-INT-LB-005-E01 @US-LB-001-AC1
+  Scenario: 未提供場次 ID 上榜時被拒絕
+    Given 使用者持有有效的 session token
+    When 使用者在未提供場次 ID 的情況下提交分數
+    Then 系統回應 HTTP 400 並提示「缺 runId」
+    And 系統不寫入任何排行記錄
+
+  # ─── 錯誤路徑：未認證上榜（401）────────────────────────
+  @p1 @regression @contract @api @TC-INT-LB-006-E01 @US-LB-001-AC1
+  Scenario: 無有效 token 提交分數時拒絕存取
+    Given 使用者未提供有效的 session token
+    When 使用者嘗試提交分數上榜
+    Then 系統回應 HTTP 401 並提示「請先登入」
+    And 系統不寫入任何排行記錄
+</code></pre>
+<h2 id="member_authfeature">member_auth.feature</h2>
+<pre><code class="language-gherkin"># features/member/member_auth.feature
+# 來源：PRD §5.1 member（US-MEM-001，AC-1～AC-6）
+# 上游 API：API.md §3 BC: member（POST /auth/register、/auth/login、/auth/logout、GET /auth/me）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+# 註：本系統 C 端信任層為 self-scoped，SSOT（API §5.2）刻意不使用 403 / 422；越權等同無效 token → 401。
+
+@member @p0
+Feature: 會員身分與 session 認證
+  作為代表玩家的客戶端整合工程師
+  我希望以 email 與密碼註冊、登入取得 session token，並查詢「我的資料」
+  以便讓伺服器以權威方式識別並歸戶每一位玩家，作為後續錢包與存檔的可信身分錨點
+
+  Background:
+    Given 資料庫已初始化為乾淨狀態
+    And 系統已存在一個啟用中的帳號，email 為 &quot;boss@example.com&quot;、密碼為 &quot;s3cret!&quot;
+
+  # ─── 正常路徑：註冊（AC-1）───────────────────────────────
+  @p0 @smoke @contract @api @TC-E2E-MEM-001-S01 @US-MEM-001-AC1
+  Scenario: 以合法資料註冊新帳號並同時開立錢包
+    Given email &quot;newboss@example.com&quot; 尚未被註冊
+    When 使用者以合法 email、顯示名稱與密碼送出註冊
+    Then 系統回應 HTTP 200 並附帶 session token
+    And 回應包含新帳號資料與初始錢包（cash 為 0、gems 為 0）
+    And 系統為該帳號建立一筆開帳的錢包異動記錄
+
+  # ─── 錯誤路徑：email 重複（AC-2）────────────────────────
+  @p0 @regression @contract @api @TC-INT-MEM-002-E01 @US-MEM-001-AC2
+  Scenario: 以已註冊的 email 再次註冊時回應衝突
+    Given email &quot;boss@example.com&quot; 已被註冊
+    When 使用者以 email &quot;boss@example.com&quot; 送出註冊
+    Then 系統回應 HTTP 409 並提示「這個 email 已經註冊過了」
+    And 系統不建立重複帳號
+
+  # ─── 邊界條件：欄位格式（AC-3）──────────────────────────
+  @p0 @regression @api @TC-UNIT-MEM-003-B01 @US-MEM-001-AC3
+  Scenario Outline: 格式或長度不合法的註冊欄位被拒絕
+    Given email &quot;&lt;email&gt;&quot; 尚未被註冊
+    When 使用者以 email &quot;&lt;email&gt;&quot;、顯示名稱 &quot;&lt;display_name&gt;&quot;、密碼 &quot;&lt;password&gt;&quot; 送出註冊
+    Then 系統拒絕註冊並回應「&lt;message&gt;」
+    And 系統不寫入任何帳號資料
+
+    Examples:
+      | email               | display_name | password | message          |
+      |                     | 喵喵科技     | s3cret!  | email 格式不正確 |
+      | notanemail          | 喵喵科技     | s3cret!  | email 格式不正確 |
+      | ok@example.com      |              | s3cret!  | 公司/老闆名需 1–24 字 |
+      | ok2@example.com     | 喵喵科技     | 12345    | 密碼至少 6 碼    |
+
+  # ─── 正常路徑：登入（AC-4）───────────────────────────────
+  @p0 @smoke @contract @api @TC-E2E-MEM-004-S01 @US-MEM-001-AC4
+  Scenario: 以正確帳密登入並簽發新 session
+    Given 帳號 &quot;boss@example.com&quot; 為啟用狀態
+    When 使用者以正確 email 與密碼登入
+    Then 系統回應 HTTP 200 並簽發有效期 30 天的新 session token
+    And 回應包含帳號資料與當前錢包餘額
+
+  # ─── 錯誤路徑：帳密錯誤（AC-5）──────────────────────────
+  @p0 @regression @contract @api @TC-INT-MEM-005-E01 @US-MEM-001-AC5
+  Scenario: 以錯誤密碼登入時回應認證失敗且不洩露帳號是否存在
+    Given 帳號 &quot;boss@example.com&quot; 為啟用狀態
+    When 使用者以正確 email 但錯誤密碼登入
+    Then 系統回應 HTTP 401 並提示「email 或密碼錯誤」
+    And 系統不簽發任何 session token
+
+  @p0 @regression @api @TC-INT-MEM-005-E02 @US-MEM-001-AC5
+  Scenario: 以未註冊的 email 登入時回應與帳密錯誤相同的訊息
+    Given email &quot;ghost@example.com&quot; 不存在於系統
+    When 使用者以未註冊的 email 登入
+    Then 系統回應認證失敗並提示「email 或密碼錯誤」
+    And 系統不透露該 email 是否已註冊
+
+  # ─── 正常路徑：我的資料 ─────────────────────────────────
+  @p0 @smoke @contract @api @TC-E2E-MEM-007-S01 @US-MEM-001-AC1
+  Scenario: 已登入者查詢我的資料彙整帳號、錢包與權益
+    Given 使用者持有有效的 session token
+    When 使用者查詢「我的資料」
+    Then 系統回應 HTTP 200 並包含帳號、錢包與已購權益清單
+    And 權益清單在未購買任何項目時為空陣列
+
+  # ─── 錯誤路徑：未認證（AC-6）────────────────────────────
+  @p0 @regression @contract @api @TC-INT-MEM-006-E01 @US-MEM-001-AC6
+  Scenario: 無有效 token 查詢我的資料時拒絕存取
+    Given 使用者未提供有效的 session token
+    When 使用者嘗試查詢「我的資料」
+    Then 系統回應 HTTP 401 並提示「請先登入」
+    And 系統不回傳任何帳號資料
+
+  # ─── 冪等：登出 ─────────────────────────────────────────
+  @p0 @regression @api @TC-INT-MEM-008-S01 @US-MEM-001-AC4
+  Scenario: 登出刪除當前 session 且為冪等操作
+    Given 使用者持有有效的 session token
+    When 使用者登出
+    Then 系統確認登出成功
+    And 原先的 session token 不再能存取需認證的資源
+
+  @p0 @regression @api @TC-INT-MEM-008-E01 @US-MEM-001-AC4
+  Scenario: 以無效或已失效的 token 登出仍回應成功（冪等）
+    Given 使用者提供一個已失效的 session token
+    When 使用者登出
+    Then 系統仍確認登出成功
+    And 系統不回應認證錯誤
+
+  # ─── 速率限制（429）─────────────────────────────────────
+  @p0 @regression @contract @api @TC-INT-MEM-009-E01 @US-MEM-001-AC1
+  Scenario: 同一來源短時間內大量註冊時觸發速率限制
+    Given 同一來源 IP 在本時間窗內的註冊次數已達上限
+    When 使用者再次送出註冊
+    Then 系統回應 HTTP 429 並提示「請求過於頻繁」
+    And 回應附帶建議的重試等待時間
+</code></pre>
+<h2 id="modulith_boundariesfeature">modulith_boundaries.feature</h2>
+<pre><code class="language-gherkin"># features/architecture/modulith_boundaries.feature
+# 來源：PRD §5.5 平台底座（US-PLAT-001，AC-3/AC-4）；API §1.1（HC-2）；EDD §3.4
+# 上游：Spring Modulith HC-1~HC-5 硬約束（禁跨 BC DB FK、只走 Public API/Event、Redis 命名空間隔離、依賴為 DAG）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+
+@architecture @modulith @p0
+Feature: Spring Modulith 有界上下文邊界守護
+  作為維運團隊的 Engineering Lead
+  我希望以可自動驗證的場景守護 7 個有界上下文的模組邊界
+  以便讓架構約束不退化為人工 code review，並確保模組可在不改邊界下逐一拆微服務
+
+  Background:
+    Given 系統由 7 個有界上下文組成：member、wallet、deposit、entitlement、record、leaderboard、game-save
+
+  # ─── HC-1：Schema 隔離 ──────────────────────────────────
+  @p0 @modulith @TC-INT-ARCH-001-S01 @US-PLAT-001-AC4
+  Scenario: 每個有界上下文只存取自己擁有的資料庫 schema
+    Given 各有界上下文各自擁有獨立的資料庫 schema
+    When 執行模組邊界靜態分析
+    Then 不存在任何跨 schema 的外鍵或直接查詢
+    And member 的錢包資料一律經 wallet 的公開介面取得
+
+  # ─── HC-2：跨模組僅走 Public API ──────────────────────
+  @p0 @modulith @TC-INT-ARCH-002-S01 @US-PLAT-001-AC4
+  Scenario: 有界上下文之間僅透過公開介面或領域事件互動
+    Given entitlement 購買流程需呼叫 wallet 進行扣款
+    When 執行模組依賴分析
+    Then entitlement 僅透過 wallet 的公開服務介面呼叫扣款
+    And 不存在對其他模組內部類別的直接依賴
+
+  # ─── HC-3：領域事件合約 ────────────────────────────────
+  @p0 @modulith @event-contract @TC-INT-ARCH-003-S01 @US-PLAT-001-AC4
+  Scenario: 跨模組通訊透過具版本相容性的領域事件
+    Given deposit 確認後需通知 wallet 入帳
+    When deposit 發布儲值確認領域事件
+    Then 該事件透過交易式 Outbox 可靠投遞
+    And 事件結構符合既有合約且向後相容
+
+  # ─── HC-4：Redis 命名空間隔離 ─────────────────────────
+  @p0 @modulith @TC-INT-ARCH-004-S01 @US-PLAT-001-AC4
+  Scenario: 各有界上下文使用隔離的 Redis 命名空間
+    Given 多個有界上下文使用 Redis 作為快取與限流後援
+    When 檢視各模組寫入的 Redis 鍵
+    Then 每個模組的鍵都帶有自己的命名空間前綴
+    And 不同模組之間不共用同一組可變快取鍵
+
+  # ─── HC-5：模組依賴為 DAG ──────────────────────────────
+  @p0 @modulith @TC-UNIT-ARCH-005-S01 @US-PLAT-001-AC3
+  Scenario: 模組依賴關係構成有向無環圖
+    Given 7 個有界上下文之間存在依賴關係
+    When 執行模組化測試驗證依賴圖
+    Then 模組依賴關係為有向無環圖
+    And 不存在任何循環依賴
+
+  # ─── 模組隔離冷啟動 ─────────────────────────────────────
+  @p0 @module-isolation @TC-INT-ARCH-006-S01 @US-PLAT-001-AC4
+  Scenario Outline: 單一有界上下文可在其他模組不可用時獨立冷啟動
+    Given 僅啟動 &quot;&lt;bc&gt;&quot; 有界上下文，其餘模組以外部替身隔離
+    When 該有界上下文啟動應用情境
+    Then 該有界上下文成功啟動
+    And 其健康檢查回報就緒
+
+    Examples:
+      | bc          |
+      | member      |
+      | wallet      |
+      | entitlement |
+      | game-save   |
+</code></pre>
+<h2 id="record_historyfeature">record_history.feature</h2>
+<pre><code class="language-gherkin"># features/record/record_history.feature
+# 來源：PRD §4.1 / §5 record（US-REC-001，P1）；RTM TC-INT-REC-001
+# 上游 API：API.md §3 BC: record（POST /records、GET /records）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+# 核心：經營史 append-only（破產 / 成就 / 傳承），破產記錄歸戶、不因重經營消失。
+
+@record @p1
+Feature: 經營史記錄寫入與查詢
+  作為透過客戶端的辦公室模擬老闆
+  我希望把破產、成就與傳承等經營史以 append-only 方式記錄並可查詢
+  以便保留公司的情感軌跡並供營運逐筆對帳
+
+  Background:
+    Given 資料庫已初始化為乾淨狀態
+    And 已存在一個登入中的帳號
+
+  # ─── 正常路徑：寫入經營史 ───────────────────────────────
+  @p1 @smoke @contract @api @TC-INT-REC-001-S01 @US-REC-001-AC1
+  Scenario: 以合法類型新增一筆破產經營史
+    Given 使用者持有有效的 session token
+    When 使用者新增一筆破產類型的經營史記錄
+    Then 系統回應 HTTP 200 並確認記錄已寫入
+    And 該筆記錄以 append-only 方式歸屬於該帳號
+
+  # ─── 邊界條件：類型驗證 ─────────────────────────────────
+  @p1 @regression @api @TC-INT-REC-002-B01 @US-REC-001-AC1
+  Scenario Outline: 類型非法的經營史記錄被拒絕
+    Given 使用者持有有效的 session token
+    When 使用者以類型 &quot;&lt;type&gt;&quot; 新增經營史記錄
+    Then 系統拒絕寫入並提示「type 不正確」
+    And 系統不新增任何經營史記錄
+
+    Examples:
+      | type      |
+      | victory   |
+      | refund    |
+      |           |
+
+  # ─── 錯誤路徑：未認證（401）─────────────────────────────
+  @p1 @regression @contract @api @TC-INT-REC-003-E01 @US-REC-001-AC1
+  Scenario: 無有效 token 寫入經營史時拒絕存取
+    Given 使用者未提供有效的 session token
+    When 使用者嘗試新增經營史記錄
+    Then 系統回應 HTTP 401 並提示「請先登入」
+    And 系統不新增任何經營史記錄
+
+  # ─── 正常路徑：查詢全部經營史 ──────────────────────────
+  @p1 @smoke @contract @api @TC-INT-REC-004-S01 @US-REC-001-AC1
+  Scenario: 查詢經營史時依建立時間由新到舊回傳
+    Given 使用者持有有效的 session token
+    And 該帳號已有破產與成就各一筆經營史記錄
+    When 使用者查詢全部經營史
+    Then 系統回應 HTTP 200 並回傳該帳號的經營史清單
+    And 清單依建立時間由新到舊排序
+
+  # ─── 正常路徑：依類型篩選 ───────────────────────────────
+  @p1 @regression @api @TC-INT-REC-005-S01 @US-REC-001-AC1
+  Scenario: 依類型篩選經營史時只回傳符合的記錄
+    Given 使用者持有有效的 session token
+    And 該帳號已有破產與成就各一筆經營史記錄
+    When 使用者以破產類型篩選查詢經營史
+    Then 系統僅回傳破產類型的經營史記錄
+    And 回傳筆數不超過單次上限 100 筆
+</code></pre>
+<h2 id="wallet_transactionsfeature">wallet_transactions.feature</h2>
+<pre><code class="language-gherkin"># features/wallet/wallet_transactions.feature
+# 來源：PRD §5.2 wallet（US-WAL-001，AC-1～AC-5）
+# 上游 API：API.md §3 BC: wallet（POST /wallet/topup、POST /wallet/spend）
+# DOC-ID: BDD-SERVER-YOCAT-OFFICE-BACKEND-20261030
+# 核心：伺服器權威錢包；每筆異動寫 append-only ledger；花費以行鎖序列化、餘額不足回 402。
+
+@wallet @p0
+Feature: 伺服器權威錢包儲值與花費
+  作為代表玩家的客戶端整合工程師
+  我希望呼叫儲值與花費使伺服器權威變更餘額，且每筆異動都寫入 append-only 帳本
+  以便根除客戶端竄改、讓餘額成為不可偽造的唯一真實來源並可逐筆對帳
+
+  Background:
+    Given 資料庫已初始化為乾淨狀態
+    And 已存在登入中的帳號，其錢包餘額為 cash 20000、gems 330
+
+  # ─── 正常路徑：以儲值包儲值（AC-1）─────────────────────
+  @p0 @smoke @contract @api @TC-E2E-WAL-001-S01 @US-WAL-001-AC1
+  Scenario: 以預定義儲值包儲值並寫入 topup 帳本
+    Given 使用者持有有效的 session token
+    When 使用者以中寶石包儲值
+    Then 系統回應 HTTP 200 並回傳加值後的最新錢包餘額
+    And 系統在同一交易寫入一筆原因為 topup 的錢包異動記錄
+
+  # ─── 正常路徑：自訂金額儲值 ─────────────────────────────
+  @p0 @regression @api @TC-E2E-WAL-001-S02 @US-WAL-001-AC1
+  Scenario: 以自訂現金金額儲值使餘額增加
+    Given 使用者持有有效的 session token
+    When 使用者以現金自訂金額 5000 儲值
+    Then 系統確認儲值成功並回傳最新錢包餘額
+    And 異動後的帳本餘額等於儲值前餘額加上本次金額
+
+  # ─── 正常路徑：花費行鎖扣款（AC-2）─────────────────────
+  @p0 @smoke @contract @api @TC-E2E-WAL-002-S01 @US-WAL-001-AC2
+  Scenario: 餘額足夠時以行鎖序列化扣款並寫入負異動帳本
+    Given 使用者持有有效的 session token
+    And 使用者的現金餘額不少於欲扣款金額
+    When 使用者以現金花費 1250
+    Then 系統回應 HTTP 200 並回傳扣款後的最新錢包餘額
+    And 系統寫入一筆負異動的錢包帳本記錄
+
+  # ─── 錯誤路徑：餘額不足（AC-3）──────────────────────────
+  @p0 @regression @contract @api @TC-INT-WAL-003-E01 @US-WAL-001-AC3
+  Scenario: 餘額不足時拒絕扣款並回傳現有錢包
+    Given 使用者持有有效的 session token
+    And 使用者的現金餘額小於欲扣款金額
+    When 使用者嘗試以現金花費超過餘額的金額
+    Then 系統回應 HTTP 402 並提示「餘額不足」
+    And 回應附帶使用者當前的錢包餘額
+    And 系統不寫入任何錢包異動記錄
+
+  # ─── 錯誤路徑：未認證（401）─────────────────────────────
+  @p0 @regression @contract @api @TC-INT-WAL-006-E01 @US-WAL-001-AC2
+  Scenario: 無有效 token 嘗試花費時拒絕存取
+    Given 使用者未提供有效的 session token
+    When 使用者嘗試花費
+    Then 系統回應 HTTP 401 並提示「請先登入」
+    And 系統不變更任何錢包餘額
+
+  # ─── 邊界條件：金額驗證（AC-4）──────────────────────────
+  @p0 @regression @api @TC-UNIT-WAL-004-B01 @US-WAL-001-AC4
+  Scenario Outline: 超出合法範圍的金額被拒絕
+    Given 使用者持有有效的 session token
+    When 使用者以 &quot;&lt;operation&gt;&quot; 操作提交金額 &lt;amount&gt;
+    Then 系統拒絕操作並提示「金額不正確」
+    And 系統不變更任何錢包餘額
+
+    Examples:
+      | operation | amount     |
+      | 花費      | 0          |
+      | 花費      | -100       |
+      | 儲值      | 0          |
+      | 儲值      | 10000001   |
+
+  # ─── 邊界條件：合法金額上下界通過 ──────────────────────
+  @p1 @regression @api @TC-UNIT-WAL-004-B02 @US-WAL-001-AC4
+  Scenario Outline: 合法邊界金額的儲值被接受
+    Given 使用者持有有效的 session token
+    When 使用者以現金自訂金額 &lt;amount&gt; 儲值
+    Then 系統確認儲值成功
+    And 回傳的最新餘額反映本次加值
+
+    Examples:
+      | amount    |
+      | 1         |
+      | 10000000  |
+
+  # ─── 併發一致性（AC-5）──────────────────────────────────
+  @p0 @regression @api @TC-INT-WAL-005-S01 @US-WAL-001-AC5
+  Scenario: 同帳號併發多筆花費時以行鎖序列化且帳本與餘額零不一致
+    Given 使用者持有有效的 session token
+    And 使用者的現金餘額為固定的已知金額
+    When 同一帳號同時送出多筆現金花費請求
+    Then 所有成功扣款的總和不超過初始餘額
+    And 最終餘額等於初始餘額減去所有成功扣款的總和
+    And 錢包餘額與帳本累積完全一致且無負餘額
+
+  # ─── 速率限制（429）─────────────────────────────────────
+  @p1 @regression @contract @api @TC-INT-WAL-007-E01 @US-WAL-001-AC2
+  Scenario: 同一帳號短時間內大量花費時觸發速率限制
+    Given 使用者持有有效的 session token
+    And 該帳號在本時間窗內的錢包請求次數已達上限
+    When 使用者再次送出花費請求
+    Then 系統回應 HTTP 429 並提示「請求過於頻繁」
+    And 回應附帶建議的重試等待時間
+</code></pre></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

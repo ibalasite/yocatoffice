@@ -1,0 +1,1 @@
+# k6 writes baseline-<scenario>-<timestamp>.{json,html} here at end of run.

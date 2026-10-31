@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/LeaderboardEntryView",
+  "title": "LeaderboardEntryView",
+  "description": "排行條目視圖",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "score": {
+      "type": "integer"
+    },
+    "grade": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "runId",
+    "name",
+    "mode",
+    "score",
+    "updatedAt"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ValueObject>>"
+}

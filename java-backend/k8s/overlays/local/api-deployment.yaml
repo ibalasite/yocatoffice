@@ -1,0 +1,69 @@
+# k8s/overlays/local/api-deployment.yaml — yocat-office-backend API (Spring Modulith, 7 BC in one JVM)
+# LOCAL_DEPLOY §4.5 + EDD §3.5/§3.6.2/§3.6.5/§3.7.2. Minimum local HA = 2 replicas (Iron Constraint).
+#
+# Env wiring NOTE (alignment fix vs LOCAL_DEPLOY §9 table): the running app (apps/api application.yml)
+# reads DB_HOST/DB_NAME/DB_USER/DB_PASSWORD/REDIS_HOST/REDIS_PORT/SERVER_PORT/CACHE_ENV — NOT DATABASE_URL.
+# ConfigMap+Secret are injected via envFrom so the exact keys the app consumes are bound (see kustomization.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yocat-office-backend-api
+  labels:
+    app: yocat-office-backend-api
+spec:
+  replicas: 2                        # Iron Constraint: local minimum HA, never 1 (EDD §3.7.2)
+  selector:
+    matchLabels:
+      app: yocat-office-backend-api
+  template:
+    metadata:
+      labels:
+        app: yocat-office-backend-api
+    spec:
+      # Spread replicas across nodes where possible (eliminate node-level SPOF, EDD §3.6.1).
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: yocat-office-backend-api
+      containers:
+        - name: api
+          image: yocat-office-backend/api:local
+          imagePullPolicy: Never        # use the local nerdctl build, never pull a registry
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: yocat-office-backend-api-config
+            - secretRef:
+                name: yocat-office-backend-api-secret
+          resources:
+            requests:
+              cpu: "250m"               # EDD §3.5 Local column
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /health/ready        # includes DB/Redis reachability (EDD §3.6.2)
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]   # drain grace before SIGTERM (EDD §3.6.5)
+      terminationGracePeriodSeconds: 60             # Graceful Shutdown (EDD §3.6.5)

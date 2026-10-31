@@ -1,0 +1,14 @@
+{
+  "name": "yocat-office-backend-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API-only E2E smoke (Playwright API testing mode) for the yoCat Office trust-layer backend — post-deploy verification of the critical user journey.",
+  "scripts": {
+    "test": "playwright test",
+    "smoke": "playwright test smoke.spec.ts",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.47.2"
+  }
+}

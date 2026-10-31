@@ -1,0 +1,41 @@
+# k8s/overlays/local/kustomization.yaml — one-command local deploy: `kubectl apply -k k8s/overlays/local/`
+# LOCAL_DEPLOY §4.5. PostgreSQL is NOT here: it is the existing yocat-pg in namespace `yocat`
+# (docs/req/postgres.yaml, applied via `make db-up`). This overlay owns Redis + API + Ingress + Flyway Job.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: yocat-office-backend-local
+
+resources:
+  - redis.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - character.yaml          # NPC 大腦（/character/* → host vLLM）
+  - gateway.yaml            # 單一對外入口（client 靜態 + 反向代理）
+  - ingress.yaml
+  - flyway-migration-job.yaml
+
+# ConfigMap keys = the env var names the running app (apps/api application.yml) actually reads.
+# DB host/name/user target the existing yocat-pg (db=yocat, user=yocat; LOCAL_DEPLOY §2/§9).
+configMapGenerator:
+  - name: yocat-office-backend-api-config
+    literals:
+      - SPRING_PROFILES_ACTIVE=local
+      - SERVER_PORT=8080
+      - DB_HOST=yocat-pg.yocat.svc.cluster.local
+      - DB_NAME=yocat
+      - DB_USER=yocat
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_ENV=local
+      - TRACE_SAMPLE=1.0
+
+# Secret from k8s/overlays/local/secrets.env (gitignored; produced by scripts/bootstrap-secrets.sh).
+# Key DB_PASSWORD is the value the app reads; SESSION_SIGNING_KEY/ENCRYPTION_KEY/ADMIN_INIT_PASSWORD
+# are carried for seed/ops use. Copy secrets.example.env → secrets.env for a throwaway run.
+secretGenerator:
+  - name: yocat-office-backend-api-secret
+    envs:
+      - secrets.env
+
+generatorOptions:
+  disableNameSuffixHash: true

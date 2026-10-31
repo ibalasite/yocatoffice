@@ -1,0 +1,77 @@
+# Source: docs/EDD.md §3.3/§3.5/§3.6/§10 + docs/blueprint/scaffold
+spring:
+  application:
+    name: yocat-office-backend
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:yocat-pg.yocat.svc.cluster.local}:5432/${DB_NAME:yocat_office}
+    username: ${DB_USER:yocat}
+    password: ${DB_PASSWORD:}
+    hikari:
+      # Spring Modulith's JDBC event-publication registry queries event_publication unqualified; the table
+      # lives in the dedicated `modulith` schema (migration V009), so it must be on the connection search_path.
+      # BC tables are fully schema-qualified, so widening the path does not affect them (EDD §3.8 / §4.6 Outbox).
+      connection-init-sql: SET search_path TO public, modulith
+  data:
+    redis:
+      host: ${REDIS_HOST:redis.yocat-office-backend-local.svc}
+      port: ${REDIS_PORT:6379}
+  modulith:
+    events:
+      jdbc:
+        enabled: true          # Transactional Outbox (Event Publication Registry) — EDD §3.3/§4.4
+  lifecycle:
+    timeout-per-shutdown-phase: 30s   # Graceful Shutdown (EDD §3.6.5)
+
+server:
+  # Port from env var (bootstrap rule: never hardcode). EDD §3.5 service-port table binds api-server to 8080;
+  # the K8s Deployment/overlay may override via SERVER_PORT without a rebuild (12-factor config).
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus   # /actuator/prometheus (EDD §10.1)
+  endpoint:
+    health:
+      probes:
+        enabled: true          # /health/live (liveness) + /health/ready (readiness) — EDD §3.6
+  health:
+    redis:
+      enabled: false           # Redis is a degradable dependency (EDD §8.3 fail-open): its outage must not
+                               # flip readiness to DOWN. Cache degradation is handled by the CacheGuard breaker.
+  tracing:
+    sampling:
+      probability: ${TRACE_SAMPLE:1.0}   # local=100%; prod 10% via env (EDD §10.2)
+
+# ── Cache layer (EDD §11.3 Redis 快取設計 / §21.3 Key Namespace / §4.5.9 Cache Contract) ──
+yocat:
+  cache:
+    env: ${CACHE_ENV:local}              # {env} key prefix prod/staging/dev/local (EDD §11.3A)
+    redis:
+      password: ${REDIS_PASSWORD:}       # Redis AUTH secret (EDD §7.5 / §13.6); never a literal
+      timeout-ms: ${REDIS_TIMEOUT_MS:500}        # API → Redis command timeout (EDD §4.5.9)
+      cluster-hash-tag: ${REDIS_CLUSTER_HASH_TAG:false}  # {bc} hash tag for Cluster mode (ARCH §7)
+      pool:
+        max-active: ${REDIS_POOL_MAX_ACTIVE:16}  # Bulkhead: Redis pool=16 (EDD §11.2)
+        max-idle: ${REDIS_POOL_MAX_IDLE:16}
+        min-idle: ${REDIS_POOL_MIN_IDLE:4}
+      sentinel:                          # empty = standalone (local); set both for Sentinel HA (EDD §3.6)
+        master: ${REDIS_SENTINEL_MASTER:}
+        nodes: ${REDIS_SENTINEL_NODES:}  # comma-separated host:port (3 nodes, EDD §7.3)
+
+# ── Resilience4j circuit breaker for the degradable Redis dependency (EDD §8.3 / §11.2) ──
+resilience4j:
+  circuitbreaker:
+    instances:
+      redis:
+        sliding-window-type: TIME_BASED
+        sliding-window-size: 10                 # 10s window (EDD §8.3)
+        minimum-number-of-calls: 20             # min 20 calls (EDD §8.3)
+        failure-rate-threshold: 50              # > 50% error → Open (EDD §8.3)
+        wait-duration-in-open-state: 30s        # Open 30s → Half-Open (EDD §8.3)
+        permitted-number-of-calls-in-half-open-state: 3   # 3 探測 (EDD §8.3)
+        record-exceptions:
+          - org.springframework.dao.DataAccessException
+          - io.lettuce.core.RedisException

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/BuyRequest",
+  "title": "BuyRequest",
+  "description": "POST /entitlements/buy",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "$ref": "EntitlementKind.schema.json"
+    },
+    "itemId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "currency": {
+      "oneOf": [
+        {
+          "$ref": "Currency.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "amount": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "≥0；預設0=免費授予"
+    }
+  },
+  "required": [
+    "kind",
+    "itemId"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<RequestDTO>>"
+}

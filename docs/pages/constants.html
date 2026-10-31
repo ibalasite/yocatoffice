@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>業務常數文件 — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">業務常數文件</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">業務常數文件</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link active" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control">Document Control</a></li><li><a class="toc__link" href="#change-log">Change Log</a></li><li><a class="toc__link" href="#使用指引">使用指引</a></li><li><a class="toc__link" href="#1-遊戲產品核心數值gameproduct-core-values">§1 遊戲/產品核心數值（Game/Product Core Values）</a></li><li><a class="toc__link" href="#2-倍率與賠率multipliers--payouts">§2 倍率與賠率（Multipliers &amp;amp; Payouts）</a></li><li><a class="toc__link" href="#3-閾值與觸發條件thresholds--triggers">§3 閾值與觸發條件（Thresholds &amp;amp; Triggers）</a></li><li><a class="toc__link" href="#4-slo--sli-目標service-level-objectives">§4 SLO / SLI 目標（Service Level Objectives）</a></li><li><a class="toc__link" href="#5-rtp--機率設計return-to-player--probability-design">§5 RTP / 機率設計（Return-to-Player / Probability Design）</a></li><li><a class="toc__link" href="#6-rate-limit-設定rate-limiting">§6 Rate Limit 設定（Rate Limiting）</a></li><li><a class="toc__link" href="#7-業務規則數值business-rule-values">§7 業務規則數值（Business Rule Values）</a></li><li><a class="toc__link" href="#8-系統容量規劃capacity-planning-constants">§8 系統容量規劃（Capacity Planning Constants）</a></li><li><a class="toc__link" href="#9-列舉值真相來源enumerations--by-bounded-context">§9 列舉值真相來源（Enumerations — by Bounded Context）</a></li><li><a class="toc__link" href="#10-http-錯誤碼與語意error-codes">§10 HTTP 錯誤碼與語意（Error Codes）</a></li><li><a class="toc__link" href="#11-設定鍵configuration-keys">§11 設定鍵（Configuration Keys）</a></li><li><a class="toc__link" href="#12-spring-modulith-有界上下文7-bc-模組名與邊界歸屬">§12 Spring Modulith 有界上下文（7 BC 模組名與邊界歸屬）</a></li><li><a class="toc__link" href="#appendix-aconstantsjson-同步格式">Appendix A：constants.json 同步格式</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="constants--全域常數--列舉--錯誤碼--設定鍵單一真相來源">CONSTANTS — 全域常數 / 列舉 / 錯誤碼 / 設定鍵（單一真相來源）</h1>
+<h2 id="document-control">Document Control</h2>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>DOC-ID</strong></td><td>CONSTANTS-YOCAT-OFFICE-BACKEND-20261030</td></tr>
+<tr><td><strong>產品名稱</strong></td><td>yoCat Office 後端信任層（yocat-office-backend）</td></tr>
+<tr><td><strong>文件版本</strong></td><td>v1.0</td></tr>
+<tr><td><strong>狀態</strong></td><td>DRAFT</td></tr>
+<tr><td><strong>作者</strong></td><td>AI Generated（gendoc gen CONSTANTS）</td></tr>
+<tr><td><strong>日期</strong></td><td>2026-10-30</td></tr>
+<tr><td><strong>上游真相來源</strong></td><td><a href="req/schema.sql" target="_blank" rel="noopener">schema.sql</a>、<a href="req/server-src/accounts.ts" target="_blank" rel="noopener">accounts.ts</a>、<a href="prd.html" target="_blank" rel="noopener">PRD.md</a>、<a href="brd.html" target="_blank" rel="noopener">BRD.md</a>、<a href="idea.html" target="_blank" rel="noopener">IDEA.md</a>、client/index.html</td></tr>
+<tr><td><strong>同步輸出</strong></td><td><a href="constants.json" target="_blank" rel="noopener">constants.json</a></td></tr>
+</table>
+<hr>
+<h2 id="change-log">Change Log</h2>
+<table>
+<tr><th>版本</th><th>日期</th><th>作者</th><th>變更摘要</th></tr>
+<tr><td>v1.0</td><td>2026-10-30</td><td>gendoc gen CONSTANTS</td><td>初稿：從 schema.sql / accounts.ts / client 遊戲常數提取全域常數、列舉、錯誤碼、設定鍵與 7 BC 邊界歸屬</td></tr>
+</table>
+<hr>
+<h2 id="使用指引">使用指引</h2>
+<blockquote><p>⚠️ <strong>唯一真相來源（SSOT）</strong>：本文件所有常數、列舉與錯誤碼均源自實際系統（DB schema、後端 API、本地遊戲算力），</p></blockquote>
+<blockquote><p>下游文件（EDD / API / SCHEMA / BDD / test-plan / runbook）與各 BC 實作<strong>必須引用本文件之值</strong>，</p></blockquote>
+<blockquote><p><strong>不得自行定義任何未經本文件登記的量化數值、列舉成員或錯誤碼</strong>。</p></blockquote>
+<blockquote><p>若發現原始碼（schema.sql / accounts.ts）與本文件衝突，<strong>以原始碼為準</strong>並回頭更新本文件。</p></blockquote>
+<blockquote><p><strong>有界上下文（Bounded Context）原則：</strong></p></blockquote>
+<blockquote><p>1. <strong>邊界常數不跨界</strong>：各 BC 獨佔之列舉（如 wallet 的 <code>reason</code>、entitlement 的 <code>kind</code>、record 的 <code>type</code>）僅於該 BC 內定義與驗證，其他 BC 不得直接引用其內部成員。</p></blockquote>
+<blockquote><p>2. <strong>本地算力常數不上雲</strong>：遊戲模擬常數（<code>BANKRUPT_CASH</code>、<code>MAX_WORKERS</code> 等）屬<strong>客戶端本地算力 BC（算力留本地）</strong>，後端信任層僅透過 <code>wallet_ledger.reason</code>（如 <code>rescue</code>）感知其結果，<strong>不持有、不驗證遊戲數值本身</strong>。</p></blockquote>
+<blockquote><p>3. <strong>跨 BC 僅走契約</strong>：常數若需跨界使用，必須經由 Public API 或 Domain Event 傳遞，不得共享可變常數。</p></blockquote>
+<hr>
+<h2 id="1-遊戲產品核心數值gameproduct-core-values">§1 遊戲/產品核心數值（Game/Product Core Values）</h2>
+<blockquote><p>下列常數分兩類：<strong>信任層核心常數</strong>（後端權威）與<strong>本地算力遊戲常數</strong>（客戶端模擬，算力留本地）。歸屬 BC 以「邊界」欄標示。</p></blockquote>
+<table>
+<tr><th>常數名稱</th><th>數值</th><th>單位</th><th>說明</th><th>邊界（BC）</th><th>來源</th></tr>
+<tr><td><code>SESSION_TTL_DAYS</code></td><td>30</td><td>天</td><td>session token 有效期（可由環境變數覆寫）</td><td>member</td><td>accounts.ts L7 / PRD §5.1 AC-4、§7.4</td></tr>
+<tr><td><code>SCRYPT_KEYLEN</code></td><td>64</td><td>bytes</td><td>scrypt 密碼雜湊輸出長度</td><td>member</td><td>accounts.ts L43/L49</td></tr>
+<tr><td><code>SCRYPT_SALT_BYTES</code></td><td>16</td><td>bytes</td><td>scrypt 隨機 salt 長度</td><td>member</td><td>accounts.ts L42</td></tr>
+<tr><td><code>SESSION_TOKEN_BYTES</code></td><td>32</td><td>bytes</td><td>session token 隨機位元組長度（hex 編碼）</td><td>member</td><td>accounts.ts L68</td></tr>
+<tr><td><code>WALLET_INIT_CASH</code></td><td>0</td><td>cash</td><td>註冊時錢包初始資本</td><td>wallet</td><td>accounts.ts L118 / schema.sql L23</td></tr>
+<tr><td><code>WALLET_INIT_GEMS</code></td><td>0</td><td>gems</td><td>註冊時錢包初始寶石</td><td>wallet</td><td>accounts.ts L118 / schema.sql L24</td></tr>
+<tr><td><code>GAME_INIT_CASH</code></td><td>20000</td><td>cash</td><td>新公司遊戲內起始現金</td><td>本地算力（client）</td><td>client/index.html L401</td></tr>
+<tr><td><code>GAME_INIT_MORALE</code></td><td>70</td><td>分</td><td>公司起始士氣</td><td>本地算力（client）</td><td>client/index.html L401</td></tr>
+<tr><td><code>GAME_DAY_START_MIN</code></td><td>540（9:00）</td><td>分鐘</td><td>每日上班起始分鐘數（9×60）</td><td>本地算力（client）</td><td>client/index.html L401</td></tr>
+<tr><td><code>GAME_DAY_SETTLE_MIN</code></td><td>1080（18:00）</td><td>時刻</td><td>日終結算時刻（營收−薪資=淨利）</td><td>本地算力（client）</td><td>企画.md §P0、PRD §2</td></tr>
+<tr><td><code>MAX_WORKERS</code></td><td>8</td><td>人</td><td>單公司員工上限</td><td>本地算力（client）</td><td>client/index.html L336</td></tr>
+<tr><td><code>MIN_WORKERS</code></td><td>1</td><td>人</td><td>單公司員工下限</td><td>本地算力（client）</td><td>client/index.html L336</td></tr>
+<tr><td><code>INITIAL_ROSTER</code></td><td>3 男 3 女（6）</td><td>人</td><td>初始均衡陣容</td><td>本地算力（client）</td><td>企画.md §外型</td></tr>
+</table>
+<hr>
+<h2 id="2-倍率與賠率multipliers--payouts">§2 倍率與賠率（Multipliers &amp; Payouts）</h2>
+<blockquote><p>本產品為伺服器信任層，<strong>非博弈/拉霸類遊戲</strong>，無賠率（odds）概念。此處登記的「倍率」為儲值包加量比例（行銷加贈），屬 deposit BC 權威定義。</p></blockquote>
+<table>
+<tr><th>常數名稱</th><th>數值</th><th>說明</th><th>邊界（BC）</th><th>來源</th></tr>
+<tr><td><code>GEM_PACK_MID_BONUS</code></td><td>+10%</td><td>中寶石包加量（g_mid：330 vs 基準 300）</td><td>deposit</td><td>accounts.ts L12</td></tr>
+<tr><td><code>GEM_PACK_BIG_BONUS</code></td><td>+16%</td><td>大寶石包加量（g_big：700 vs 基準 600）</td><td>deposit</td><td>accounts.ts L13</td></tr>
+<tr><td><code>RESCUE_CASH_FLOOR_MULT</code></td><td>max(cash+20000, 8000)</td><td>破產注資後保證正現金跑道（取較大者）</td><td>本地算力（client）</td><td>client/index.html L1942</td></tr>
+</table>
+<blockquote><p>遊戲生產力公式 <code>生產力 = 技能 × 心情 × 精力 × 部門權重</code>（企画 §P0）屬本地算力 BC，係數不由後端信任層持有，故不在本信任層常數表中固定數值。</p></blockquote>
+<hr>
+<h2 id="3-閾值與觸發條件thresholds--triggers">§3 閾值與觸發條件（Thresholds &amp; Triggers）</h2>
+<table>
+<tr><th>常數名稱</th><th>數值</th><th>單位</th><th>觸發條件與結果</th><th>邊界（BC）</th><th>來源</th></tr>
+<tr><td><code>DISPLAY_NAME_MIN</code></td><td>1</td><td>字</td><td>公司/老闆名 &lt; 1 字 → 回 400「公司/老闆名需 1–24 字」，不寫入</td><td>member</td><td>accounts.ts L109 / PRD §5.1 AC-3</td></tr>
+<tr><td><code>DISPLAY_NAME_MAX</code></td><td>24</td><td>字</td><td>公司/老闆名 &gt; 24 字 → 回 400，不寫入</td><td>member</td><td>accounts.ts L109</td></tr>
+<tr><td><code>PASSWORD_MIN</code></td><td>6</td><td>碼</td><td>密碼 &lt; 6 碼 → 回 400「密碼至少 6 碼」，不寫入</td><td>member</td><td>accounts.ts L110 / PRD §5.1 AC-3</td></tr>
+<tr><td><code>TOPUP_AMOUNT_MIN</code></td><td>1</td><td>cash/gems</td><td>儲值 amount ≤ 0 → 回 400「金額不正確」</td><td>wallet</td><td>accounts.ts L175 / PRD §5.2 AC-4</td></tr>
+<tr><td><code>TOPUP_AMOUNT_MAX</code></td><td>10,000,000</td><td>cash/gems</td><td>儲值 amount &gt; 1e7 → 回 400「金額不正確」</td><td>wallet</td><td>accounts.ts L175 / PRD §5.2 邊界</td></tr>
+<tr><td><code>SPEND_INSUFFICIENT</code></td><td>餘額 &lt; amount</td><td>—</td><td>花費/購買餘額不足 → 回 402「餘額不足」+ 回傳現有 wallet，交易回滾</td><td>wallet / entitlement</td><td>accounts.ts L214/L249 / PRD §5.2 AC-3</td></tr>
+<tr><td><code>REQUEST_BODY_MAX</code></td><td>4,000,000（4e6）</td><td>bytes</td><td>請求 body &gt; 4MB → 中斷連線（req.destroy）</td><td>平台底座</td><td>accounts.ts L34 / PRD §5.4 邊界</td></tr>
+<tr><td><code>SPEND_REASON_MAXLEN</code></td><td>40</td><td>字元</td><td>花費 reason 超過 40 字元 → 截斷</td><td>wallet</td><td>accounts.ts L195</td></tr>
+<tr><td><code>LEADERBOARD_LIMIT_DEFAULT</code></td><td>20</td><td>筆</td><td>Top N 查詢未帶 limit → 預設 20</td><td>leaderboard</td><td>accounts.ts L145</td></tr>
+<tr><td><code>LEADERBOARD_LIMIT_MAX</code></td><td>100</td><td>筆</td><td>Top N limit 夾擠於 [1, 100]</td><td>leaderboard</td><td>accounts.ts L314</td></tr>
+<tr><td><code>BANKRUPT_CASH</code></td><td>-15000</td><td>cash</td><td>遊戲內現金 &lt; -15000 → 一律跳破產抉擇窗（含代管）</td><td>本地算力（client）</td><td>client/index.html L336/L1929</td></tr>
+<tr><td><code>BANKRUPT_WARN_CASH</code></td><td>&lt; 0</td><td>cash</td><td>現金 &lt; 0 → 底部紅色脈動「資金告急」警示條</td><td>本地算力（client）</td><td>client/index.html L1664</td></tr>
+<tr><td><code>RESCUE_GEMS_COST</code></td><td>20</td><td>gems（資本）</td><td>破產時選「繼續投資」→ 扣 20 資本，寫 <code>reason=&#x27;rescue&#x27;</code> ledger，現金保證 ≥ 8000 跑道</td><td>本地算力 → wallet</td><td>client/index.html L1933/L1941</td></tr>
+<tr><td><code>INJECT_CASH</code></td><td>20000</td><td>cash</td><td>破產注資補充現金額（保證跑道下限 8000）</td><td>本地算力（client）</td><td>client/index.html L1933</td></tr>
+</table>
+<blockquote><p>觸發-結果對照（供下游 BDD Given-When-Then 引用）：</p></blockquote>
+<blockquote><p>- <strong>破產觸發</strong>：<code>W.cash &lt; BANKRUPT_CASH</code> → 跳抉擇窗 → ①注資（扣 <code>RESCUE_GEMS_COST</code> 資本、寫 <code>rescue</code> ledger、現金 ≥ 8000）／②讓它倒（寫 <code>records</code> type=<code>bankruptcy</code>、進 recycle）。</p></blockquote>
+<blockquote><p>- <strong>recycle 原則</strong>：僅重置當前公司現金/營運，<strong>付費特聘靈魂、校友庫、成就、排行、外觀、記錄一律不奪走</strong>（不作惡底線，PRD §5.3 AC-5）。</p></blockquote>
+<hr>
+<h2 id="4-slo--sli-目標service-level-objectives">§4 SLO / SLI 目標（Service Level Objectives）</h2>
+<table>
+<tr><th>指標名稱</th><th>目標值</th><th>測量方式</th><th>來源</th></tr>
+<tr><td>可用性（Availability，Production）</td><td>99.9%（&lt; 8.7h/year）</td><td>健康檢查 + APM；Day1 HA ≥2 replicas、HPA、PDB</td><td>PRD §7.2 / BRD §7</td></tr>
+<tr><td>回應時間 P50</td><td>&lt; 200ms @ 500 PCU</td><td>APM（Micrometer + Prometheus）</td><td>PRD §7.1</td></tr>
+<tr><td>回應時間 P99</td><td>&lt; 1000ms @ 500 PCU（成長期 3,000 PCU &lt; 1500ms）</td><td>APM</td><td>PRD §7.1</td></tr>
+<tr><td>錯誤率（5xx）</td><td>&lt; 1%</td><td>HTTP 5xx 比率（告警 &gt; 1% 持續 5 分鐘 → P1）</td><td>PRD §7.7.4 / §9.2</td></tr>
+<tr><td>HA 滾動更新錯誤率</td><td>&lt; 0.1%</td><td>混沌測試 + APM（殺 pod / rolling update 不中斷）</td><td>PRD §5.5 AC-1/AC-2 / §9.1</td></tr>
+<tr><td>排行榜 Top N 查詢 P99</td><td>&lt; 300ms（limit ≤ 100）</td><td>APM + <code>idx_lb_mode_score</code></td><td>PRD §7.1</td></tr>
+<tr><td>寫入交易吞吐量</td><td>≥ 200 txn/sec（wallet/entitlement 交易）</td><td>壓測（k6 / Gatling）</td><td>PRD §7.1</td></tr>
+<tr><td>錢包對帳一致性</td><td>0 筆不一致（ledger 100% 相符）</td><td>併發壓測 + 對帳稽核（任一不一致即 P0）</td><td>PRD §9.1 / §9.2</td></tr>
+<tr><td>RTO / RPO（Production）</td><td>RTO 30 min / RPO 5 min</td><td>BCP 演練</td><td>PRD §7.2</td></tr>
+</table>
+<hr>
+<h2 id="5-rtp--機率設計return-to-player--probability-design">§5 RTP / 機率設計（Return-to-Player / Probability Design）</h2>
+<p><strong>N/A — 本產品為伺服器信任層（身分/錢包/權益/記錄/排行/存檔），非博弈或拉霸類遊戲，無 RTP、無隨機賠率、無機率抽獎設計。</strong></p>
+<blockquote><p>說明：yoCat Office 的遊戲性為辦公室經營模擬（確定性模擬），所有隨機性（角色性別/姓名/座位洗牌等）皆屬客戶端本地算力，且不涉及付費期望值回報；信任層只負責權威記錄金流與權益，無任何 RTP 承諾。若未來新增轉蛋/抽獎類付費玩法，須新增獨立 BC 並於本章登記各情境 RTP。</p></blockquote>
+<hr>
+<h2 id="6-rate-limit-設定rate-limiting">§6 Rate Limit 設定（Rate Limiting）</h2>
+<blockquote><p>現行原型（accounts.ts）<strong>尚未實作端點層 rate limit</strong>；PRD §7.4 要求安全層具備限流能力。下列為下游 EDD §9 安全設計須落地之建議值（行業通用基準，標注為建議值，待 Engineering 於 EDD 定稿）。</p></blockquote>
+<table>
+<tr><th>端點 / 功能</th><th>建議限制值</th><th>時間窗口</th><th>說明</th><th>邊界（BC）</th><th>來源</th></tr>
+<tr><td><code>POST /auth/login</code></td><td>10 次</td><td>每分鐘 / 每 IP</td><td>防暴力破解（密碼比對已用 timingSafeEqual）</td><td>member</td><td>建議值（PRD §7.4，EDD 定稿）</td></tr>
+<tr><td><code>POST /auth/register</code></td><td>5 次</td><td>每分鐘 / 每 IP</td><td>防量產帳號</td><td>member</td><td>建議值（EDD 定稿）</td></tr>
+<tr><td><code>POST /wallet/topup</code>、<code>/wallet/spend</code></td><td>60 次</td><td>每分鐘 / 每帳號</td><td>防金流濫用</td><td>wallet</td><td>建議值（EDD 定稿）</td></tr>
+<tr><td><code>POST /entitlements/buy</code></td><td>30 次</td><td>每分鐘 / 每帳號</td><td>防重複購買衝擊</td><td>entitlement</td><td>建議值（EDD 定稿）</td></tr>
+<tr><td><code>GET /leaderboard</code></td><td>120 次</td><td>每分鐘 / 每 IP</td><td>公開查詢（不需登入），防爬取</td><td>leaderboard</td><td>建議值（EDD 定稿）</td></tr>
+</table>
+<hr>
+<h2 id="7-業務規則數值business-rule-values">§7 業務規則數值（Business Rule Values）</h2>
+<blockquote><p>本章登記不屬 §1–§6 的量化業務規則與付費包定義（deposit / wallet BC 權威）。</p></blockquote>
+<table>
+<tr><th>常數名稱</th><th>數值</th><th>單位</th><th>業務規則描述</th><th>邊界（BC）</th><th>來源</th></tr>
+<tr><td><code>GEM_PACK.g_small</code></td><td>60</td><td>gems</td><td>小寶石包</td><td>deposit</td><td>accounts.ts L11</td></tr>
+<tr><td><code>GEM_PACK.g_mid</code></td><td>330</td><td>gems</td><td>中寶石包（+10%）</td><td>deposit</td><td>accounts.ts L12</td></tr>
+<tr><td><code>GEM_PACK.g_big</code></td><td>700</td><td>gems</td><td>大寶石包（+16%）</td><td>deposit</td><td>accounts.ts L13</td></tr>
+<tr><td><code>CAP_PACK.cap_1000</code></td><td>1000</td><td>cash</td><td>資本儲值包（假付費，測試用）</td><td>deposit</td><td>accounts.ts L17</td></tr>
+<tr><td><code>init</code> ledger delta</td><td>0</td><td>gems</td><td>註冊時寫入一筆 <code>reason=&#x27;init&#x27;</code> 開帳 ledger（balance=0）</td><td>wallet</td><td>accounts.ts L119</td></tr>
+<tr><td>免費授予 amount</td><td>0</td><td>—</td><td>entitlement 購買 amount=0 → 僅插權益、不寫 ledger（活動贈與）</td><td>entitlement</td><td>accounts.ts L236 / PRD §5.3 邊界</td></tr>
+<tr><td>save slot 預設</td><td><code>main</code></td><td>—</td><td>存檔 slot 未指定時預設 main；(account_id, slot) 為主鍵</td><td>game-save</td><td>accounts.ts L256/L262 / schema.sql L54</td></tr>
+<tr><td>records 查詢上限</td><td>100</td><td>筆</td><td>GET /records 單次回傳上限</td><td>record</td><td>accounts.ts L282</td></tr>
+</table>
+<hr>
+<h2 id="8-系統容量規劃capacity-planning-constants">§8 系統容量規劃（Capacity Planning Constants）</h2>
+<table>
+<tr><th>常數名稱</th><th>數值</th><th>單位</th><th>說明</th><th>來源</th></tr>
+<tr><td>最大並發用戶（啟動期）</td><td>500</td><td>PCU</td><td>啟動期設計並發（對應 5,000 DAU）</td><td>PRD §7.3 / IDEA §6 Q4</td></tr>
+<tr><td>最大並發用戶（成長期）</td><td>3,000</td><td>PCU</td><td>成長期目標並發（對應 50,000 DAU，10x）</td><td>PRD §7.3 / §5.5 邊界</td></tr>
+<tr><td>日活躍用戶（啟動 / 成長）</td><td>5,000 / 50,000</td><td>DAU</td><td>容量規劃基準</td><td>PRD §7.3 / BRD §7</td></tr>
+<tr><td>峰值寫入 TPS</td><td>200</td><td>txn/sec</td><td>wallet/entitlement 交易吞吐量下限</td><td>PRD §7.1</td></tr>
+<tr><td>HPA 擴容基準 / 上限</td><td>500 / 3,000</td><td>PCU</td><td>CPU/請求量達閾值自動擴容</td><td>PRD §5.5 邊界</td></tr>
+<tr><td>最小副本數</td><td>2</td><td>replicas</td><td>Day1 HA（無 SPOF、PodDisruptionBudget 保最小可用）</td><td>PRD §7.2 / §5.5 AC-1</td></tr>
+<tr><td>資料保留（Log，熱 / 冷）</td><td>90 / 365</td><td>天</td><td>Production 日誌保留（熱 90 天 / 冷 1 年）</td><td>PRD §7.7.1</td></tr>
+<tr><td>資料保留（Staging Log）</td><td>14</td><td>天</td><td>Staging 日誌保留</td><td>PRD §7.7.1</td></tr>
+<tr><td>Trace 保留</td><td>7</td><td>天</td><td>分散式追蹤保留</td><td>PRD §7.7.3</td></tr>
+<tr><td><code>wallet_ledger</code> 保留</td><td>append-only 永久（Phase B 分區）</td><td>—</td><td>審計帳本不刪（帳號刪除時 CASCADE，依法匿名化保留）</td><td>schema.sql L29 / PRD §6.3</td></tr>
+</table>
+<hr>
+<h2 id="9-列舉值真相來源enumerations--by-bounded-context">§9 列舉值真相來源（Enumerations — by Bounded Context）</h2>
+<blockquote><p>⚠️ 下列列舉為<strong>各 BC 獨佔</strong>，成員值以 DB schema 與 accounts.ts 驗證邏輯為準，跨 BC 不得擴充或引用內部成員。</p></blockquote>
+<table>
+<tr><th>列舉</th><th>允許成員</th><th>欄位 / 位置</th><th>邊界（BC）</th><th>驗證點</th><th>來源</th></tr>
+<tr><td><strong>貨幣種類（currency）</strong></td><td><code>cash</code>、<code>gems</code></td><td><code>wallets.cash/gems</code>、<code>wallet_ledger.currency</code></td><td>wallet</td><td>非 <code>gems</code> 一律視為 <code>cash</code></td><td>schema.sql L23-24/L32、accounts.ts L171/L193</td></tr>
+<tr><td><strong>錢包異動原因（reason）</strong></td><td><code>init</code>、<code>topup</code>、<code>rescue</code>、<code>buy_cosmetic</code>、<code>buy_dream</code>、<code>buy_scenario</code></td><td><code>wallet_ledger.reason</code></td><td>wallet</td><td>由各動作寫入（註冊=init、儲值=topup、購買=buy_&lt;kind&gt;、破產注資=rescue）</td><td>schema.sql L34、accounts.ts L119/L183/L241</td></tr>
+<tr><td><strong>權益種類（kind）</strong></td><td><code>cosmetic</code>、<code>dream</code>、<code>scenario</code></td><td><code>entitlements.kind</code></td><td>entitlement</td><td>不在集合內 → 回 400「項目不正確」</td><td>schema.sql L45、accounts.ts L230</td></tr>
+<tr><td><strong>經營史類型（type）</strong></td><td><code>bankruptcy</code>、<code>achievement</code>、<code>legacy</code></td><td><code>records.type</code></td><td>record</td><td>不在集合內 → 回 400「type 不正確」</td><td>schema.sql L64、accounts.ts L275</td></tr>
+<tr><td><strong>排行模式（mode）</strong></td><td>自由字串（預設 <code>sandbox</code>）</td><td><code>leaderboard.mode</code></td><td>leaderboard</td><td>未帶 mode → 預設 <code>sandbox</code>；查詢空字串＝全模式</td><td>accounts.ts L291/L144</td></tr>
+<tr><td><strong>存檔槽（slot）</strong></td><td>自由字串（預設 <code>main</code>）</td><td><code>saves.slot</code></td><td>game-save</td><td>未帶 slot → 預設 <code>main</code></td><td>schema.sql L54、accounts.ts L256</td></tr>
+</table>
+<blockquote><p><strong>列舉一致性註記：</strong> schema.sql L34 註解列舉 <code>reason</code> 含 <code>buy_cosmetic</code>、<code>hire_dream</code>，而 accounts.ts L241 的購買動作以 <code>&quot;buy_&quot; + kind</code> 動態產生 <code>buy_cosmetic</code> / <code>buy_dream</code> / <code>buy_scenario</code>。<code>hire_dream</code>（特聘夢想人才）為語意別名，實作上夢想員工購買寫入為 <code>buy_dream</code>。下游實作應以「<code>buy_&lt;entitlement.kind&gt;</code> + <code>topup</code> + <code>rescue</code> + <code>init</code>」為 reason 真實集合；<code>hire_dream</code> 保留為業務語意同義詞。此差異已標記，供 EDD 統一命名決策。</p></blockquote>
+<hr>
+<h2 id="10-http-錯誤碼與語意error-codes">§10 HTTP 錯誤碼與語意（Error Codes）</h2>
+<blockquote><p>全域錯誤碼契約（api-only，客戶端須可預期處理）。訊息為 zh-TW，可 i18n key 化。</p></blockquote>
+<table>
+<tr><th>HTTP 碼</th><th>語意</th><th>觸發情境</th><th>回應訊息（範例）</th><th>來源</th></tr>
+<tr><td><strong>200</strong></td><td>成功</td><td>正常完成</td><td>回傳對應資源</td><td>accounts.ts 全域</td></tr>
+<tr><td><strong>204</strong></td><td>無內容</td><td>CORS 預檢（OPTIONS）</td><td>—</td><td>accounts.ts L99</td></tr>
+<tr><td><strong>400</strong></td><td>請求格式/參數錯誤</td><td>email 格式錯、名稱越界、密碼過短、金額不正確、kind/type 不正確、缺 data/runId</td><td>附欄位錯誤訊息</td><td>accounts.ts L108-110/L175/L196/L230/L263/L275/L293</td></tr>
+<tr><td><strong>401</strong></td><td>未授權</td><td>無/過期/無效 Bearer token；登入帳密錯誤</td><td>「請先登入」／「email 或密碼錯誤」</td><td>accounts.ts L134/L157 / PRD §5.1 AC-5/AC-6</td></tr>
+<tr><td><strong>402</strong></td><td>需付費（餘額不足）</td><td>wallet/spend 或 entitlements/buy 餘額 &lt; amount</td><td>「餘額不足」+ 回傳現有 wallet</td><td>accounts.ts L214/L249 / PRD §5.2 AC-3</td></tr>
+<tr><td><strong>404</strong></td><td>找不到</td><td>命中 API 前綴但無對應路由</td><td>「api not found」</td><td>accounts.ts L302</td></tr>
+<tr><td><strong>409</strong></td><td>衝突</td><td>email 已註冊；已擁有同一 (kind,item_id) 權益</td><td>「這個 email 已經註冊過了」／「已經擁有這個項目」</td><td>accounts.ts L112/L248 / PRD §5.1 AC-2、§5.3 AC-2</td></tr>
+<tr><td><strong>500</strong></td><td>伺服器錯誤</td><td>未預期例外（交易回滾，不產生半筆異動）</td><td>錯誤訊息字串</td><td>accounts.ts L305 / PRD §6.2</td></tr>
+</table>
+<hr>
+<h2 id="11-設定鍵configuration-keys">§11 設定鍵（Configuration Keys）</h2>
+<blockquote><p>環境變數與部署設定鍵，供 EDD / k8s manifest / runbook 引用。</p></blockquote>
+<table>
+<tr><th>設定鍵</th><th>預設值</th><th>類型</th><th>說明</th><th>邊界 / 位置</th><th>來源</th></tr>
+<tr><td><code>SESSION_TTL_DAYS</code></td><td>30</td><td>int（天）</td><td>session token 有效期</td><td>member / 後端 env</td><td>accounts.ts L7</td></tr>
+<tr><td><code>CONFIG.BACKEND_URL</code></td><td><code>http://localhost:30088</code>（file:）/ 空（同源）</td><td>string</td><td>客戶端呼叫後端位址</td><td>client</td><td>client/index.html L243</td></tr>
+<tr><td><code>CONFIG.USE_BACKEND</code></td><td>true</td><td>bool</td><td>客戶端是否啟用後端信任層</td><td>client</td><td>client/index.html L243</td></tr>
+<tr><td>CORS <code>Allow-Origin</code></td><td><code>*</code></td><td>string</td><td>跨來源允許（Phase A 寬鬆，正式須收斂）</td><td>平台底座</td><td>accounts.ts L22</td></tr>
+<tr><td>CORS <code>Allow-Methods</code></td><td><code>GET,POST,PUT,OPTIONS</code></td><td>string</td><td>允許的 HTTP 方法</td><td>平台底座</td><td>accounts.ts L23</td></tr>
+<tr><td>DB 連線池（HikariCP）</td><td>依 Q4 容量設定</td><td>int</td><td>連線池大小（待 EDD 定稿）</td><td>平台底座</td><td>PRD §5.5 邊界 / §8.2</td></tr>
+<tr><td>Tracing 採樣率</td><td>Prod 10% / Staging 100%（錯誤 100%）</td><td>%</td><td>OpenTelemetry 採樣</td><td>平台底座</td><td>PRD §7.7.3</td></tr>
+</table>
+<hr>
+<h2 id="12-spring-modulith-有界上下文7-bc-模組名與邊界歸屬">§12 Spring Modulith 有界上下文（7 BC 模組名與邊界歸屬）</h2>
+<blockquote><p>7 個有界上下文 = 7 個 Spring Modulith module；module = bounded context；跨模組只走 Public API 或 Domain Event（Transactional Outbox），無跨 BC DB FK、無共享可變狀態（HC-1~HC-5）。</p></blockquote>
+<table>
+<tr><th>#</th><th>模組名（BC）</th><th>職責</th><th>獨佔列舉 / 常數</th><th>權威資料表</th><th>來源</th></tr>
+<tr><td>1</td><td><code>member</code></td><td>身分權威：註冊/登入/登出/我的資料（scrypt + session）</td><td><code>SESSION_TTL_DAYS</code>、<code>SCRYPT_<em></code>、<code>DISPLAY_NAME_</em></code>、<code>PASSWORD_MIN</code></td><td>accounts、sessions</td><td>PRD §5.1 / schema.sql L4-18</td></tr>
+<tr><td>2</td><td><code>wallet</code></td><td>伺服器權威錢包：topup / spend，append-only ledger</td><td>currency、reason 列舉、<code>TOPUP_<em></code>、<code>SPEND_</em></code></td><td>wallets、wallet_ledger</td><td>PRD §5.2 / schema.sql L21-39</td></tr>
+<tr><td>3</td><td><code>deposit</code></td><td>儲值接口：假付費走 ledger，Phase B 真金流冪等/對帳預留</td><td><code>GEM_PACK.<em></code>、<code>CAP_PACK.</em></code>、包加量倍率</td><td>（經 wallet 入帳）</td><td>PRD §4.1 / accounts.ts L10-18</td></tr>
+<tr><td>4</td><td><code>entitlement</code></td><td>已購權益：原子扣款+授予 / 列出，破產不消失</td><td>kind 列舉（cosmetic/dream/scenario）</td><td>entitlements</td><td>PRD §5.3 / schema.sql L42-49</td></tr>
+<tr><td>5</td><td><code>record</code></td><td>經營史記錄：破產/成就/傳承（append-only）</td><td>type 列舉（bankruptcy/achievement/legacy）</td><td>records</td><td>PRD §4.1 / schema.sql L61-68</td></tr>
+<tr><td>6</td><td><code>leaderboard</code></td><td>全域排行：歸戶寫入 + 公開 Top N 查詢</td><td><code>LEADERBOARD_LIMIT_*</code>、mode</td><td>leaderboard</td><td>PRD §4.1 / schema.sql L71-81</td></tr>
+<tr><td>7</td><td><code>game-save</code></td><td>跨裝置存檔：/save GET / PUT（slot upsert）</td><td><code>save slot 預設=main</code>、<code>REQUEST_BODY_MAX</code></td><td>saves</td><td>PRD §5.4 / schema.sql L52-58</td></tr>
+</table>
+<blockquote><p><strong>平台底座（非 BC，橫切）：</strong> 承載 7 BC 的 Spring Modulith 單體 + Clean Architecture 4 層 + Day1 HA（≥2 replicas、HPA、PodDisruptionBudget）+ Event Publication Registry（Outbox）。相關常數見 §8 容量與 §4 SLO。</p></blockquote>
+<hr>
+<h2 id="appendix-aconstantsjson-同步格式">Appendix A：constants.json 同步格式</h2>
+<p>本文件生成後同步輸出 <a href="constants.json" target="_blank" rel="noopener"><code>docs/constants.json</code></a>，供下游 AI / 工具機器可讀引用。數值以 JSON 數字表示，列舉以字串陣列表示，<code>TBD</code> 記為 <code>null</code>。節錄結構如下：</p>
+<pre><code class="language-json">{
+  &quot;version&quot;: &quot;1.0&quot;,
+  &quot;generated_from&quot;: [&quot;docs/req/schema.sql&quot;, &quot;docs/req/server-src/accounts.ts&quot;, &quot;client/index.html&quot;],
+  &quot;last_updated&quot;: &quot;2026-10-30&quot;,
+  &quot;core&quot;: {
+    &quot;SESSION_TTL_DAYS&quot;: 30,
+    &quot;SCRYPT_KEYLEN&quot;: 64,
+    &quot;WALLET_INIT_CASH&quot;: 0,
+    &quot;WALLET_INIT_GEMS&quot;: 0,
+    &quot;GAME_INIT_CASH&quot;: 20000,
+    &quot;MAX_WORKERS&quot;: 8,
+    &quot;MIN_WORKERS&quot;: 1,
+    &quot;BANKRUPT_CASH&quot;: -15000,
+    &quot;RESCUE_GEMS_COST&quot;: 20,
+    &quot;INJECT_CASH&quot;: 20000
+  },
+  &quot;thresholds&quot;: {
+    &quot;DISPLAY_NAME_MIN&quot;: 1,
+    &quot;DISPLAY_NAME_MAX&quot;: 24,
+    &quot;PASSWORD_MIN&quot;: 6,
+    &quot;TOPUP_AMOUNT_MIN&quot;: 1,
+    &quot;TOPUP_AMOUNT_MAX&quot;: 10000000,
+    &quot;REQUEST_BODY_MAX&quot;: 4000000,
+    &quot;LEADERBOARD_LIMIT_DEFAULT&quot;: 20,
+    &quot;LEADERBOARD_LIMIT_MAX&quot;: 100
+  },
+  &quot;slo&quot;: {
+    &quot;availability_pct&quot;: 99.9,
+    &quot;p99_latency_ms&quot;: 1000,
+    &quot;error_rate_pct&quot;: 1,
+    &quot;ha_rolling_error_rate_pct&quot;: 0.1,
+    &quot;write_tps_min&quot;: 200
+  },
+  &quot;capacity&quot;: {
+    &quot;max_concurrent_users_launch&quot;: 500,
+    &quot;max_concurrent_users_growth&quot;: 3000,
+    &quot;dau_launch&quot;: 5000,
+    &quot;dau_growth&quot;: 50000,
+    &quot;min_replicas&quot;: 2,
+    &quot;log_retention_hot_days&quot;: 90,
+    &quot;log_retention_cold_days&quot;: 365
+  },
+  &quot;enums&quot;: {
+    &quot;currency&quot;: [&quot;cash&quot;, &quot;gems&quot;],
+    &quot;wallet_ledger_reason&quot;: [&quot;init&quot;, &quot;topup&quot;, &quot;rescue&quot;, &quot;buy_cosmetic&quot;, &quot;buy_dream&quot;, &quot;buy_scenario&quot;],
+    &quot;entitlement_kind&quot;: [&quot;cosmetic&quot;, &quot;dream&quot;, &quot;scenario&quot;],
+    &quot;record_type&quot;: [&quot;bankruptcy&quot;, &quot;achievement&quot;, &quot;legacy&quot;]
+  },
+  &quot;error_codes&quot;: {
+    &quot;400&quot;: &quot;請求格式/參數錯誤&quot;,
+    &quot;401&quot;: &quot;未授權&quot;,
+    &quot;402&quot;: &quot;餘額不足&quot;,
+    &quot;404&quot;: &quot;找不到&quot;,
+    &quot;409&quot;: &quot;衝突（已存在/已擁有）&quot;,
+    &quot;500&quot;: &quot;伺服器錯誤&quot;
+  },
+  &quot;deposit_packs&quot;: {
+    &quot;GEM_PACK&quot;: {&quot;g_small&quot;: 60, &quot;g_mid&quot;: 330, &quot;g_big&quot;: 700},
+    &quot;CAP_PACK&quot;: {&quot;cap_1000&quot;: 1000}
+  },
+  &quot;modulith_bounded_contexts&quot;: [&quot;member&quot;, &quot;wallet&quot;, &quot;deposit&quot;, &quot;entitlement&quot;, &quot;record&quot;, &quot;leaderboard&quot;, &quot;game-save&quot;],
+  &quot;config_keys&quot;: {
+    &quot;SESSION_TTL_DAYS&quot;: 30,
+    &quot;CORS_ALLOW_ORIGIN&quot;: &quot;*&quot;,
+    &quot;CORS_ALLOW_METHODS&quot;: &quot;GET,POST,PUT,OPTIONS&quot;
+  }
+}</code></pre></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

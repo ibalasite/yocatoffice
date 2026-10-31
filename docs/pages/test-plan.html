@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>測試計畫 (Test Plan) — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">測試計畫 (Test Plan)</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">測試計畫 (Test Plan)</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link active" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control">Document Control</a></li><li><a class="toc__link" href="#change-log">Change Log</a></li><li><a class="toc__link" href="#1-executive-summary測試目標與原則">§1 Executive Summary（測試目標與原則）</a></li><li><a class="toc__link toc__link--h3" href="#11-測試目標smart-量化">§1.1 測試目標（SMART 量化）</a></li><li><a class="toc__link toc__link--h3" href="#12-測試原則">§1.2 測試原則</a></li><li><a class="toc__link toc__link--h3" href="#13-test-pyramid測試金字塔">§1.3 Test Pyramid（測試金字塔）</a></li><li><a class="toc__link toc__link--h3" href="#14-品質目標quality-gates">§1.4 品質目標（Quality Gates）</a></li><li><a class="toc__link" href="#2-test-scope">§2 Test Scope</a></li><li><a class="toc__link toc__link--h3" href="#21-in-scope測試範圍內">§2.1 In-Scope（測試範圍內）</a></li><li><a class="toc__link toc__link--h3" href="#22-out-of-scope排除項目">§2.2 Out-of-Scope（排除項目）</a></li><li><a class="toc__link toc__link--h3" href="#23-future-scope後續版本規劃">§2.3 Future Scope（後續版本規劃）</a></li><li><a class="toc__link toc__link--h3" href="#24-測試假設與限制">§2.4 測試假設與限制</a></li><li><a class="toc__link" href="#3-test-types--strategy">§3 Test Types &amp;amp; Strategy</a></li><li><a class="toc__link toc__link--h3" href="#31-unit-tests">§3.1 Unit Tests</a></li><li><a class="toc__link toc__link--h3" href="#32-integration-tests">§3.2 Integration Tests</a></li><li><a class="toc__link toc__link--h3" href="#33-e2e--bdd-tests">§3.3 E2E / BDD Tests</a></li><li><a class="toc__link toc__link--h3" href="#34-performance-tests">§3.4 Performance Tests</a></li><li><a class="toc__link toc__link--h3" href="#35-uatuser-acceptance-tests">§3.5 UAT（User Acceptance Tests）</a></li><li><a class="toc__link toc__link--h3" href="#36-ha--failover--chaos-tests">§3.6 HA / Failover / Chaos Tests</a></li><li><a class="toc__link toc__link--h3" href="#37-security-tests">§3.7 Security Tests</a></li><li><a class="toc__link toc__link--h3" href="#38-spring-modulith-可拆解性驗證decomposability-test-suite">§3.8 Spring Modulith 可拆解性驗證（Decomposability Test Suite）</a></li><li><a class="toc__link" href="#4-test-environment-specification">§4 Test Environment Specification</a></li><li><a class="toc__link" href="#5-test-data-management">§5 Test Data Management</a></li><li><a class="toc__link toc__link--h3" href="#51-資料生成策略">§5.1 資料生成策略</a></li><li><a class="toc__link toc__link--h3" href="#52-pii-masking-規則對應-prd-17--schemamd-14">§5.2 PII Masking 規則（對應 PRD §17 / SCHEMA.md §14）</a></li><li><a class="toc__link toc__link--h3" href="#53-test-isolation-原則">§5.3 Test Isolation 原則</a></li><li><a class="toc__link toc__link--h3" href="#54-shared-test-data-規範">§5.4 Shared Test Data 規範</a></li><li><a class="toc__link" href="#6-entry--exit-criteria">§6 Entry / Exit Criteria</a></li><li><a class="toc__link" href="#7-defect-management">§7 Defect Management</a></li><li><a class="toc__link toc__link--h3" href="#71-severity-分類與-sla">§7.1 Severity 分類與 SLA</a></li><li><a class="toc__link toc__link--h3" href="#72-defect-workflow">§7.2 Defect Workflow</a></li><li><a class="toc__link toc__link--h3" href="#73-defect-escape-rate-監控">§7.3 Defect Escape Rate 監控</a></li><li><a class="toc__link" href="#8-test-automation--cicd-integration">§8 Test Automation &amp;amp; CI/CD Integration</a></li><li><a class="toc__link toc__link--h3" href="#81-ci-pipeline-觸發時機">§8.1 CI Pipeline 觸發時機</a></li><li><a class="toc__link toc__link--h3" href="#82-ci-pipeline-gatemermaid">§8.2 CI Pipeline Gate（Mermaid）</a></li><li><a class="toc__link toc__link--h3" href="#83-測試執行時間目標pr-ci--10-分鐘">§8.3 測試執行時間目標（PR CI &amp;lt; 10 分鐘）</a></li><li><a class="toc__link toc__link--h3" href="#84-自動化率目標">§8.4 自動化率目標</a></li><li><a class="toc__link toc__link--h3" href="#85-工具矩陣含版本目標與設定檔">§8.5 工具矩陣（含版本目標與設定檔）</a></li><li><a class="toc__link" href="#9-risk-based-testing-matrix">§9 Risk-Based Testing Matrix</a></li><li><a class="toc__link" href="#10-performance-testing-specification">§10 Performance Testing Specification</a></li><li><a class="toc__link toc__link--h3" href="#101-load-targets從-constants-8--edd-11">§10.1 Load Targets（從 CONSTANTS §8 / EDD §11）</a></li><li><a class="toc__link toc__link--h3" href="#102-slo--sli-矩陣p50p95p99與-edd-105-對齊">§10.2 SLO / SLI 矩陣（P50/P95/P99，與 EDD §10.5 對齊）</a></li><li><a class="toc__link toc__link--h3" href="#103-錢包一致性與冪等測試向量核心prd-91">§10.3 錢包一致性與冪等測試向量（核心，PRD §9.1）</a></li><li><a class="toc__link toc__link--h3" href="#104-效能測試環境與工具">§10.4 效能測試環境與工具</a></li><li><a class="toc__link" href="#11-security-testing-scope">§11 Security Testing Scope</a></li><li><a class="toc__link toc__link--h3" href="#111-sast">§11.1 SAST</a></li><li><a class="toc__link toc__link--h3" href="#112-dast">§11.2 DAST</a></li><li><a class="toc__link toc__link--h3" href="#113-owasp-top-10每項測試方法與工具摘要見-37-完整矩陣">§11.3 OWASP Top 10（每項測試方法與工具，摘要見 §3.7 完整矩陣）</a></li><li><a class="toc__link toc__link--h3" href="#114-滲透測試release-前">§11.4 滲透測試（Release 前）</a></li><li><a class="toc__link toc__link--h3" href="#115-密碼與-pii-安全">§11.5 密碼與 PII 安全</a></li><li><a class="toc__link" href="#12-uat-plan">§12 UAT Plan</a></li><li><a class="toc__link toc__link--h3" href="#121-uat-範圍與參與者">§12.1 UAT 範圍與參與者</a></li><li><a class="toc__link toc__link--h3" href="#122-uat-測試案例每個-p0-功能--1-場景">§12.2 UAT 測試案例（每個 P0 功能 ≥ 1 場景）</a></li><li><a class="toc__link toc__link--h3" href="#123-uat-環境與通過條件">§12.3 UAT 環境與通過條件</a></li><li><a class="toc__link" href="#13-test-schedule--milestones">§13 Test Schedule &amp;amp; Milestones</a></li><li><a class="toc__link" href="#14-raci-matrix測試責任分工">§14 RACI Matrix（測試責任分工）</a></li><li><a class="toc__link" href="#15-requirements-traceability-matrixrtm">§15 Requirements Traceability Matrix（RTM）</a></li><li><a class="toc__link toc__link--h3" href="#151-functional-rtmprd-ac--tc涵蓋所有-p0-ac">§15.1 Functional RTM（PRD AC → TC，涵蓋所有 P0 AC）</a></li><li><a class="toc__link toc__link--h3" href="#152-unit-test-rtm目標藍圖class-inventorymd-26-個-class每-public-method-seb-為覆蓋政策目標">§15.2 Unit Test RTM（目標藍圖：class-inventory.md 26 個 class，每 public method S/E/B 為覆蓋政策目標）</a></li><li><a class="toc__link toc__link--h3" href="#153-ac-覆蓋率完整性a3r--未覆蓋-ac-清單">§15.3 AC 覆蓋率完整性（A3r — 未覆蓋 AC 清單）</a></li><li><a class="toc__link" href="#16-test-summary-report-template">§16 Test Summary Report Template</a></li><li><a class="toc__link" href="#17-open-questions">§17 Open Questions</a></li><li><a class="toc__link" href="#18-approval-sign-off">§18 Approval Sign-off</a></li><li><a class="toc__link" href="#19-mobile-testing-strategy">§19 Mobile Testing Strategy</a></li><li><a class="toc__link" href="#20-accessibility-testing-strategy無障礙測試">§20 Accessibility Testing Strategy（無障礙測試）</a></li><li><a class="toc__link" href="#測試情境使用-nvda--chrome-完成使用者登入供客戶端-ui-參考樣板">測試情境：使用 NVDA + Chrome 完成使用者登入（供客戶端 UI 參考樣板）</a></li><li><a class="toc__link" href="#21-test-debt-management測試技術債管理">§21 Test Debt Management（測試技術債管理）</a></li><li><a class="toc__link toc__link--h3" href="#211-flaky-test-管理流程">§21.1 Flaky Test 管理流程</a></li><li><a class="toc__link toc__link--h3" href="#212-測試健康儀表板6-項週度指標">§21.2 測試健康儀表板（6 項週度指標）</a></li><li><a class="toc__link toc__link--h3" href="#213-測試債登記與償還">§21.3 測試債登記與償還</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="test-plan--測試計畫">Test Plan — 測試計畫</h1>
+<h2 id="document-control">Document Control</h2>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>DOC-ID</strong></td><td>TP-YOCAT-OFFICE-20261030</td></tr>
+<tr><td><strong>專案名稱</strong></td><td>yocat-office-backend（yoCat Office 後端信任層）</td></tr>
+<tr><td><strong>文件版本</strong></td><td>v1.0</td></tr>
+<tr><td><strong>狀態</strong></td><td>IN_REVIEW</td></tr>
+<tr><td><strong>作者（QA Lead）</strong></td><td>QA Architect（gendoc 自動生成）</td></tr>
+<tr><td><strong>日期</strong></td><td>2026-10-30</td></tr>
+<tr><td><strong>上游 ARCH</strong></td><td><a href="arch.html" target="_blank" rel="noopener">ARCH.md</a></td></tr>
+<tr><td><strong>上游 API</strong></td><td><a href="api.html" target="_blank" rel="noopener">API.md</a></td></tr>
+<tr><td><strong>上游 SCHEMA</strong></td><td><a href="schema.html" target="_blank" rel="noopener">SCHEMA.md</a></td></tr>
+<tr><td><strong>上游 PRD</strong></td><td><a href="prd.html" target="_blank" rel="noopener">PRD.md</a></td></tr>
+<tr><td><strong>上游 EDD</strong></td><td><a href="edd.html" target="_blank" rel="noopener">EDD.md</a></td></tr>
+<tr><td><strong>上游 CONSTANTS</strong></td><td><a href="constants.html" target="_blank" rel="noopener">CONSTANTS.md</a></td></tr>
+<tr><td><strong>下游 BDD</strong></td><td>BDD.md（features/*.feature）</td></tr>
+<tr><td><strong>審閱者</strong></td><td>QA Architect, SRE Expert, DevOps Expert</td></tr>
+<tr><td><strong>核准者</strong></td><td>Engineering Lead（Executive Sponsor）</td></tr>
+</table>
+<p><strong>技術棧（來自 EDD §3.3 / state.tech_stack_hints）：</strong> Java 21 + Spring Boot 3.3 + Spring Modulith 1.3 + PostgreSQL 16 + Redis + Kubernetes（Rancher Desktop，local-first）。</p>
+<p><strong>產品型態：</strong> api-only 信任層（<code>client_type=api-only</code>，<code>has_admin_backend=false</code>），18 個 REST 端點，7 個 Spring Modulith 有界上下文（member/wallet/deposit/entitlement/record/leaderboard/game-save）。</p>
+<hr>
+<h2 id="change-log">Change Log</h2>
+<table>
+<tr><th>版本</th><th>日期</th><th>作者</th><th>變更摘要</th></tr>
+<tr><td>v1.0</td><td>2026-10-30</td><td>QA Architect</td><td>初稿：依 PRD/EDD/ARCH/API/SCHEMA/CONSTANTS/class-inventory 生成完整 IEEE 829 Test Plan</td></tr>
+</table>
+<hr>
+<h2 id="1-executive-summary測試目標與原則">§1 Executive Summary（測試目標與原則）</h2>
+<blockquote><p>本章節建立整體測試策略的方向，所有後續章節的決策均以此為依據。對應 PRD §1 Executive Summary 與 §9 Success Metrics。</p></blockquote>
+<h3 id="11-測試目標smart-量化">§1.1 測試目標（SMART 量化）</h3>
+<ol><li><strong>功能驗證</strong>：於 Alpha 內測結束前，確認所有 PRD Must-have（P0）AC（US-MEM-001 6 條 + US-WAL-001 5 條 + US-ENT-001 5 條 + US-SAVE-001 5 條 + US-PLAT-001 5 條，共 <strong>26 條 P0 AC</strong>）通過自動化測試，P0 通過率達 <strong>100%</strong>（P0 未覆蓋 = 未驗收，不得 merge）。</li><li><strong>覆蓋率保障</strong>：所有 BC 的 Unit Test 行覆蓋率（Line Coverage）≥ <strong>80%</strong>，核心錢包/權益交易邏輯（<code>SpendWalletUseCase</code>、<code>TopUpWalletUseCase</code>、<code>BuyEntitlementUseCase</code>）≥ <strong>100%</strong>，Branch Coverage ≥ <strong>70%</strong>，於每次 PR merge 前由 CI JaCoCo gate 強制驗收。</li><li><strong>效能基準</strong>：核心 API 端點在正常負載（500 PCU）下，P99 延遲 ≤ <strong>1000ms</strong>，P50 ≤ <strong>200ms</strong>，排行榜 Top N 查詢 P99 ≤ <strong>300ms</strong>，寫入吞吐量 ≥ <strong>200 txn/sec</strong>，Error Rate ≤ <strong>1%</strong>，於進入 Staging 的 Release Candidate 前完成基準測試（來源 EDD §10.5）。</li><li><strong>一致性保障</strong>：併發扣款與 failover 壓測後，錢包餘額與 <code>wallet_ledger</code> 對帳 <strong>0 筆不一致</strong>（PRD §9.1 北極星護欄，任一不一致即 P0）。</li><li><strong>安全合規</strong>：SAST（SpotBugs + Semgrep）、DAST（OWASP ZAP）掃描無 High/Critical 等級漏洞，OWASP Top 10 A01-A10 全數覆蓋，滲透測試確認 <strong>0 條可竄改伺服器餘額路徑</strong>，於進入 Staging 前完成。</li><li><strong>HA 驗證</strong>：殺 1 個 pod / 滾動更新期間 5xx 錯誤率 &lt; <strong>0.1%</strong>，ModularityTests 100% 綠、0 循環依賴，於 Go/No-Go 前完成（PRD §9.3）。</li></ol>
+<h3 id="12-測試原則">§1.2 測試原則</h3>
+<table>
+<tr><th>原則</th><th>說明</th><th>實踐方式</th></tr>
+<tr><td><strong>Risk-Based Testing</strong></td><td>優先測試高風險、高業務價值功能</td><td>參照 §9 Risk Matrix；wallet/entitlement 交易列 High/P0</td></tr>
+<tr><td><strong>Shift-Left</strong></td><td>測試活動前移至開發早期</td><td>Pre-commit hook 執行變更檔 Unit Tests；PR 觸發 Integration + ModularityTests</td></tr>
+<tr><td><strong>Fail-Fast</strong></td><td>最快找出最嚴重問題</td><td>CI 依序 Unit → Integration → ArchUnit/Modulith → E2E，任一層失敗即中止</td></tr>
+<tr><td><strong>Test Isolation</strong></td><td>每個測試獨立，不依賴外部狀態</td><td>每個測試自帶 setup/teardown，使用 Testcontainers（PostgreSQL 16 / Redis）</td></tr>
+<tr><td><strong>Automation First</strong></td><td>可自動化的測試必須自動化</td><td>目標自動化率 ≥ <strong>90%</strong>（E2E Smoke 100%，Regression ≥ 80%）；UAT 手動</td></tr>
+<tr><td><strong>Living Documentation</strong></td><td>BDD scenarios 反映業務需求</td><td>Gherkin feature files 與 PRD AC 雙向追蹤（§15 RTM）</td></tr>
+</table>
+<h3 id="13-test-pyramid測試金字塔">§1.3 Test Pyramid（測試金字塔）</h3>
+<div class="diagram-container"><pre class="mermaid">graph TD
+    E2E[&quot;🔺 E2E / BDD Tests&lt;br/&gt;約 10%&lt;br/&gt;Playwright&lt;br/&gt;Critical user flows + HA Chaos&lt;br/&gt;執行時間：5-15 min&quot;]
+    INT[&quot;🔸 Integration Tests&lt;br/&gt;約 20%&lt;br/&gt;MockMvc + Testcontainers&lt;br/&gt;API layer、BC boundary、DB、Pact 合約&lt;br/&gt;執行時間：2-5 min&quot;]
+    UNIT[&quot;🔷 Unit Tests&lt;br/&gt;約 70%&lt;br/&gt;JUnit 5 + Mockito&lt;br/&gt;Domain / Application 純邏輯&lt;br/&gt;執行時間：&lt; 60 sec&quot;]
+
+    E2E --&gt; INT
+    INT --&gt; UNIT
+
+    style E2E fill:#ff6b6b,color:#fff
+    style INT fill:#ffa94d,color:#fff
+    style UNIT fill:#339af0,color:#fff</pre></div>
+<blockquote><p><strong>比例說明</strong>：</p></blockquote>
+<blockquote><p>- <strong>Unit (70%)</strong>：覆蓋所有 Domain Entity 不變式、ValueObject 不可變性、UseCase 協調邏輯。秒級執行，開發者本機頻繁執行。</p></blockquote>
+<blockquote><p>- <strong>Integration (20%)</strong>：覆蓋 18 個 REST 端點 contract、PostgreSQL 交易/行鎖、Redis、BC 間 Pact 合約、Spring Modulith 邊界。以 Testcontainers 隔離。</p></blockquote>
+<blockquote><p>- <strong>E2E (10%)</strong>：覆蓋關鍵使用者流程（登入→儲值→購買→存檔 Happy Path）與 HA Chaos 場景。僅在 PR merge 後或排程觸發。</p></blockquote>
+<p>&gt;</p>
+<blockquote><p><strong>自動化率目標：整體 ≥ 90%；E2E Smoke 100%；Regression ≥ 80%；手動僅限 UAT 與探索性測試。</strong></p></blockquote>
+<h3 id="14-品質目標quality-gates">§1.4 品質目標（Quality Gates）</h3>
+<table>
+<tr><th>指標</th><th>目標值</th><th>測量工具</th><th>頻率</th><th>來源</th></tr>
+<tr><td>Unit Test Line Coverage</td><td>≥ 80%（核心交易 100%）</td><td>JaCoCo</td><td>每次 PR</td><td>PRD §7.6</td></tr>
+<tr><td>Unit Test Branch Coverage</td><td>≥ 70%</td><td>JaCoCo</td><td>每次 PR</td><td>業界標準</td></tr>
+<tr><td>Integration Test Pass Rate</td><td>100%（PR merge 前）</td><td>JUnit XML / Surefire</td><td>每次 PR</td><td>—</td></tr>
+<tr><td>E2E Smoke Pass Rate</td><td>100%</td><td>Playwright HTML Report</td><td>每次 PR merge</td><td>—</td></tr>
+<tr><td>E2E Regression Pass Rate</td><td>≥ 95%</td><td>Playwright HTML Report</td><td>每日排程</td><td>—</td></tr>
+<tr><td>Defect Escape Rate（to Prod）</td><td>≤ 2 P0+P1 defects / sprint</td><td>Jira / Linear</td><td>每 Sprint</td><td>PRD §9.2</td></tr>
+<tr><td>P99 API Latency（500 PCU）</td><td>≤ 1000ms</td><td>k6</td><td>每週 + Release</td><td>EDD §10.5</td></tr>
+<tr><td>排行榜 Top N P99</td><td>≤ 300ms</td><td>k6</td><td>每週</td><td>EDD §10.5</td></tr>
+<tr><td>寫入交易吞吐量</td><td>≥ 200 txn/sec</td><td>k6</td><td>每週</td><td>EDD §10.5</td></tr>
+<tr><td>Error Rate（5xx）</td><td>≤ 1%</td><td>k6 / APM</td><td>每週</td><td>EDD §10.5</td></tr>
+<tr><td>Security High/Critical Issues</td><td>0</td><td>SpotBugs / Semgrep / ZAP</td><td>每次 PR / 每週</td><td>PRD §9.3</td></tr>
+<tr><td><strong>錢包對帳一致性</strong></td><td><strong>0 筆不一致（任一不一致即 P0）</strong></td><td>併發壓測 + 對帳稽核</td><td>每次壓測</td><td>PRD §9.1</td></tr>
+<tr><td><strong>ModularityTests 通過率</strong></td><td><strong>100% 綠、0 循環依賴</strong></td><td><code>ApplicationModules.verify()</code></td><td>每次建置</td><td>PRD §9.1</td></tr>
+<tr><td><strong>Pact Contract Test Pass Rate</strong></td><td><strong>100%（PR merge 前）</strong></td><td>Pact Broker / PactFlow</td><td>每次 PR</td><td>EDD §4.6.1</td></tr>
+<tr><td><strong>跨 Schema SQL 違規</strong></td><td><strong>0（CROSS_BC_SQL_COUNT = 0）</strong></td><td>P6Spy SQL Analyzer</td><td>每次 PR</td><td>EDD §3.4 HC-1</td></tr>
+<tr><td>Flaky Test Rate</td><td>≤ 2%</td><td>CI Dashboard</td><td>每週</td><td>—</td></tr>
+</table>
+<hr>
+<h2 id="2-test-scope">§2 Test Scope</h2>
+<h3 id="21-in-scope測試範圍內">§2.1 In-Scope（測試範圍內）</h3>
+<p><strong>Must-have 功能（對應 PRD §5 Functional Requirements，全 P0）：</strong></p>
+<table>
+<tr><th>功能模組（BC）</th><th>PRD REQ-ID</th><th>AC 數</th><th>測試類型</th><th>備註</th></tr>
+<tr><td>member — 會員身分</td><td>US-MEM-001</td><td>6</td><td>Unit + Integration + E2E + Security</td><td>認證敏感，含時序攻擊防護</td></tr>
+<tr><td>wallet — 伺服器權威錢包</td><td>US-WAL-001</td><td>5</td><td>Unit + Integration + E2E + Performance</td><td>行鎖併發一致性、append-only ledger</td></tr>
+<tr><td>entitlement — 已購權益</td><td>US-ENT-001</td><td>5</td><td>Unit + Integration + E2E</td><td>原子扣款+授予、UNIQUE 防重複</td></tr>
+<tr><td>game-save — 跨裝置存檔</td><td>US-SAVE-001</td><td>5</td><td>Unit + Integration + E2E</td><td>slot upsert、跨裝置還原</td></tr>
+<tr><td>平台底座 — 7 BC Modulith + Day1 HA</td><td>US-PLAT-001</td><td>5</td><td>Unit + Integration + E2E（Chaos）</td><td>ModularityTests + HA Failover</td></tr>
+<tr><td>deposit — 儲值接口</td><td>US-DEP-001</td><td>2</td><td>Unit + Integration + E2E</td><td>假付費走 DepositConfirmed 入帳，Idempotency-Key 冪等防重複</td></tr>
+<tr><td>record — 經營史記錄</td><td>US-REC-001</td><td>1</td><td>Unit + Integration</td><td>append-only，type 列舉驗證</td></tr>
+<tr><td>leaderboard — 全域排行</td><td>US-LB-001</td><td>1</td><td>Unit + Integration + Performance</td><td>公開 Top N 查詢 + 上榜 upsert</td></tr>
+</table>
+<p><strong>非功能性測試（NFR）：</strong></p>
+<ul><li><strong>Module 可拆解性驗證（必填 NFR）</strong>：Spring Modulith HC-1～HC-5 的 SM-TEST-00～SM-TEST-04 均需通過（見 §3.8）。</li><li><strong>效能測試</strong>：全 18 個 public API endpoint，重點 wallet/spend、wallet/topup、entitlements/buy、leaderboard（讀）。</li><li><strong>安全測試</strong>：所有 authenticated endpoints、密碼/session 處理流程、OWASP A01-A10。</li><li><strong>HA / Failover 測試</strong>：殺 pod、DB Failover、Redis Sentinel 切換、Graceful Shutdown（依 EDD §12.2 HA-01~HA-04）。</li><li><strong>一致性測試</strong>：wallet 併發扣款 + failover 的錢包/ledger 對帳向量（§3.6 + §10）。</li></ul>
+<h3 id="22-out-of-scope排除項目">§2.2 Out-of-Scope（排除項目）</h3>
+<table>
+<tr><th>排除項目</th><th>原因</th><th>替代方案</th></tr>
+<tr><td>Phase B 真金流支付 Gateway 內部邏輯（金流 SDK）</td><td>第三方責任，MVP 為假付費</td><td>以 WireMock 驗證 <code>DepositConfirmed</code> 冪等合約；接口預留測試</td></tr>
+<tr><td>客戶端遊戲模擬 / LLM 本地算力</td><td>算力留本地，非信任層範圍（IDEA 邊界）</td><td>信任層僅測 API 契約</td></tr>
+<tr><td>客戶端 UI（index.html）</td><td>本專案為 api-only 信任層</td><td>由客戶端團隊獨立測試（見 §19/§20）</td></tr>
+<tr><td>行動端原生 App（iOS/Android）</td><td>無原生 App，玩家經由客戶端呼叫 API</td><td>N/A（見 §19）</td></tr>
+<tr><td>成長期 3,000 PCU 以上壓力測試</td><td>啟動期規模 500 PCU，超出成本效益</td><td>列入 Phase B；Stress Test 以 150% × 500 PCU 為上限</td></tr>
+</table>
+<h3 id="23-future-scope後續版本規劃">§2.3 Future Scope（後續版本規劃）</h3>
+<table>
+<tr><th>功能</th><th>目標版本</th><th>測試需求說明</th></tr>
+<tr><td>Phase B 真金流（DepositConfirmed 真實金流 + 對帳）</td><td>v2.0</td><td>需新增金流冪等鍵、HMAC 驗簽、對帳 E2E；預估 15 個 TC</td></tr>
+<tr><td>wallet_ledger 歷史分區查詢</td><td>v2.0</td><td>需分區表查詢效能測試</td></tr>
+<tr><td>跨 Region Global LB 切換（成長期）</td><td>成長期</td><td>HA-04 替換為跨 Region failover（RTO ≤ 30 min）</td></tr>
+<tr><td>轉蛋/抽獎類付費玩法（若新增 BC）</td><td>TBD（待確認：產品決策）</td><td>需新增獨立 BC 並登記各情境 RTP 測試</td></tr>
+</table>
+<blockquote><p><strong>注意</strong>：HA Failover 測試<strong>不屬</strong> Future Scope，已全數於 §3.6 定義並須在 MVP 上線前完成（符合 PRD §9.3 Go/No-Go）。</p></blockquote>
+<h3 id="24-測試假設與限制">§2.4 測試假設與限制</h3>
+<p><strong>假設（Assumptions）：</strong></p>
+<ol><li>測試環境（Dev/Test/Staging）具獨立 PostgreSQL 16 與 Redis，不與 Production 共用。</li><li>所有 18 個 API endpoints 在測試開始前已完成開發並部署至 Test 環境。</li><li>QA 工程師擁有 Test/Staging 環境完整存取權限（含 DB read、log、kubectl）。</li><li>Phase B 金流 Sandbox 未就緒時，以 WireMock 模擬 <code>DepositConfirmed</code> 事件。</li><li>CI/CD pipeline 已建置（GitHub Actions + Rancher Desktop k8s，local-first）。</li></ol>
+<p><strong>限制（Constraints）：</strong></p>
+<ol><li><strong>環境限制</strong>：本機 PostgreSQL/Redis 於 Local Dev 為單節點（EDD §3.7.2 例外），HA Failover 測試需在 Staging（≥ 2 replicas、DB Primary+Standby、Redis Sentinel）執行。</li><li><strong>資料限制</strong>：含 PII（email/display_name）的真實資料不可用於測試環境，需匿名化（§5.2）。</li><li><strong>時程限制</strong>：UAT sign-off 倒推，效能測試須於 Release Candidate 前完成。</li><li><strong>人力限制</strong>：優先確保 26 條 P0 AC 全覆蓋。</li></ol>
+<hr>
+<h2 id="3-test-types--strategy">§3 Test Types &amp; Strategy</h2>
+<blockquote><p>本章節為核心章節，定義每種測試類型的執行策略、工具選型與品質標準。技術棧 = Java 21 + Spring Boot 3.3，工具組合依此選定。</p></blockquote>
+<hr>
+<h3 id="31-unit-tests">§3.1 Unit Tests</h3>
+<p><strong>目標</strong>：驗證單一函式、類別、模組邏輯正確性，不依賴外部資源。</p>
+<h4 id="框架選型java-技術棧">框架選型（Java 技術棧）</h4>
+<table>
+<tr><th>類型</th><th>框架</th><th>Coverage 工具</th><th>設定檔</th></tr>
+<tr><td>Unit</td><td>JUnit 5 (Jupiter) + Mockito</td><td>JaCoCo</td><td><code>build.gradle</code> / <code>pom.xml</code></td></tr>
+<tr><td>參數化測試</td><td>JUnit 5 <code>@ParameterizedTest</code></td><td>JaCoCo</td><td>同上</td></tr>
+<tr><td>斷言</td><td>AssertJ</td><td>—</td><td>同上</td></tr>
+</table>
+<h4 id="覆蓋率目標">覆蓋率目標</h4>
+<pre><code class="">Line Coverage     ≥ 80%  (CI hard gate — JaCoCo fail if below)
+核心交易邏輯        = 100% (SpendWalletUseCase / TopUpWalletUseCase / BuyEntitlementUseCase)
+Branch Coverage   ≥ 70%  (CI warning)
+Function Coverage ≥ 85%  (CI warning)</code></pre>
+<h4 id="clean-architecture-層次分類依-edd-31b--class-inventorymd">Clean Architecture 層次分類（依 EDD §3.1b + class-inventory.md）</h4>
+<p><strong>Domain 層（目標覆蓋率 ≥ 90%）</strong></p>
+<ul><li>對象：<code>&lt;&lt;AggregateRoot&gt;&gt;</code>（Wallet, Account, Entitlement...）/ <code>&lt;&lt;Entity&gt;&gt;</code>（LedgerEntry, Session）/ <code>&lt;&lt;ValueObject&gt;&gt;</code>（Money, AccountId, Email, DisplayName）/ <code>&lt;&lt;DomainEvent&gt;&gt;</code>。</li><li>特性：<strong>完全隔離，不得 import <code>org.springframework.<em></code> / <code>java.sql.</em></code> / 任何 ORM/DB/HTTP</strong>（EDD §3.1b Dependency Rule，由 ArchUnit 強制驗證）。</li><li>測試重點：Entity 不變式（Wallet 餘額 ≥ 0）、ValueObject 不可變性（Money 四則運算不改原值）、Email 格式驗證分支、DisplayName 長度邊界（0/24/25）。</li></ul>
+<p><strong>Application 層（目標覆蓋率 ≥ 80%，核心 UseCase 100%）</strong></p>
+<ul><li>對象：<code>&lt;&lt;UseCase&gt;&gt;</code>（SpendWalletUseCase...）/ <code>&lt;&lt;ApplicationService&gt;&gt;</code>（WalletService）。</li><li>特性：<strong>mock 所有 Interface</strong>（<code>WalletRepository</code>、<code>MemberRepository</code>、<code>DomainEventPublisher</code>），不啟動 DB。</li><li>測試重點：UseCase 主流程、錯誤分支（餘額不足 → 402 語意例外）、<code>WalletBalanceChanged</code> / <code>MemberRegistered</code> Domain Event 發布時機。</li></ul>
+<p><strong>Infrastructure 層（以 Integration Test 為主，Unit ≥ 60%）</strong></p>
+<ul><li>對象：<code>&lt;&lt;RepositoryImpl&gt;&gt;</code>（JdbcWalletRepository）/ <code>&lt;&lt;Adapter&gt;&gt;</code>（ScryptPasswordEncoder, BearerTokenFilter, ModulithEventPublisher）。</li><li>特性：<code>JdbcWalletRepositoryIT</code> 使用 Testcontainers 啟動真實 PostgreSQL 16，驗證 <code>SELECT ... FOR UPDATE</code> 行鎖；<code>ScryptPasswordEncoderTest</code> 為純轉換邏輯可 Unit。</li><li>歸類：RepositoryImpl 列入 §3.2 Integration，不計入 §3.1 Unit 覆蓋率。</li></ul>
+<ul><li><strong>執行策略</strong>：Pre-commit hook（變更檔）+ PR CI（全量）強制通過。</li><li><strong>排除項目</strong>：<code>&lt;&lt;Controller&gt;&gt;</code>（WalletController, AuthController，由 §3.2 MockMvc 覆蓋）、<code>&lt;&lt;RequestDTO&gt;&gt;</code>/<code>&lt;&lt;ResponseDTO&gt;&gt;</code>。</li></ul>
+<blockquote><p>§15.2 Unit Test RTM 以 class-inventory.md 的 26 個 class 為<strong>目標藍圖</strong>，將「每個 public method ≥ 3 TC（S/E/B）」訂為覆蓋<strong>政策/目標</strong>。<strong>目前已列舉（enumerated）的權威單元測試集為 <a href="rtm.html" target="_blank" rel="noopener">RTM §3.2</a> 的 14 個 TC、涵蓋 11 個核心 Method（此為當前 SSOT）</strong>；§15.2 中尚未列入 RTM §3.2 的 S/E/B 案例屬 <strong>target/future（規劃中）</strong>，待排期補齊，不計入目前 14 TC 統計。</p></blockquote>
+<hr>
+<h3 id="32-integration-tests">§3.2 Integration Tests</h3>
+<p><strong>目標</strong>：驗證 BC 之間、API layer、PostgreSQL/Redis 操作的整合行為，確認 contract 符合 API.md 規格。</p>
+<h4 id="測試範圍">測試範圍</h4>
+<table>
+<tr><th>層次</th><th>測試內容</th><th>工具</th></tr>
+<tr><td>API Layer</td><td>HTTP request/response、status codes（200/400/401/402/404/409/500）、response schema</td><td>Spring MockMvc / <code>@SpringBootTest</code> + TestRestTemplate</td></tr>
+<tr><td>Database Layer</td><td>CRUD、交易、<code>SELECT FOR UPDATE</code> 行鎖、UNIQUE 約束、索引、append-only ledger</td><td>Testcontainers（PostgreSQL 16，實際 DB）</td></tr>
+<tr><td>BC Boundary</td><td>BC 間 Public API（<code>WalletService.debit()</code>）contract</td><td>Pact Consumer-Driven Contract</td></tr>
+<tr><td>Message / Event</td><td>Domain Event 發布/消費、Outbox 投遞、event_id 去重冪等</td><td>Testcontainers + Spring Modulith <code>@ApplicationModuleTest</code></td></tr>
+<tr><td>Cache Layer</td><td>Redis session 快取、排行榜 Top N 快取、限流滑動視窗</td><td>Testcontainers（Redis）</td></tr>
+<tr><td><strong>HA 行為</strong></td><td>Pod 重啟後服務恢復、DB 重連、分散式鎖競爭</td><td>chaoskube（K8s）/ toxiproxy（網路注入）</td></tr>
+</table>
+<h4 id="api-endpoint-覆蓋全-18-個來自-edd-52--apimd-3">API Endpoint 覆蓋（全 18 個，來自 EDD §5.2 / API.md §3）</h4>
+<p>每個業務端點至少覆蓋 200 成功、400 輸入錯誤、401 未授權（需 Auth 者）、402/409 業務衝突（適用者）、500 內部錯誤：</p>
+<table>
+<tr><th>Method</th><th>Path</th><th>BC</th><th>認證</th><th>必測狀態碼</th></tr>
+<tr><td>GET</td><td><code>/health/live</code></td><td>平台</td><td>否</td><td>200</td></tr>
+<tr><td>GET</td><td><code>/health/ready</code></td><td>平台</td><td>否</td><td>200 / 503（DB/Redis down）</td></tr>
+<tr><td>POST</td><td><code>/auth/register</code></td><td>member</td><td>否</td><td>200 / 400 / 409</td></tr>
+<tr><td>POST</td><td><code>/auth/login</code></td><td>member</td><td>否</td><td>200 / 400 / 401</td></tr>
+<tr><td>POST</td><td><code>/auth/logout</code></td><td>member</td><td>是</td><td>200（冪等）/ 401</td></tr>
+<tr><td>GET</td><td><code>/auth/me</code></td><td>member</td><td>是</td><td>200 / 401</td></tr>
+<tr><td>POST</td><td><code>/wallet/topup</code></td><td>wallet/deposit</td><td>是</td><td>200 / 400 / 401</td></tr>
+<tr><td>POST</td><td><code>/wallet/spend</code></td><td>wallet</td><td>是</td><td>200 / 400 / 401 / 402</td></tr>
+<tr><td>GET</td><td><code>/deposit/packs</code></td><td>deposit</td><td>否</td><td>200</td></tr>
+<tr><td>POST</td><td><code>/deposit/checkout</code></td><td>deposit</td><td>是</td><td>200 / 400 / 401 / 409</td></tr>
+<tr><td>GET</td><td><code>/entitlements</code></td><td>entitlement</td><td>是</td><td>200 / 401</td></tr>
+<tr><td>POST</td><td><code>/entitlements/buy</code></td><td>entitlement/wallet</td><td>是</td><td>200 / 400 / 401 / 402 / 409</td></tr>
+<tr><td>GET</td><td><code>/save</code></td><td>game-save</td><td>是</td><td>200（含 <code>{save:null}</code>）/ 401</td></tr>
+<tr><td>PUT</td><td><code>/save</code></td><td>game-save</td><td>是</td><td>200 / 400 / 401</td></tr>
+<tr><td>POST</td><td><code>/records</code></td><td>record</td><td>是</td><td>200 / 400 / 401</td></tr>
+<tr><td>GET</td><td><code>/records</code></td><td>record</td><td>是</td><td>200 / 401</td></tr>
+<tr><td>GET</td><td><code>/leaderboard</code></td><td>leaderboard</td><td>否</td><td>200</td></tr>
+<tr><td>POST</td><td><code>/leaderboard</code></td><td>leaderboard</td><td>是</td><td>200 / 400 / 401</td></tr>
+</table>
+<blockquote><p><strong>deposit 端點 RTM TC 追溯（對應 RTM §4.2 API-009/010）</strong>：<code>GET /deposit/packs</code> → TC-E2E-DEP-001；<code>POST /deposit/checkout</code> → TC-E2E-DEP-002（確認訂單）、TC-INT-DEP-003（冪等重放）、TC-INT-DEP-004（冪等鍵衝突 409）、TC-INT-DEP-005（儲值包不存在 400）、TC-INT-DEP-006（缺冪等鍵 400）、TC-INT-DEP-007（未授權 401）。</p></blockquote>
+<h4 id="資料庫約束測試策略對應-schemamd-9">資料庫約束測試策略（對應 SCHEMA.md §9）</h4>
+<ul><li><strong>UNIQUE 約束</strong>：<code>accounts.email</code> 併發註冊僅一筆成功（其餘 409）；<code>entitlements UNIQUE(account_id, kind, item_id)</code> 重複購買回 409；<code>saves PK(account_id, slot)</code> upsert。</li><li><strong>行鎖一致性</strong>：<code>wallet_ledger</code> append-only + <code>wallets</code> 行 <code>SELECT ... FOR UPDATE</code>，驗證併發扣款序列化、餘額永遠 ≥ 0。</li><li><strong>Cross-BC FK 移除驗證（HC-1）</strong>：確認各 BC 以 <code>account_id BIGINT</code>（application-layer ID）參照，<strong>無跨 schema FK</strong>；SQL 攔截器驗證無跨 BC JOIN。</li><li><strong>Migration 回滾</strong>：Flyway/Liquibase migration up/down 可回滾，不破壞既有資料。</li><li><strong>NOT NULL 邊界</strong>：缺 <code>data</code>（PUT /save）、缺 <code>runId</code>（POST /leaderboard）回 400。</li></ul>
+<h4 id="ha-integration-test-標準場景依-edd-122">HA Integration Test 標準場景（依 EDD §12.2）</h4>
+<table>
+<tr><th>場景 ID</th><th>測試名稱</th><th>注入方式</th><th>通過條件</th></tr>
+<tr><td>HA-INT-01</td><td>分散式鎖競爭（≥ 2 API replica）</td><td>同時發送 2 個相同帳號 spend 請求</td><td>行鎖序列化，最終餘額 = 初始 − Σ成功扣款，ledger 對帳 0 筆不一致</td></tr>
+<tr><td>HA-INT-02</td><td>Session 外置驗證</td><td>Kill API Pod 後用原 Bearer token 重新請求</td><td>新 Pod 從 Redis/DB 正確驗證原 session，無需重新登入</td></tr>
+<tr><td>HA-INT-03</td><td>DB 連線重連</td><td>toxiproxy 斷開 PostgreSQL 連線 5s 後恢復</td><td>HikariCP 自動重連，請求不丟失</td></tr>
+<tr><td>HA-INT-04</td><td>Circuit Breaker 觸發</td><td>toxiproxy 注入 500ms 延遲到 Redis</td><td>Resilience4j CB 開啟，session 回源 DB（降級非 5xx）</td></tr>
+</table>
+<h4 id="spring-modulith-module-decomposability-tests必填見-38-詳述">Spring Modulith Module Decomposability Tests（必填，見 §3.8 詳述）</h4>
+<p>Integration 層執行 <code>ApplicationModules.verify()</code>（SM-TEST-00）、<code>@ApplicationModuleTest</code> 單 BC 冷啟動（SM-TEST-04）、Pact 合約（SM-TEST-02）、Schema 隔離 P6Spy 攔截（SM-TEST-01）、Redis Namespace 隔離（SM-TEST-HC4）。</p>
+<h4 id="admin-rbac-boundary-test">Admin RBAC Boundary Test</h4>
+<blockquote><p><strong>本系統 <code>has_admin_backend=false</code>（state 確認），無管理後台，§3.2 Admin RBAC 測試略過。</strong> 營運對帳 Console 由客戶端團隊於另案規劃（見 PRD §19 標註為條件章節未啟用）。</p></blockquote>
+<h4 id="test-database-策略">Test Database 策略</h4>
+<pre><code class="">Strategy: 每個 integration test suite 使用獨立 PostgreSQL schema（對應各 BC）
+Setup:    @BeforeAll → Testcontainers 啟動 postgres:16，執行 migration，載入 seed
+Teardown: @AfterEach → transaction rollback；@AfterAll → 停止 container
+
+// Testcontainers（Java 範例）
+@Container
+static PostgreSQLContainer&lt;?&gt; pg = new PostgreSQLContainer&lt;&gt;(&quot;postgres:16&quot;)
+    .withDatabaseName(&quot;test_db&quot;).withUsername(&quot;test_user&quot;).withPassword(&quot;test_pass&quot;);</code></pre>
+<h4 id="資料清理原則">資料清理原則</h4>
+<ol><li>不使用 truncate 清理（破壞並行 suite）。</li><li>使用 transaction rollback 或 schema isolation（每 BC 一 schema）。</li><li>Seed data 版本化（納入 version control，修改需 PR review）。</li><li>禁止 test 間共享可變狀態；每個 test 自帶 factory 建資料。</li></ol>
+<hr>
+<h3 id="33-e2e--bdd-tests">§3.3 E2E / BDD Tests</h3>
+<p><strong>目標</strong>：從客戶端整合工程師視角驗證 Critical User Flows，確保跨 BC/跨層整合無誤。E2E 以 API 層黑箱方式進行（api-only 無 UI）。</p>
+<h4 id="工具選型">工具選型</h4>
+<ul><li><strong>E2E 框架</strong>：Playwright（API testing mode，<code>request</code> fixture，跨語言統一）。</li><li><strong>BDD</strong>：Gherkin feature files（<code>features/*.feature</code>），與 PRD AC @tag 雙向追蹤。</li></ul>
+<h4 id="gherkin-feature-範例">Gherkin Feature 範例</h4>
+<pre><code class="language-gherkin"># features/wallet/spend.feature
+Feature: 伺服器權威錢包扣款
+  As a 客戶端整合工程師 Kevin（代表玩家）
+  I want to 呼叫 /wallet/spend 使伺服器權威扣款
+  So that 餘額成為不可偽造的唯一真實來源
+
+  Background:
+    Given 服務運行於 &quot;staging&quot; 環境
+    And 存在已登入帳號 token 且 wallet.cash = 20000
+
+  @p0 @wallet @US-WAL-001-AC2
+  Scenario: 餘額足夠扣款成功
+    When 我 POST /wallet/spend body {currency:&quot;cash&quot;, amount:1250, reason:&quot;buy_cosmetic&quot;}
+    Then 回應狀態為 200
+    And wallet.cash 為 18750
+    And wallet_ledger 新增一筆 delta=-1250, balance=18750
+
+  @p0 @wallet @US-WAL-001-AC3
+  Scenario: 餘額不足回 402
+    When 我 POST /wallet/spend body {currency:&quot;cash&quot;, amount:99999, reason:&quot;buy_cosmetic&quot;}
+    Then 回應狀態為 402 且 error = &quot;餘額不足&quot;
+    And wallet.cash 不變且不寫 ledger</code></pre>
+<h4 id="critical-user-flows-清單從-prd-6-user-flows--5-ac-提取">Critical User Flows 清單（從 PRD §6 User Flows + §5 AC 提取）</h4>
+<table>
+<tr><th>Flow Name</th><th>優先序</th><th>Smoke?</th><th>預期執行時間</th><th>PRD AC 對應</th></tr>
+<tr><td>註冊 → 建帳+錢包+init ledger → 取 token</td><td>P0</td><td>Yes</td><td>&lt; 10 sec</td><td>US-MEM-001/AC-1</td></tr>
+<tr><td>登入 → 簽發 session → GET /auth/me</td><td>P0</td><td>Yes</td><td>&lt; 10 sec</td><td>US-MEM-001/AC-4</td></tr>
+<tr><td>登入 → topup → spend → GET /auth/me 對帳</td><td>P0</td><td>Yes</td><td>&lt; 20 sec</td><td>US-WAL-001/AC-1,AC-2</td></tr>
+<tr><td>購買權益（原子扣款+授予）→ GET /entitlements</td><td>P0</td><td>Yes</td><td>&lt; 15 sec</td><td>US-ENT-001/AC-1</td></tr>
+<tr><td>裝置 A PUT /save → 裝置 B GET /save 還原</td><td>P0</td><td>Yes</td><td>&lt; 15 sec</td><td>US-SAVE-001/AC-5</td></tr>
+<tr><td>破產 recycle 後權益仍完整</td><td>P0</td><td>No</td><td>&lt; 15 sec</td><td>US-ENT-001/AC-5</td></tr>
+<tr><td>錯誤帳密登入 → 401</td><td>P1</td><td>No</td><td>&lt; 5 sec</td><td>US-MEM-001/AC-5</td></tr>
+<tr><td>重複購買同項目 → 409</td><td>P1</td><td>No</td><td>&lt; 10 sec</td><td>US-ENT-001/AC-2</td></tr>
+<tr><td>上榜 upsert → 公開 Top N 查詢</td><td>P1</td><td>No</td><td>&lt; 10 sec</td><td>POST/GET /leaderboard</td></tr>
+<tr><td><strong>HA-E2E-001 Pod Kill 後服務恢復</strong></td><td>P0</td><td>Yes</td><td>&lt; 60 sec</td><td>US-PLAT-001/AC-1、EDD §12.2 HA-01</td></tr>
+<tr><td><strong>HA-E2E-002 DB Failover 後寫入一致</strong></td><td>P0</td><td>Yes</td><td>&lt; 60 sec</td><td>EDD §12.2 HA-02</td></tr>
+<tr><td><strong>HA-E2E-003 Redis 切換後 session 有效</strong></td><td>P1</td><td>No</td><td>&lt; 30 sec</td><td>EDD §12.2 HA-03</td></tr>
+<tr><td><strong>HA-E2E-004 滾動更新 in-flight 不中斷</strong></td><td>P0</td><td>Yes</td><td>&lt; 90 sec</td><td>US-PLAT-001/AC-2</td></tr>
+</table>
+<blockquote><p><strong>HA E2E 執行要求</strong>：</p></blockquote>
+<blockquote><p>- HA-E2E-001/002/004 列入 Smoke，每次 pre-release 必須通過。</p></blockquote>
+<blockquote><p>- HA E2E 須於 Staging（≥ 2 API replica、DB Primary+Standby、Redis Sentinel）執行，不可於 localhost 單進程執行。</p></blockquote>
+<blockquote><p>- HA-E2E-001：<code>kubectl delete pod -l app=yocat-office-backend-api --grace-period=0</code>，驗證流量路由至剩餘 Pod，≤ 30s 重建（EDD §3.6.3 RTO）。</p></blockquote>
+<blockquote><p>- HA-E2E-002：<code>pg_ctl stop -m fast</code> 觸發 Standby 提升，驗證 HikariCP 自動重連、RPO=0 無資料丟失。</p></blockquote>
+<h4 id="環境矩陣api-only以-http-client-取代瀏覽器">環境矩陣（api-only，以 HTTP Client 取代瀏覽器）</h4>
+<table>
+<tr><th>執行方式</th><th>版本</th><th>Smoke?</th><th>Full Regression?</th></tr>
+<tr><td>Playwright <code>request</code>（Node runner）</td><td>Latest stable</td><td>Yes</td><td>Yes</td></tr>
+<tr><td>curl / newman（契約煙霧）</td><td>Latest</td><td>Yes</td><td>No</td></tr>
+</table>
+<blockquote><p>瀏覽器相容矩陣（Chrome/Firefox/Safari）適用於未來客戶端 UI，由客戶端團隊負責（見 §20）。</p></blockquote>
+<hr>
+<h3 id="34-performance-tests">§3.4 Performance Tests</h3>
+<p><strong>目標</strong>：驗證系統在預期與極端負載下的行為，確認 SLO 達標（來源 EDD §10.5 / CONSTANTS §4）。</p>
+<h4 id="四種效能測試場景">四種效能測試場景</h4>
+<p><strong>Scenario 1 — Smoke Test（健康檢查）</strong></p>
+<pre><code class="">目的：確認腳本可執行、基本功能無誤
+負載：1 VU，持續 1 分鐘
+通過條件：Error Rate = 0%，所有 SLO P99 達標
+工具：k6；執行時機：每次部署後</code></pre>
+<p><strong>Scenario 2 — Load Test（正常負載，PR CI + Nightly）</strong></p>
+<pre><code class="">目的：驗證 500 PCU 正常負載下 SLO 達標
+負載：500 並發用戶（啟動期 PCU），持續 30 分鐘
+Ramp-up：前 5 分鐘線性增至 500 VU；Steady：20 分鐘；Ramp-down：5 分鐘
+通過條件：P99 &lt; 1000ms、P50 &lt; 200ms、Error Rate &lt; 0.1%、寫入 TPS ≥ 200</code></pre>
+<p><strong>Scenario 3 — Stress Test（壓力測試，Release Gate）</strong></p>
+<pre><code class="">目的：找出承載上限與降級行為
+負載：從 500 PCU 起每 5 分鐘 +25%，至 150% 峰值（750 PCU）× 10 分鐘，或 P99 &gt; 2x SLO
+恢復測試：壓力移除後系統 ≤ 5 分鐘恢復正常
+關注：行鎖爭用下 wallet/spend 是否仍 0 筆不一致</code></pre>
+<p><strong>Scenario 4 — Soak Test（持久測試，每週 + 大版本前）</strong></p>
+<pre><code class="">目的：發現記憶體洩漏、HikariCP 連線池耗盡、Outbox 積壓
+負載：350-400 PCU（正常 70-80%），持續 2 小時
+監控：JVM Heap RSS trend、HikariCP utilization（&lt; 80%）、Error Rate trend、GC frequency、trust_outbox_pending（&lt; 100）
+通過條件：2h 內 Error Rate 無上升、Memory 無線性增長、Outbox 無積壓</code></pre>
+<h4 id="slo-targets-表格與-edd-105-完全對齊">SLO Targets 表格（與 EDD §10.5 完全對齊）</h4>
+<table>
+<tr><th>Endpoint 類型</th><th>P50</th><th>P95</th><th>P99</th><th>Error Rate</th><th>Throughput</th></tr>
+<tr><td>讀取 API（GET /auth/me, /entitlements, /records）</td><td>≤ 100ms</td><td>≤ 300ms</td><td>≤ 1000ms</td><td>≤ 0.1%</td><td>—</td></tr>
+<tr><td>寫入 API（POST /wallet/spend, /topup, /entitlements/buy）</td><td>≤ 200ms</td><td>≤ 500ms</td><td>≤ 1000ms</td><td>≤ 0.1%</td><td>≥ 200 txn/s</td></tr>
+<tr><td>排行榜 Top N（GET /leaderboard, limit ≤ 100）</td><td>≤ 100ms</td><td>≤ 200ms</td><td>≤ 300ms</td><td>≤ 0.1%</td><td>—</td></tr>
+<tr><td>健康檢查（GET /health/*）</td><td>≤ 10ms</td><td>≤ 20ms</td><td>≤ 50ms</td><td>0%</td><td>≥ 500</td></tr>
+<tr><td>整體系統 @ 500 PCU</td><td>≤ 200ms</td><td>≤ 500ms</td><td>≤ 1000ms</td><td>≤ 1%</td><td>—</td></tr>
+</table>
+<h4 id="k6-腳本骨架">k6 腳本骨架</h4>
+<pre><code class="language-javascript">// tests/performance/load-test.js
+import http from &#x27;k6/http&#x27;;
+import { check } from &#x27;k6&#x27;;
+export const options = {
+  stages: [
+    { duration: &#x27;5m&#x27;, target: 500 },   // ramp-up 至 500 PCU
+    { duration: &#x27;20m&#x27;, target: 500 },  // steady-state
+    { duration: &#x27;5m&#x27;, target: 0 },     // ramp-down
+  ],
+  thresholds: {
+    http_req_duration: [&#x27;p(99)&lt;1000&#x27;, &#x27;p(50)&lt;200&#x27;],
+    http_req_failed: [&#x27;rate&lt;0.001&#x27;],
+  },
+};
+export default function () {
+  const res = http.post(`${__ENV.BASE_URL}/wallet/spend`,
+    JSON.stringify({ currency: &#x27;cash&#x27;, amount: 100, reason: &#x27;buy_cosmetic&#x27; }),
+    { headers: { Authorization: `Bearer ${__ENV.TOKEN}`, &#x27;Content-Type&#x27;: &#x27;application/json&#x27; } });
+  check(res, { &#x27;status 200 or 402&#x27;: (r) =&gt; r.status === 200 || r.status === 402 });
+}</code></pre>
+<blockquote><p><strong>執行命令</strong>：<code>k6 run --env BASE_URL=https://perf.yocat.internal --env TOKEN=&lt;token&gt; tests/performance/load-test.js</code>。</p></blockquote>
+<blockquote><p><strong>工具版本</strong>：k6 latest stable；環境規格見 §4（Perf 環境與 Production 同規格 DB）。</p></blockquote>
+<hr>
+<h3 id="35-uatuser-acceptance-tests">§3.5 UAT（User Acceptance Tests）</h3>
+<p><strong>目標</strong>：由業務 stakeholder 驗證產品符合 PRD/BRD，給出上線核准。</p>
+<h4 id="驗收標準逐項來自-prd-95-definition-of-done">驗收標準（逐項來自 PRD §9.5 Definition of Done）</h4>
+<p><strong>Product DoD：</strong></p>
+<ol><li>所有 P0 AC 均有對應 BDD scenario 並通過（PM 驗收）。</li><li>§7.8 所有 Analytics Event 已確認觸發 ≥ 5 次（PM）。</li><li>所有已知 edge case 與 error state（400/401/402/409/500）已測試（QA）。</li><li>§9/§17 Phase A 合規項通過法務初審（Legal）。</li><li>API 錯誤訊息已 key 化，無 hardcode（Engineering）。</li><li>Launch 前已記錄 Metrics 基準值（PM）。</li></ol>
+<p><strong>Engineering DoD：</strong></p>
+<ol><li>Coverage ≥ 80%（核心錢包/權益交易 100%）。</li><li>所有 API endpoint 有 integration test。</li><li>所有 P0 AC 自動化測試通過（E2E 覆蓋 Happy + Error Path）。</li><li>無 CRITICAL/HIGH 開放缺陷。</li><li>ModularityTests 100% 綠、0 循環依賴、HC-1~HC-5 合規。</li><li>SAST 無 HIGH/CRITICAL、dependencies 無 CVE &gt; 7.0。</li><li>P99 ≤ 1000ms @ 500 PCU、Error Rate ≤ 1%。</li><li>P0 功能在 Feature Flag Kill Switch 保護下上線。</li></ol>
+<h4 id="stakeholder-清單">Stakeholder 清單</h4>
+<table>
+<tr><th>角色</th><th>職責</th><th>參與場景</th></tr>
+<tr><td>Product Manager</td><td>功能驗收</td><td>所有 Must-have flows（register/login/topup/spend/buy/save）</td></tr>
+<tr><td>Business Owner（營運/Finance）</td><td>業務邏輯 + 對帳驗收</td><td>錢包對帳、ledger 稽核、付費轉化</td></tr>
+<tr><td>Engineering Lead</td><td>架構/HA 驗收</td><td>ModularityTests、HA Chaos、Go/No-Go</td></tr>
+<tr><td>Security Officer</td><td>安全合規驗收</td><td>滲透測試報告、OWASP</td></tr>
+<tr><td>客戶端整合工程師（代表性用戶 1-3 人）</td><td>API DX 驗收</td><td>OpenAPI 契約一致性、錯誤碼處理</td></tr>
+</table>
+<h4 id="uat-執行環境與通過條件">UAT 執行環境與通過條件</h4>
+<ul><li><strong>環境</strong>：Staging（production-like，≥ 2 replica）。</li><li><strong>資料</strong>：匿名化 production-representative 或 UAT 專用 seed，測試帳號 <code>@test.invalid</code>。</li><li><strong>時間</strong>：Release Candidate 確認後 3-5 個工作天。</li><li><strong>通過條件</strong>：所有 P0 UAT 案例通過 + 無 CRITICAL/P0/P1 open defect → 核准上線。</li></ul>
+<hr>
+<h3 id="36-ha--failover--chaos-tests">§3.6 HA / Failover / Chaos Tests</h3>
+<p><strong>目標</strong>：驗證系統在元件故障、節點重啟、網路中斷時能自動恢復並維持 SLO（可用性 ≥ 99.9%）。</p>
+<p><strong>HA 原則</strong>：HA 是架構前提，非 Future Scope。所有服務在 MVP 上線前必須通過 §3.6 最小 HA 場景（PRD §9.3）。</p>
+<h4 id="361-integration-test--ha-failover依-edd-122-ha-01ha-04">§3.6.1 Integration Test — HA Failover（依 EDD §12.2 HA-01~HA-04）</h4>
+<table>
+<tr><th>測試場景</th><th>工具</th><th>通過條件（含具體數字）</th></tr>
+<tr><td><strong>API Pod 強制終止</strong>（<code>chaoskube --labels app=yocat-office-backend-api</code>）</td><td>chaoskube + curl</td><td>K8s ≤ 30s 重建新 pod（EDD §3.6.3 RTO）；其他 pod 承接，P99 ≤ 2000ms（SLO 2x）；5xx 錯誤率 &lt; 0.1%；/health/ready 持續 200</td></tr>
+<tr><td><strong>Primary DB 故障切換</strong>（<code>pg_ctl stop -m fast</code>）</td><td>pgbench + failover trigger</td><td>Standby ≤ 30s 提升為 Primary；HikariCP 自動重連；已確認（Commit）寫入 RPO=0 不遺失</td></tr>
+<tr><td><strong>Redis Master 斷線</strong>（Sentinel 模式停 master）</td><td>redis-cli + health probe</td><td>Sentinel 選出新 Master；應用 ≤ 500ms（EDD §3.6.2 timeout）切換；session cache miss 回源 DB，降級非 500</td></tr>
+<tr><td><strong>單節點重啟</strong>（啟動期單 Region，HA-04）</td><td>kubectl + 節點重啟</td><td>單節點 DB 重啟後應用自動恢復；成長期跨 Region 以 Global LB 切換（RTO ≤ 30 min）</td></tr>
+<tr><td><strong>API Gateway 限流觸發</strong></td><td>k6 / vegeta</td><td>超過 Rate Limit（如 login 10/min/IP）回 429 + <code>Retry-After</code>，不報 500</td></tr>
+</table>
+<h4 id="362-e2e-test--ha-chaos-scenario-3-個-ha-場景">§3.6.2 E2E Test — HA Chaos Scenario（≥ 3 個 @ha 場景）</h4>
+<pre><code class="language-gherkin">Feature: HA Failover — 端點對端點驗證
+
+  @ha @failover @chaos
+  Scenario: Pod 重啟期間使用者請求不中斷
+    Given 系統已部署 2 個 API Server Pod（≥ 2 replicas）
+    And 有持續每秒 10 req 的穩定流量（register/login/spend 混合）
+    When 其中 1 個 API Pod 被強制終止
+    Then 流量自動切換至剩餘 Pod
+    And 期間 5XX 錯誤率 ≤ 0.1%（允許 ≤ 1 個請求失敗）
+    And 新 Pod 在 30 秒內通過 Readiness Probe 並重新接收流量
+
+  @ha @failover @chaos
+  Scenario: DB Primary 切換後錢包寫入一致性
+    Given 系統正在進行 wallet/spend 寫入（每秒 5 筆）
+    When Primary DB 節點發生故障（pg_ctl stop -m fast）
+    Then Standby DB 在 30 秒內自動提升為 Primary
+    And 所有已 Commit 的扣款資料不遺失（RPO=0）
+    And wallet 餘額與 wallet_ledger 對帳 0 筆不一致
+    And API 在 60 秒內恢復正常寫入
+
+  @ha @graceful-shutdown
+  Scenario: Pod Rolling Update 期間 in-flight 請求完成
+    Given API Pod 正在處理需要 5 秒的 entitlements/buy 交易
+    When Kubernetes 發送 SIGTERM 信號至該 Pod
+    Then Pod 停止接受新請求（Readiness Probe 失敗）
+    And 現有 in-flight 請求正常完成（最多等待 30s，EDD §3.6.5）
+    And PodDisruptionBudget 保證最小可用副本數
+    And Pod 退出後不殘留未完成的交易（無半筆 ledger）</code></pre>
+<h4 id="363-本地-ha-驗證local-dev遵循-edd-372-圖-b">§3.6.3 本地 HA 驗證（Local Dev，遵循 EDD §3.7.2 圖 B）</h4>
+<pre><code class="language-bash"># 1. 確認 Local 有 ≥ 2 API replicas
+kubectl get pods -l app=yocat-office-backend-api | grep Running | wc -l
+# 期望 ≥ 2
+
+# 2. 終止其中一個 Pod，觀察服務不中斷
+kubectl delete pod $(kubectl get pods -l app=yocat-office-backend-api -o jsonpath=&#x27;{.items[0].metadata.name}&#x27;)
+curl http://localhost:8080/health/ready   # 應在 5s 內持續回應 200
+
+# 3. 驗證 Outbox 事件冪等（送出同一 MemberRegistered event_id 兩次）
+#    斷言 wallet 僅建立一次（event_id dedup，EDD §4.6.1）</code></pre>
+<blockquote><p>本機 PostgreSQL/Redis 為單節點（EDD §3.7.2 例外），DB/Redis Failover 場景須於 Staging 執行。</p></blockquote>
+<hr>
+<h3 id="37-security-tests">§3.7 Security Tests</h3>
+<p><strong>目標</strong>：系統性識別並修復安全漏洞，確認符合 OWASP Top 10（來源 EDD §9.5 / PRD §7.4）。</p>
+<h4 id="sastjava-技術棧">SAST（Java 技術棧）</h4>
+<table>
+<tr><th>工具</th><th>語言</th><th>觸發時機</th><th>Fail 條件</th></tr>
+<tr><td>SpotBugs + FindSecBugs</td><td>Java</td><td>PR opened</td><td>High/Critical bug pattern</td></tr>
+<tr><td>Semgrep</td><td>多語言</td><td>PR opened</td><td>High/Critical rule matches</td></tr>
+</table>
+<h4 id="dast">DAST</h4>
+<table>
+<tr><th>工具</th><th>掃描目標</th><th>觸發時機</th><th>排除項目</th></tr>
+<tr><td>OWASP ZAP（Baseline Scan）</td><td>Staging 18 個 API endpoint</td><td>每週排程</td><td><code>/health/live</code>, <code>/health/ready</code></td></tr>
+<tr><td>OWASP ZAP（Full Scan）</td><td>Staging 全應用</td><td>UAT 前</td><td>—</td></tr>
+</table>
+<h4 id="dependency-scanning">Dependency Scanning</h4>
+<table>
+<tr><th>工具</th><th>掃描對象</th><th>觸發時機</th><th>Fail 條件</th></tr>
+<tr><td>Trivy</td><td>Container image</td><td>PR merged to main</td><td>Critical CVE</td></tr>
+<tr><td>OWASP Dependency-Check</td><td>Gradle/Maven 依賴</td><td>PR opened</td><td>High/Critical CVE（CVE &gt; 7.0）</td></tr>
+<tr><td>GitHub Dependabot</td><td>所有依賴</td><td>每日</td><td>自動開 PR，不 block</td></tr>
+</table>
+<h4 id="owasp-top-10-coveragea01-a10-每項均有測試方法對應-edd-95">OWASP Top 10 Coverage（A01-A10 每項均有測試方法，對應 EDD §9.5）</h4>
+<table>
+<tr><th>OWASP 類別</th><th>適用性</th><th>測試方法</th><th>工具</th><th>Pass Condition</th><th>負責人</th></tr>
+<tr><td>A01 Broken Access Control</td><td>高</td><td>以他人 token 存取本人錢包/存檔 → 401/403；session 歸戶驗證</td><td>pytest/REST + ZAP</td><td>所有越權請求回 401/403（非 200）</td><td>Security</td></tr>
+<tr><td>A02 Cryptographic Failures</td><td>中</td><td>scrypt 密碼雜湊審查、TLS 1.3 設定、無硬編碼 secrets</td><td>Semgrep + testssl.sh</td><td>密碼單向雜湊、TLS 1.3+、0 硬編碼 secret</td><td>Security</td></tr>
+<tr><td>A03 Injection</td><td>高</td><td>參數化查詢審查（JDBC PreparedStatement）、ZAP active scan</td><td>SpotBugs + ZAP</td><td>無字串拼接 SQL、無注入成功</td><td>QA Lead</td></tr>
+<tr><td>A04 Insecure Design</td><td>中</td><td>STRIDE Threat Model Review（EDD §9.6）</td><td>人工審查</td><td>Threat model 完成且 High risk 已 mitigate</td><td>Architect</td></tr>
+<tr><td>A05 Security Misconfiguration</td><td>高</td><td>無 debug endpoint、CORS 收斂檢查、預設密碼掃描</td><td>ZAP + Trivy</td><td>無 debug endpoint、CORS 非 <code>*</code>（正式）</td><td>DevOps</td></tr>
+<tr><td>A06 Vulnerable Components</td><td>高</td><td>依賴 CVE 掃描</td><td>Trivy + Dependency-Check</td><td>無 Critical CVE，High 有 remediation</td><td>DevOps</td></tr>
+<tr><td>A07 Auth &amp; Session Failures</td><td>高</td><td>登入暴力破解（login 10/min/IP 限流）、session 過期（TTL 30 天）、<code>timingSafeEqual</code> 防時序</td><td>ZAP + 自撰測試</td><td>限流生效、過期 token 回 401、密碼比對恆定時間</td><td>Security</td></tr>
+<tr><td>A08 Software &amp; Data Integrity</td><td>低</td><td>append-only ledger 不可改、event_id 冪等、CI action pin 版本</td><td>人工 + CI audit</td><td>ledger WORM、pinned action</td><td>DevOps</td></tr>
+<tr><td>A09 Logging &amp; Monitoring Failures</td><td>中</td><td>認證事件有 log、PII（email）遮罩、無明文密碼/token</td><td>人工 audit</td><td>所有 auth event 有 log、0 PII 洩漏</td><td>DevOps</td></tr>
+<tr><td>A10 SSRF</td><td>低（無外部 URL 輸入）</td><td>save data JSONB 無 URL fetch；Phase B webhook URL 驗證</td><td>ZAP + 人工</td><td>無法觸發內部網路存取</td><td>QA Lead</td></tr>
+</table>
+<h4 id="滲透測試release-前prd-93-go-條件">滲透測試（Release 前，PRD §9.3 Go 條件）</h4>
+<ul><li>重點：<strong>0 條可由客戶端竄改伺服器餘額路徑</strong>（北極星護欄）。</li><li>範圍：錢包 topup/spend、entitlements/buy、session 偽造、JWT/token 竄改。委外或內部 Security Officer 執行，輸出滲透測試報告。</li></ul>
+<hr>
+<h3 id="38-spring-modulith-可拆解性驗證decomposability-test-suite">§3.8 Spring Modulith 可拆解性驗證（Decomposability Test Suite）</h3>
+<blockquote><p>本節以 Spring Modulith 1.3 驗證系統 HC-1～HC-5 邊界約束。<strong>必填，不可省略。</strong></p></blockquote>
+<p><strong>目標</strong>：確保系統從 Day 1 符合 Bounded Context 邊界，具備微服務拆解能力：</p>
+<ul><li><strong>HC-1 Schema 隔離</strong>：各 BC 獨佔 PostgreSQL schema，無跨 BC FK、無跨 BC JOIN。</li><li><strong>HC-2 公開介面</strong>：跨 BC 僅走 <code>@NamedInterface</code>（<code>*/api</code>）或 Domain Event，無直接 internal class 呼叫。</li><li><strong>HC-3 事件驅動</strong>：跨 BC 通訊走 Domain Event（Transactional Outbox），消費端 event_id 冪等。</li><li><strong>HC-4 無共享可變狀態</strong>：Redis Key 符合 <code>{BC}:{type}:{id}</code> namespace，無跨 BC Key 存取。</li><li><strong>HC-5 DAG 依賴圖</strong>：<code>ApplicationModules.verify()</code> 無循環依賴。</li></ul>
+<h4 id="381-applicationmodules-全局驗證對應-hc-5">§3.8.1 ApplicationModules 全局驗證（對應 HC-5）</h4>
+<table>
+<tr><th>測試 ID</th><th>測試類型</th><th>工具</th><th>驗證目標</th><th>合格標準</th></tr>
+<tr><td>SM-TEST-00</td><td>Architecture Test</td><td><code>ApplicationModules.verify()</code></td><td>全域模組邊界 + 循環依賴偵測</td><td><code>verify()</code> 無 AssertionError（CI 強制 gate）</td></tr>
+</table>
+<pre><code class="language-java">// src/test/java/com/yocat/office/ModulithVerificationTest.java
+@SpringBootTest
+class ModulithVerificationTest {
+    @Test
+    void modules_comply_with_all_hc_constraints() {
+        ApplicationModules modules = ApplicationModules.of(YocatOfficeBackendApplication.class);
+        modules.verify();   // HC-5 DAG + HC-1/HC-2 邊界違規 → AssertionError
+    }
+
+    @Test
+    void modules_have_no_circular_dependencies() {
+        ApplicationModules modules = ApplicationModules.of(YocatOfficeBackendApplication.class);
+        modules.forEach(m -&gt; System.out.println(m.getName() + &quot;: &quot; + m.getDependencies()));
+        modules.verify();
+    }
+
+    @Test   // 另產出模組文件（供 Review 確認邊界）
+    void write_documentation() {
+        new Documenter(ApplicationModules.of(YocatOfficeBackendApplication.class))
+            .writeModulesAsPlantUml().writeIndividualModulesAsPlantUml();
+    }
+}</code></pre>
+<blockquote><p><strong>CI 阻斷 merge 條件</strong>：<code>ApplicationModules.verify()</code> 必須在每個 PR CI pipeline 執行，任何 <code>AssertionError</code>（HC-1/HC-2/HC-5 違規）阻斷 merge（見 §8 自動化策略）。</p></blockquote>
+<h4 id="382-per-bc-邊界隔離測試對應-hc-1hc-2edd-34-全-7-bc">§3.8.2 Per-BC 邊界隔離測試（對應 HC-1/HC-2，EDD §3.4 全 7 BC）</h4>
+<table>
+<tr><th>測試 ID</th><th>BC 名稱</th><th>測試方式</th><th>合格標準</th></tr>
+<tr><td>SM-TEST-01-member</td><td>member</td><td><code>@ApplicationModuleTest</code> 單 BC context 啟動</td><td><code>/auth/*</code> endpoints 回 2XX，無跨 BC 依賴滲漏</td></tr>
+<tr><td>SM-TEST-01-wallet</td><td>wallet</td><td><code>@ApplicationModuleTest</code> 單 BC context 啟動</td><td><code>/wallet/*</code> endpoints 回 2XX</td></tr>
+<tr><td>SM-TEST-01-deposit</td><td>deposit</td><td><code>@ApplicationModuleTest</code> 單 BC context 啟動</td><td>topup pack 解析正常，Event 發布可驗</td></tr>
+<tr><td>SM-TEST-01-entitlement</td><td>entitlement</td><td><code>@ApplicationModuleTest</code>（stub WalletService）</td><td><code>/entitlements/*</code> 回 2XX</td></tr>
+<tr><td>SM-TEST-01-record</td><td>record</td><td><code>@ApplicationModuleTest</code> 單 BC context 啟動</td><td><code>/records/*</code> 回 2XX</td></tr>
+<tr><td>SM-TEST-01-leaderboard</td><td>leaderboard</td><td><code>@ApplicationModuleTest</code> 單 BC context 啟動</td><td><code>/leaderboard</code> 回 2XX</td></tr>
+<tr><td>SM-TEST-01-game-save</td><td>game-save</td><td><code>@ApplicationModuleTest</code> 單 BC context 啟動</td><td><code>/save</code> GET/PUT 回 2XX</td></tr>
+</table>
+<h4 id="383-event-contract-測試對應-hc-3依-edd-461-跨-bc-pair">§3.8.3 Event Contract 測試（對應 HC-3，依 EDD §4.6.1 跨 BC pair）</h4>
+<p>跨 BC Domain Event pair（Owning BC → Consumer BC）各產生一組 Pact / Schema 合約測試：</p>
+<table>
+<tr><th>測試 ID</th><th>Producer BC</th><th>Event Class</th><th>Consumer BC</th><th>Contract Type</th><th>合格標準</th></tr>
+<tr><td>SM-TEST-02-EVT-01</td><td>member</td><td><code>MemberRegistered</code></td><td>wallet</td><td>Pact Consumer-Driven + JSON Schema</td><td>wallet 端 pact verify 100% 通過，建錢包+init ledger</td></tr>
+<tr><td>SM-TEST-02-EVT-02</td><td>deposit</td><td><code>DepositConfirmed</code></td><td>wallet</td><td>Pact + orderId dedup</td><td>wallet 端 verify 通過，orderId 冪等入帳</td></tr>
+<tr><td>SM-TEST-02-EVT-03</td><td>member</td><td><code>MemberDeleted</code></td><td>wallet</td><td>Pact + Schema</td><td>wallet 端消費匿名化/清理</td></tr>
+<tr><td>SM-TEST-02-EVT-04</td><td>member</td><td><code>MemberDeleted</code></td><td>entitlement</td><td>Pact + Schema</td><td>entitlement 端消費清理</td></tr>
+<tr><td>SM-TEST-02-EVT-05</td><td>member</td><td><code>MemberDeleted</code></td><td>record</td><td>Pact + Schema</td><td>record 端消費清理</td></tr>
+<tr><td>SM-TEST-02-EVT-06</td><td>member</td><td><code>MemberDeleted</code></td><td>leaderboard</td><td>Pact + Schema</td><td>leaderboard 端消費清理</td></tr>
+<tr><td>SM-TEST-02-EVT-07</td><td>member</td><td><code>MemberDeleted</code></td><td>game-save</td><td>Pact + Schema</td><td>game-save 端消費清理</td></tr>
+</table>
+<blockquote><p><code>WalletBalanceChanged</code>、<code>EntitlementGranted</code>、<code>BusinessRecordAdded</code>、<code>RunScoreSubmitted</code> 為 <strong>BC-internal 消費</strong>（EDD §4.6.1），不產生跨 BC Pact，但以 §3.8.3 Schema 版本相容性測試（SM-TEST-03）驗證 producer/consumer <code>event_schema_version=v1</code> 相容。另 entitlement → wallet 為 <strong>同步 Public API</strong>（<code>WalletService.debit()</code>，EDD §3.4），以 Pact SM-TEST-02-API-01 驗證。</p></blockquote>
+<h4 id="384-schema-隔離驗證對應-hc-1">§3.8.4 Schema 隔離驗證（對應 HC-1）</h4>
+<pre><code class="">驗證方法：Integration Test 中以 P6Spy（Java）攔截所有 SQL，
+          記錄每個 BC 程式碼執行的 SQL 目標 schema，
+          驗證無任何 SQL 存取其他 BC 的 schema（如 wallet BC 讀 member schema）。
+合格標準：CROSS_BC_SQL_COUNT = 0
+測試 ID：SM-TEST-01-SCHEMA
+工具：P6Spy + 自撰 SQL schema analyzer</code></pre>
+<h4 id="385-redis-namespace-隔離驗證對應-hc-4">§3.8.5 Redis Namespace 隔離驗證（對應 HC-4）</h4>
+<pre><code class="">驗證方法：Redis MONITOR 在 Integration Test 記錄所有 Redis 操作，
+          驗證每個 BC 的 Key 符合其 namespace（與 SCHEMA.md §19 一致）。
+合格標準：所有 Redis Key 符合各 BC Key Pattern，無跨 BC Key 存取。
+各 BC Redis Key Pattern（SCHEMA.md §19）：
+  member      → session:{token}
+  leaderboard → lb:{mode}:top（Top N 頁快取）
+  平台底座     → ratelimit:{scope}:{id}（限流滑動視窗）
+測試 ID：SM-TEST-HC4-NAMESPACE</code></pre>
+<h4 id="386-hc-3-domain-event-消費冪等性測試">§3.8.6 HC-3 Domain Event 消費冪等性測試</h4>
+<pre><code class="">測試 ID：SM-TEST-HC3-IDEMPOTENCY
+驗證方法：Testcontainers 跑 wallet Consumer，投遞同一 MemberRegistered event_id 兩次，
+          斷言 wallets 僅建立一筆、init ledger 僅一筆（event_id dedup，EDD §4.6.1）。
+合格標準：重複投遞後 DB 業務記錄只有一筆；processed_event_id 去重表 INSERT 可驗。
+風險覆蓋：MQ/Outbox at-least-once 重複投遞 → 重複建錢包/重複入帳。</code></pre>
+<hr>
+<h2 id="4-test-environment-specification">§4 Test Environment Specification</h2>
+<blockquote><p>每個環境用途不同，資料策略嚴格隔離，避免測試汙染 Production。全環境 local-first（Rancher Desktop k8s）。</p></blockquote>
+<table>
+<tr><th>Environment</th><th>用途</th><th>URL Pattern</th><th>Database</th><th>資料策略</th><th>部署方式</th></tr>
+<tr><td><strong>Dev</strong></td><td>開發者本機 Unit/快速 Integration</td><td><code>localhost:8080</code></td><td>本機 Docker PostgreSQL 16 / Testcontainers</td><td>開發者自管，每次重啟清空</td><td><code>docker compose up</code> / Rancher Desktop</td></tr>
+<tr><td><strong>Test</strong></td><td>Integration + E2E CI pipeline</td><td><code>http://test.yocat.internal</code></td><td>獨立 Test DB（CI 每次重建）</td><td>CI 前 migration + seed，執行後保留供 debug</td><td>GitHub Actions + Rancher Desktop k8s</td></tr>
+<tr><td><strong>Staging</strong></td><td>UAT / Performance / DAST / HA Chaos</td><td><code>https://staging.yocat.internal</code></td><td>獨立 Staging DB（匿名化快照，Primary+Standby）</td><td>月更匿名化快照，QA Lead 手動 reset</td><td>與 Production 相同 IaC（Helm/k8s，≥ 2 replica）</td></tr>
+<tr><td><strong>Perf（Prod-like）</strong></td><td>Stress / Soak（隔離）</td><td><code>https://perf.yocat.internal</code></td><td>與 Production 同規格 DB（Primary+Standby + Redis Sentinel）</td><td>測試前 provision，測試後 destroy</td><td>與 Production 相同 IaC，按需建立</td></tr>
+</table>
+<p><strong>各測試類型執行環境對照：</strong></p>
+<ul><li>Unit Test → Dev（本機，無 DB）/ CI。</li><li>Integration Test → Dev/Test（Testcontainers PostgreSQL 16 + Redis）。</li><li>E2E（功能）→ Test。</li><li>E2E（HA Chaos）→ Staging（≥ 2 replica、DB Primary+Standby、Redis Sentinel，不可於 localhost 執行）。</li><li>Performance（Load）→ Staging；Performance（Stress/Soak）→ Perf。</li><li>Security DAST / 滲透 → Staging。</li></ul>
+<p><strong>環境存取控制：</strong></p>
+<ul><li>Dev：開發者本人。</li><li>Test：Dev + QA（GitHub Actions service account）。</li><li>Staging：Dev + QA + PM + UAT stakeholders + SRE（VPN required）。</li><li>Perf：QA Lead + SRE（限效能測試時段）。</li></ul>
+<hr>
+<h2 id="5-test-data-management">§5 Test Data Management</h2>
+<h3 id="51-資料生成策略">§5.1 資料生成策略</h3>
+<table>
+<tr><th>策略</th><th>使用場景</th><th>工具</th><th>說明</th></tr>
+<tr><td><strong>Faker</strong></td><td>動態生成單筆測試資料</td><td>datafaker（Java）</td><td>Unit/Integration，每次執行生成 email/displayName</td></tr>
+<tr><td><strong>Factory</strong></td><td>批量建立具業務邏輯物件</td><td>自撰 TestFactory + Instancio</td><td>支援 trait（已登入帳號、餘額足/不足、已擁有權益）</td></tr>
+<tr><td><strong>Fixture</strong></td><td>靜態基準資料（seed）</td><td>SQL/JSON fixtures</td><td>E2E 固定測試帳號，納入 version control</td></tr>
+<tr><td><strong>Production Anonymized</strong></td><td>UAT / Staging</td><td>自建匿名化 pipeline</td><td>僅 Staging，嚴禁用於 Test/Dev</td></tr>
+</table>
+<p><strong>Factory 範例（Java）：</strong></p>
+<pre><code class="language-java">// src/test/java/com/yocat/office/support/WalletFactory.java
+public final class WalletFactory {
+    public static Wallet withCash(long cash) {
+        return Wallet.rehydrate(AccountId.of(1001L), Money.of(cash, Currency.CASH), Money.zero(Currency.GEMS));
+    }
+    public static Wallet insufficient() { return withCash(0); }  // 觸發 402
+}</code></pre>
+<h3 id="52-pii-masking-規則對應-prd-17--schemamd-14">§5.2 PII Masking 規則（對應 PRD §17 / SCHEMA.md §14）</h3>
+<table>
+<tr><th>PII 類型</th><th>Masking 方式</th><th>範例（原始 → 匿名化）</th><th>環境適用</th></tr>
+<tr><td>display_name</td><td>隨機替換（同語系）</td><td>王小明 → 測試員A7</td><td>Staging</td></tr>
+<tr><td>email</td><td>固定 domain 替換</td><td>john@real.com → test_8f3a@test.invalid</td><td>Staging / Test</td></tr>
+<tr><td>pass_hash</td><td>已為 scrypt 單向雜湊，不還原</td><td>（不可逆，保持雜湊）</td><td>全環境</td></tr>
+<tr><td>IP 地址（audit log）</td><td>保留前兩段，後兩段隨機</td><td>203.0.113.45 → 203.0.xxx.xxx</td><td>Staging</td></tr>
+</table>
+<p><strong>PII 禁令：</strong></p>
+<ul><li>Test/Dev 環境<strong>嚴禁</strong>真實 PII；測試帳號用 <code>@test.invalid</code> / <code>@example.com</code>。</li><li>匿名化 pipeline 由 SRE 維護，QA Lead 每季審核。</li><li>違規使用立即通報 Security Officer。</li></ul>
+<h3 id="53-test-isolation-原則">§5.3 Test Isolation 原則</h3>
+<pre><code class="">每個 Test Case 黃金法則：
+1. SETUP（Arrange）：Factory/Fixture 建最小資料集，不假設前一 test 狀態
+2. EXECUTE（Act）：執行被測行為，一個 test 只測一件事
+3. VERIFY（Assert）：僅 assert 本 test 關心的狀態
+4. TEARDOWN（Cleanup）：transaction rollback 自動還原，不留副作用</code></pre>
+<h3 id="54-shared-test-data-規範">§5.4 Shared Test Data 規範</h3>
+<table>
+<tr><th>類型</th><th>說明</th><th>管理方式</th><th>注意事項</th></tr>
+<tr><td>Seed Data（靜態）</td><td>deposit_pack 包目錄、currency/kind/type 列舉基礎資料</td><td>Flyway migration，版本化</td><td>只讀不寫</td></tr>
+<tr><td>Dynamic Test Data</td><td>每個 test 動態建的 account/wallet/entitlement</td><td>Factory function</td><td>teardown 清理</td></tr>
+<tr><td>Shared Fixtures（E2E）</td><td>跨裝置存檔測試的固定帳號</td><td><code>@BeforeAll</code> / Playwright fixtures</td><td>唯讀共享</td></tr>
+</table>
+<hr>
+<h2 id="6-entry--exit-criteria">§6 Entry / Exit Criteria</h2>
+<table>
+<tr><th>Stage</th><th>Entry Criteria</th><th>Exit Criteria</th><th>Blocking Defects</th></tr>
+<tr><td><strong>Unit Testing</strong></td><td>功能開發完成，PR opened，CI 觸發</td><td>Line Coverage ≥ 80%（核心交易 100%），所有 Unit Tests pass</td><td>任何 Unit Test failure</td></tr>
+<tr><td><strong>Integration Testing</strong></td><td>Unit 通過，Test 環境部署成功，Testcontainers 可啟動</td><td>18 endpoint 測試通過，API contract 符合 API.md，ModularityTests 綠</td><td>P0/P1 defect、API schema mismatch、<code>verify()</code> AssertionError</td></tr>
+<tr><td><strong>E2E Testing</strong></td><td>Integration 通過，E2E 環境穩定，測試資料備妥</td><td>Smoke 100% pass，Regression ≥ 95%，HA Smoke 通過</td><td>P0 defect、Critical Flow failure、HA Smoke 失敗</td></tr>
+<tr><td><strong>Performance Testing</strong></td><td>E2E 通過，Staging/Perf 部署，k6 腳本 review 完畢</td><td>P99 ≤ 1000ms @ 500 PCU、Error Rate &lt; 0.1%、寫入 TPS ≥ 200、對帳 0 筆不一致</td><td>P99 超 SLO 50%、Error Rate &gt; 1%、任一筆對帳不一致</td></tr>
+<tr><td><strong>Security Testing</strong></td><td>Staging 可存取，SAST 初掃完成</td><td>OWASP A01-A10 全通過，無 High/Critical open issue，滲透 0 條竄改路徑</td><td>任何 Critical 漏洞、任一可竄改餘額路徑</td></tr>
+<tr><td><strong>UAT</strong></td><td>上述全通過，Staging 穩定，stakeholders 已排程</td><td>所有 P0 UAT sign-off，無 P0/P1 open defect</td><td>P0 defect、Must-have AC 未通過</td></tr>
+</table>
+<p><strong>Release Exit Criteria（Go/No-Go，PRD §9.3）：</strong> 所有 P0 AC 通過 + 覆蓋率 ≥ 80%（核心 100%）+ 滲透 0 竄改路徑 + 併發/failover 0 筆不一致 + 殺 pod/滾動更新 &lt; 0.1% + ModularityTests 0 循環依賴 + 安全掃描無 CRITICAL/HIGH + local-first 全綠 + Rollback 已驗證。</p>
+<hr>
+<h2 id="7-defect-management">§7 Defect Management</h2>
+<h3 id="71-severity-分類與-sla">§7.1 Severity 分類與 SLA</h3>
+<table>
+<tr><th>Priority</th><th>定義</th><th>修復 SLA</th><th>驗證 SLA</th><th>範例</th></tr>
+<tr><td><strong>P0 Critical</strong></td><td>系統崩潰/資料遺失/安全漏洞/錢包對帳不一致</td><td>4 小時</td><td>2 小時</td><td>可竄改餘額、負餘額、SQL injection、DB SPOF</td></tr>
+<tr><td><strong>P1 High</strong></td><td>核心功能無法使用（無 workaround）</td><td>24 小時</td><td>4 小時</td><td>spend/buy 失敗、session 驗證錯誤、ledger 漏記</td></tr>
+<tr><td><strong>P2 Medium</strong></td><td>功能受損但有 workaround</td><td>3 個工作天</td><td>1 個工作天</td><td>非核心端點異常、效能略低於 SLO</td></tr>
+<tr><td><strong>P3 Low</strong></td><td>次要問題/訊息文字</td><td>Next Sprint</td><td>Next Sprint</td><td>錯誤訊息錯字、log 格式瑕疵</td></tr>
+</table>
+<p><strong>Defect Escape Rate 目標</strong>：Production P0/P1 defect ≤ <strong>2 per sprint</strong>（P0 = 0、P1 ≤ 1）。</p>
+<h3 id="72-defect-workflow">§7.2 Defect Workflow</h3>
+<div class="diagram-container"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; New : 發現問題 (QA / Dev / 客戶端整合)
+    New --&gt; Triaged : QA Lead 確認分類 Severity
+    New --&gt; Duplicate : 重複 → 關閉
+    New --&gt; NotABug : 預期行為 → 關閉
+    Triaged --&gt; InProgress : Dev 認領 (P0 立即；P1 24h)
+    Triaged --&gt; Deferred : PM 決定延後 (僅 P2/P3)
+    InProgress --&gt; CodeReview : 修復完成，PR opened
+    CodeReview --&gt; QAVerification : PR merged，部署至 Test
+    QAVerification --&gt; Closed : QA 驗證通過
+    QAVerification --&gt; Reopened : 驗證失敗
+    Reopened --&gt; InProgress : 重新指派
+    Deferred --&gt; Triaged : 下 Sprint 重評
+    Duplicate --&gt; [*]
+    NotABug --&gt; [*]
+    Closed --&gt; [*]</pre></div>
+<h3 id="73-defect-escape-rate-監控">§7.3 Defect Escape Rate 監控</h3>
+<table>
+<tr><th>指標</th><th>目標</th><th>測量方式</th><th>行動觸發</th></tr>
+<tr><td>Production P0 defects / sprint</td><td>= 0</td><td>Jira sprint report</td><td>立即 post-mortem</td></tr>
+<tr><td>Production P1 defects / sprint</td><td>≤ 1</td><td>Jira sprint report</td><td>根因分析，改善覆蓋</td></tr>
+<tr><td>錢包對帳不一致</td><td>= 0（任一即 P0）</td><td>對帳稽核</td><td>立即凍結金流 + On-Call</td></tr>
+<tr><td>Defect resolution within SLA</td><td>≥ 95%</td><td>Jira time tracking</td><td>&lt; 90% 升級 Engineering Lead</td></tr>
+</table>
+<hr>
+<h2 id="8-test-automation--cicd-integration">§8 Test Automation &amp; CI/CD Integration</h2>
+<h3 id="81-ci-pipeline-觸發時機">§8.1 CI Pipeline 觸發時機</h3>
+<table>
+<tr><th>事件</th><th>執行測試類型</th><th>允許時間</th><th>Fail 行為</th></tr>
+<tr><td><code>git commit</code>（pre-commit hook）</td><td>變更檔 Unit Tests</td><td>&lt; 30 sec</td><td>Block commit</td></tr>
+<tr><td>PR opened / push</td><td>全量 Unit + Integration + ModularityTests + SAST + Pact</td><td>&lt; 10 min</td><td>Block PR merge</td></tr>
+<tr><td>PR merged to main</td><td>Unit + Integration + E2E Smoke（含 HA Smoke）</td><td>&lt; 15 min</td><td>Alert on Slack</td></tr>
+<tr><td>Daily（02:00 UTC）</td><td>Full E2E Regression + Security DAST</td><td>&lt; 30 min</td><td>Alert + Jira ticket</td></tr>
+<tr><td>Weekly（Mon 04:00 UTC）</td><td>Load Test + Soak Test + Full Security Scan</td><td>&lt; 120 min</td><td>Alert + Jira ticket</td></tr>
+<tr><td>Release</td><td>Stress + Soak + UAT Gate + 滲透測試</td><td>Varies</td><td>QA Lead 通知，阻斷 Release</td></tr>
+</table>
+<h3 id="82-ci-pipeline-gatemermaid">§8.2 CI Pipeline Gate（Mermaid）</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+  PR[&quot;PR Created&quot;] --&gt; U[&quot;Unit Test&quot;] --&gt; I[&quot;Integration Test&quot;] --&gt; M[&quot;ArchUnit + ApplicationModules.verify()&quot;] --&gt; S[&quot;SAST + Pact&quot;] --&gt; B[&quot;Build&quot;]
+  Merge[&quot;PR Merged&quot;] --&gt; E2E[&quot;E2E Smoke + HA Smoke (Staging)&quot;]
+  Nightly[&quot;Nightly&quot;] --&gt; Reg[&quot;E2E Regression + DAST&quot;]
+  Weekly[&quot;Weekly&quot;] --&gt; Load[&quot;Load + Soak + Full Security&quot;]
+  Release[&quot;Release&quot;] --&gt; St[&quot;Stress + Soak + UAT + Pen Test&quot;]</pre></div>
+<h3 id="83-測試執行時間目標pr-ci--10-分鐘">§8.3 測試執行時間目標（PR CI &lt; 10 分鐘）</h3>
+<ul><li>Unit Test：&lt; 2 分鐘；Integration Test：&lt; 5 分鐘；ArchUnit + Modulith verify：&lt; 1 分鐘；SAST：&lt; 3 分鐘。</li><li><strong>並行策略</strong>：Unit + SAST 並行；Integration 在 Unit 通過後觸發；ModularityTests 與 Integration 並行。</li></ul>
+<h3 id="84-自動化率目標">§8.4 自動化率目標</h3>
+<ul><li>整體自動化率 ≥ <strong>90%</strong>；E2E Smoke <strong>100%</strong>；Regression ≥ <strong>80%</strong>。</li><li><strong>不自動化</strong>：UAT（業務 stakeholder 手動驗收）、探索性測試（exploratory）、滲透測試人工部分。理由：需人工業務判斷或創造性探索。</li></ul>
+<h3 id="85-工具矩陣含版本目標與設定檔">§8.5 工具矩陣（含版本目標與設定檔）</h3>
+<table>
+<tr><th>類型</th><th>工具</th><th>版本目標</th><th>設定檔位置</th></tr>
+<tr><td>Unit</td><td>JUnit 5 + Mockito + AssertJ</td><td>latest stable</td><td><code>build.gradle</code> / <code>pom.xml</code></td></tr>
+<tr><td>Coverage</td><td>JaCoCo</td><td>latest stable</td><td><code>build.gradle</code></td></tr>
+<tr><td>Integration</td><td>Spring MockMvc + Testcontainers</td><td>latest stable</td><td><code>src/test/resources/</code></td></tr>
+<tr><td>Architecture</td><td>ArchUnit + Spring Modulith <code>ApplicationModules</code></td><td>latest stable</td><td><code>*/ModulithVerificationTest.java</code></td></tr>
+<tr><td>Contract</td><td>Pact JVM</td><td>latest stable</td><td><code>src/test/pact/</code></td></tr>
+<tr><td>E2E</td><td>Playwright（API mode）</td><td>latest stable</td><td><code>playwright.config.ts</code></td></tr>
+<tr><td>Performance</td><td>k6</td><td>latest stable</td><td><code>tests/performance/</code></td></tr>
+<tr><td>SAST</td><td>SpotBugs + FindSecBugs + Semgrep</td><td>latest stable</td><td>CI 設定</td></tr>
+<tr><td>DAST</td><td>OWASP ZAP</td><td>latest</td><td><code>zap/</code></td></tr>
+<tr><td>Dependency</td><td>Trivy + OWASP Dependency-Check</td><td>latest</td><td>CI 設定</td></tr>
+</table>
+<hr>
+<h2 id="9-risk-based-testing-matrix">§9 Risk-Based Testing Matrix</h2>
+<table>
+<tr><th>功能（BC）</th><th>業務優先級</th><th>風險等級</th><th>測試深度</th><th>覆蓋率目標</th></tr>
+<tr><td>wallet（topup/spend/ledger）</td><td>P0</td><td><strong>High</strong></td><td>Unit + Integration + E2E + Performance + 併發壓測</td><td>≥ 90%（核心 100%）</td></tr>
+<tr><td>entitlement（原子扣款+授予）</td><td>P0</td><td><strong>High</strong></td><td>Unit + Integration + E2E</td><td>≥ 90%（核心 100%）</td></tr>
+<tr><td>member（註冊/登入/session）</td><td>P0</td><td><strong>High</strong></td><td>Unit + Integration + E2E + Security</td><td>≥ 90%</td></tr>
+<tr><td>平台底座（7 BC Modulith + HA）</td><td>P0</td><td><strong>High</strong></td><td>Unit（Modulith）+ Integration + E2E Chaos</td><td>100%（ModularityTests）</td></tr>
+<tr><td>game-save（跨裝置存檔）</td><td>P0</td><td>Medium</td><td>Unit + Integration + E2E</td><td>≥ 80%</td></tr>
+<tr><td>deposit（假付費/Phase B 預留）</td><td>P0</td><td>Medium</td><td>Unit + Integration</td><td>≥ 80%</td></tr>
+<tr><td>leaderboard（公開 Top N + 上榜）</td><td>P1</td><td>Medium</td><td>Unit + Integration + Performance</td><td>≥ 80%</td></tr>
+<tr><td>record（經營史 append-only）</td><td>P1</td><td>Low</td><td>Unit + Integration</td><td>≥ 70%</td></tr>
+</table>
+<p><strong>高風險功能詳細清單（P0 High，逐一對應 AC）：</strong></p>
+<ul><li><strong>wallet</strong>：US-WAL-001 AC-1~AC-5（topup 上限 10,000,000、spend 行鎖、402 餘額不足、併發 0 筆不一致）。</li><li><strong>entitlement</strong>：US-ENT-001 AC-1~AC-5（原子扣款、409 重複、402 餘額不足交易回滾、破產後權益不消失）。</li><li><strong>member</strong>：US-MEM-001 AC-1~AC-6（409 email 重複、401 帳密錯/未登入、timingSafeEqual、session TTL）。</li><li><strong>平台底座</strong>：US-PLAT-001 AC-1~AC-5（殺 pod &lt; 0.1%、滾動更新、ModularityTests 0 循環、跨 BC 僅 Public API/Event、local-first）。</li></ul>
+<blockquote><p><strong>Admin 後台</strong>：<code>has_admin_backend=false</code>，無 Admin RBAC 風險項，不列入本 Matrix。</p></blockquote>
+<hr>
+<h2 id="10-performance-testing-specification">§10 Performance Testing Specification</h2>
+<h3 id="101-load-targets從-constants-8--edd-11">§10.1 Load Targets（從 CONSTANTS §8 / EDD §11）</h3>
+<table>
+<tr><th>場景</th><th>並發用戶數</th><th>持續時間</th><th>目標</th><th>工具</th></tr>
+<tr><td>Smoke</td><td>1 VU</td><td>1 min</td><td>0 error，SLO P99 達標</td><td>k6</td></tr>
+<tr><td>Normal Load</td><td>500 PCU</td><td>30 min</td><td>P99 &lt; 1000ms、寫入 TPS ≥ 200、Error &lt; 0.1%</td><td>k6</td></tr>
+<tr><td>Stress（Peak）</td><td>750 PCU（150%）</td><td>10 min</td><td>找降級點，壓力移除 ≤ 5min 恢復</td><td>k6</td></tr>
+<tr><td>Soak</td><td>350-400 PCU</td><td>2 hours</td><td>Memory 穩定、Outbox &lt; 100、Error 不上升</td><td>k6</td></tr>
+</table>
+<h3 id="102-slo--sli-矩陣p50p95p99與-edd-105-對齊">§10.2 SLO / SLI 矩陣（P50/P95/P99，與 EDD §10.5 對齊）</h3>
+<table>
+<tr><th>Endpoint 類型</th><th>P50</th><th>P95</th><th>P99</th><th>Max Error Rate</th></tr>
+<tr><td>讀取 API（GET）</td><td>≤ 100ms</td><td>≤ 300ms</td><td>≤ 1000ms</td><td>≤ 0.1%</td></tr>
+<tr><td>寫入 API（POST/PUT）</td><td>≤ 200ms</td><td>≤ 500ms</td><td>≤ 1000ms</td><td>≤ 0.1%</td></tr>
+<tr><td>排行榜 Top N</td><td>≤ 100ms</td><td>≤ 200ms</td><td>≤ 300ms</td><td>≤ 0.1%</td></tr>
+<tr><td>健康檢查</td><td>≤ 10ms</td><td>≤ 20ms</td><td>≤ 50ms</td><td>0%</td></tr>
+</table>
+<h3 id="103-錢包一致性與冪等測試向量核心prd-91">§10.3 錢包一致性與冪等測試向量（核心，PRD §9.1）</h3>
+<table>
+<tr><th>向量 ID</th><th>情境</th><th>輸入</th><th>預期結果</th></tr>
+<tr><td>CONS-01</td><td>單帳號併發 100 筆 spend（餘額足）</td><td>cash=100000，100 × amount=1000</td><td>行鎖序列化，最終 cash=0，ledger 100 筆，餘額 = 初始 − Σ扣款，0 筆不一致</td></tr>
+<tr><td>CONS-02</td><td>併發 spend 至餘額邊界</td><td>cash=5000，10 × amount=1000</td><td>5 筆成功、5 筆回 402，最終 cash=0，永不負餘額</td></tr>
+<tr><td>CONS-03</td><td>spend 交易中途 pod 被殺</td><td>扣款交易執行中 kill pod</td><td>交易回滾，無半筆 ledger，餘額不變（ledger 與餘額恆一致）</td></tr>
+<tr><td>CONS-04</td><td>topup 冪等（Phase B 預留）</td><td>同 orderId 重送 DepositConfirmed 2 次</td><td>orderId dedup，僅入帳一次</td></tr>
+<tr><td>CONS-05</td><td>entitlements/buy 併發同項目</td><td>同帳號併發買同 (kind,item_id)</td><td>行鎖 + UNIQUE，僅一次授予，其餘 409，扣款僅一次</td></tr>
+<tr><td>CONS-06</td><td>MemberRegistered 重複投遞</td><td>同 event_id 投遞 2 次</td><td>wallet 僅建一次、init ledger 僅一筆</td></tr>
+</table>
+<blockquote><p>執行方式：k6 / Gatling 併發腳本 + 測試後對帳稽核 SQL（<code>SELECT balance FROM wallets</code> vs <code>SUM(delta) FROM wallet_ledger</code>）。合格標準：所有向量 0 筆不一致。</p></blockquote>
+<h3 id="104-效能測試環境與工具">§10.4 效能測試環境與工具</h3>
+<ul><li><strong>環境</strong>：Perf（Prod-like，與 Production 同規格 DB + Redis Sentinel，隔離）。</li><li><strong>工具版本</strong>：k6 latest stable。</li><li><strong>執行命令</strong>：<code>k6 run --vus 500 --duration 30m --env BASE_URL=https://perf.yocat.internal tests/performance/load-test.js</code>。</li><li><strong>資料量要求</strong>：預載 ≥ 50,000 accounts（成長期 DAU 量級）、≥ 1,000,000 wallet_ledger 筆，驗證 <code>idx_ledger_acct</code> 查詢不退化。</li></ul>
+<hr>
+<h2 id="11-security-testing-scope">§11 Security Testing Scope</h2>
+<blockquote><p>依 EDD §4（Security）/ §9.5 與 OWASP 標準。詳細測試方法見 §3.7。</p></blockquote>
+<h3 id="111-sast">§11.1 SAST</h3>
+<ul><li>工具：SpotBugs + FindSecBugs + Semgrep。</li><li>觸發：PR 提交自動執行。</li><li>必掃：JDBC 注入、密碼/token 洩漏、硬編碼 secret、不安全反序列化。</li></ul>
+<h3 id="112-dast">§11.2 DAST</h3>
+<ul><li>工具：OWASP ZAP。</li><li>觸發：Nightly（Baseline）+ Release 前（Full）。</li><li>掃描目標：Staging 全 18 個 API endpoint（排除 /health/*）。</li></ul>
+<h3 id="113-owasp-top-10每項測試方法與工具摘要見-37-完整矩陣">§11.3 OWASP Top 10（每項測試方法與工具，摘要見 §3.7 完整矩陣）</h3>
+<table>
+<tr><th>OWASP 項目</th><th>測試類型</th><th>工具</th><th>觸發</th></tr>
+<tr><td>A01 Broken Access Control</td><td>Integration + DAST</td><td>自撰 REST + ZAP</td><td>PR + Nightly</td></tr>
+<tr><td>A02 Cryptographic Failures</td><td>SAST + 審查</td><td>Semgrep + testssl.sh</td><td>PR</td></tr>
+<tr><td>A03 Injection</td><td>SAST + DAST</td><td>SpotBugs + ZAP</td><td>PR + Nightly</td></tr>
+<tr><td>A05 Security Misconfiguration</td><td>DAST + Config Scan</td><td>ZAP + Trivy</td><td>Weekly</td></tr>
+<tr><td>A07 Auth &amp; Session Failures</td><td>Integration（暴力破解/限流/session 過期）</td><td>ZAP + 自撰</td><td>PR</td></tr>
+</table>
+<h3 id="114-滲透測試release-前">§11.4 滲透測試（Release 前）</h3>
+<ul><li>P0 金融相關（錢包/權益/session）：委外或 Security Officer 執行 Pen Test。</li><li>驗收：<strong>0 條可竄改伺服器餘額路徑</strong>（PRD §9.3 Go 條件），輸出滲透測試報告。</li></ul>
+<h3 id="115-密碼與-pii-安全">§11.5 密碼與 PII 安全</h3>
+<ul><li>scrypt 密碼雜湊（salt$hash）、<code>crypto.timingSafeEqual</code> 恆定時間比對驗證。</li><li>Log 遮罩 email/account_id、禁止記錄明文密碼/pass_hash/token（A09）。</li></ul>
+<hr>
+<h2 id="12-uat-plan">§12 UAT Plan</h2>
+<blockquote><p>依 PRD P0 User Story 與業務利害關係人需求定義（詳見 §3.5）。</p></blockquote>
+<h3 id="121-uat-範圍與參與者">§12.1 UAT 範圍與參與者</h3>
+<ul><li><strong>範圍</strong>：所有 P0 功能（register/login/topup/spend/buy/save）+ 對帳驗收 + HA Go/No-Go。</li><li><strong>參與者</strong>：Product Manager、Business Owner（營運/Finance）、Engineering Lead、Security Officer、客戶端整合工程師（1-3 人）。</li></ul>
+<h3 id="122-uat-測試案例每個-p0-功能--1-場景">§12.2 UAT 測試案例（每個 P0 功能 ≥ 1 場景）</h3>
+<table>
+<tr><th>UAT-ID</th><th>功能</th><th>前置條件</th><th>測試步驟</th><th>預期結果</th><th>驗收標準</th></tr>
+<tr><td>UAT-001</td><td>註冊建帳</td><td>email 未註冊</td><td>POST /auth/register {email, displayName, password}</td><td>回 token + account + wallet(cash:0,gems:0) + init ledger</td><td>US-MEM-001/AC-1</td></tr>
+<tr><td>UAT-002</td><td>權威扣款</td><td>已登入 cash=20000</td><td>POST /wallet/spend {cash, 1250}</td><td>cash=18750，ledger 新增 -1250 筆</td><td>US-WAL-001/AC-2</td></tr>
+<tr><td>UAT-003</td><td>原子購買</td><td>已登入餘額足未擁有</td><td>POST /entitlements/buy {cosmetic, item1}</td><td>扣款+授予同交易，回 wallet + entitlements</td><td>US-ENT-001/AC-1</td></tr>
+<tr><td>UAT-004</td><td>跨裝置還原</td><td>裝置 A 已 PUT /save</td><td>裝置 B 登入 GET /save</td><td>回裝置 A 最新存檔</td><td>US-SAVE-001/AC-5</td></tr>
+<tr><td>UAT-005</td><td>對帳一致</td><td>併發壓測後</td><td>執行對帳稽核 SQL</td><td>wallet 餘額 = Σ ledger delta，0 筆不一致</td><td>PRD §9.1</td></tr>
+<tr><td>UAT-006</td><td>HA 殺 pod</td><td>≥ 2 replica</td><td>kubectl delete 1 pod + 持續流量</td><td>5xx &lt; 0.1%，服務不中斷</td><td>US-PLAT-001/AC-1</td></tr>
+</table>
+<h3 id="123-uat-環境與通過條件">§12.3 UAT 環境與通過條件</h3>
+<ul><li><strong>環境</strong>：Staging（production-like）；<strong>資料</strong>：匿名化 seed + <code>@test.invalid</code> 帳號；<strong>時間</strong>：RC 確認後 3-5 工作天。</li><li><strong>通過條件</strong>：所有 P0 UAT 通過 + 無 CRITICAL/P0/P1 open defect → 核准上線。</li></ul>
+<hr>
+<h2 id="13-test-schedule--milestones">§13 Test Schedule &amp; Milestones</h2>
+<table>
+<tr><th>測試階段</th><th>開始條件</th><th>預計週期</th><th>執行方式</th><th>里程碑</th></tr>
+<tr><td>Unit Test</td><td>每次 commit</td><td>持續</td><td>CI 自動化</td><td>每個 PR</td></tr>
+<tr><td>Integration + ModularityTests</td><td>PR created</td><td>持續</td><td>CI 自動化</td><td>每個 PR</td></tr>
+<tr><td>E2E Smoke（含 HA Smoke）</td><td>PR merged</td><td>持續</td><td>CI 自動化</td><td>Sprint Review</td></tr>
+<tr><td>E2E Regression</td><td>Daily</td><td>Nightly</td><td>CI 自動化</td><td>Sprint Review</td></tr>
+<tr><td>Performance（Load）</td><td>Staging deploy</td><td>Weekly</td><td>排程 CI</td><td>Release Candidate</td></tr>
+<tr><td>Performance（Stress/Soak）</td><td>Perf 環境就緒</td><td>Weekly + Release</td><td>排程</td><td>Release Candidate</td></tr>
+<tr><td>Security（DAST + 滲透）</td><td>Staging 可存取</td><td>Weekly + Release</td><td>排程 + 人工</td><td>Release Candidate</td></tr>
+<tr><td>UAT</td><td>RC 確認</td><td>3-5 工作天</td><td>手動</td><td>Sign-off 前</td></tr>
+<tr><td>Smoke（Production）</td><td>每次部署後</td><td>&lt; 15 分鐘</td><td>CI 自動化</td><td>每次 Release</td></tr>
+</table>
+<p><strong>Go/No-Go 里程碑條件：</strong></p>
+<ul><li>Sprint Review 通過：所有 Unit/Integration 通過，覆蓋率 ≥ 80%，ModularityTests 綠。</li><li>Release Candidate 通過：Performance SLO 達標、對帳 0 筆不一致、HA Smoke 通過、安全無 High/Critical。</li></ul>
+<p><strong>CI 報告（自動化）：</strong></p>
+<ul><li>每次 run 產出 JaCoCo Coverage Report（HTML + badge）。</li><li>E2E 失敗自動存 Playwright trace + 截圖至 CI artifact（保留 30 天）。</li><li>Performance 產出 k6 HTML report（P50/P95/P99 圖表）。</li><li>覆蓋率下降 &gt; 5% 觸發 Slack 告警。</li></ul>
+<hr>
+<h2 id="14-raci-matrix測試責任分工">§14 RACI Matrix（測試責任分工）</h2>
+<table>
+<tr><th>活動</th><th>QA Lead</th><th>Dev</th><th>DevOps/SRE</th><th>PM</th><th>Engineering Lead</th></tr>
+<tr><td>Unit Test 撰寫</td><td>Consulted</td><td>Responsible</td><td>-</td><td>-</td><td>Accountable</td></tr>
+<tr><td>Integration Test 撰寫</td><td>Responsible</td><td>Consulted</td><td>-</td><td>-</td><td>Accountable</td></tr>
+<tr><td>ModularityTests 維護</td><td>Consulted</td><td>Responsible</td><td>-</td><td>-</td><td>Accountable</td></tr>
+<tr><td>E2E Test 撰寫</td><td>Responsible</td><td>Consulted</td><td>-</td><td>-</td><td>-</td></tr>
+<tr><td>Performance Test 設計</td><td>Responsible</td><td>Consulted</td><td>Consulted</td><td>-</td><td>Informed</td></tr>
+<tr><td>HA / Chaos Test 執行</td><td>Consulted</td><td>-</td><td>Responsible</td><td>-</td><td>Accountable</td></tr>
+<tr><td>CI Pipeline 設定</td><td>Consulted</td><td>Consulted</td><td>Responsible</td><td>-</td><td>-</td></tr>
+<tr><td>Security Test / 滲透</td><td>Responsible</td><td>Informed</td><td>Consulted</td><td>-</td><td>Informed</td></tr>
+<tr><td>UAT 協調</td><td>Responsible</td><td>Informed</td><td>-</td><td>Consulted</td><td>Accountable</td></tr>
+<tr><td>缺陷 Triage</td><td>Responsible</td><td>Consulted</td><td>-</td><td>Informed</td><td>Accountable</td></tr>
+<tr><td>Release 核准</td><td>Consulted</td><td>-</td><td>Consulted</td><td>Responsible</td><td>Accountable</td></tr>
+</table>
+<hr>
+<h2 id="15-requirements-traceability-matrixrtm">§15 Requirements Traceability Matrix（RTM）</h2>
+<h3 id="151-functional-rtmprd-ac--tc涵蓋所有-p0-ac">§15.1 Functional RTM（PRD AC → TC，涵蓋所有 P0 AC）</h3>
+<table>
+<tr><th>TC-ID</th><th>PRD REQ-ID / AC</th><th>AC 描述</th><th>BDD Scenario / @tag</th><th>測試類型</th><th>狀態</th></tr>
+<tr><td>TC-E2E-MEM-001-S01</td><td>US-MEM-001/AC-1</td><td>註冊建帳+錢包+init ledger</td><td><code>@US-MEM-001-AC1</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-INT-MEM-002-E01</td><td>US-MEM-001/AC-2</td><td>email 重複回 409</td><td><code>@US-MEM-001-AC2</code></td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-UNIT-MEM-003-B01</td><td>US-MEM-001/AC-3</td><td>格式/長度/密碼錯誤回 400</td><td>—</td><td>Unit</td><td>待執行</td></tr>
+<tr><td>TC-E2E-MEM-004-S01</td><td>US-MEM-001/AC-4</td><td>登入簽發 session（TTL 30 天）</td><td><code>@US-MEM-001-AC4</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-INT-MEM-005-E01</td><td>US-MEM-001/AC-5</td><td>帳密錯 401 + timingSafeEqual</td><td><code>@US-MEM-001-AC5</code></td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-INT-MEM-006-E01</td><td>US-MEM-001/AC-6</td><td>無/過期 token 回 401</td><td><code>@US-MEM-001-AC6</code></td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-E2E-WAL-001-S01</td><td>US-WAL-001/AC-1</td><td>topup 入帳 + topup ledger</td><td><code>@US-WAL-001-AC1</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-E2E-WAL-002-S01</td><td>US-WAL-001/AC-2</td><td>spend 行鎖扣款 + 負 delta ledger</td><td><code>@US-WAL-001-AC2</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-INT-WAL-003-E01</td><td>US-WAL-001/AC-3</td><td>餘額不足回 402 不寫 ledger</td><td><code>@US-WAL-001-AC3</code></td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-UNIT-WAL-004-B01</td><td>US-WAL-001/AC-4</td><td>amount ≤ 0/非數字回 400</td><td>—</td><td>Unit</td><td>待執行</td></tr>
+<tr><td>TC-INT-WAL-005-S01</td><td>US-WAL-001/AC-5</td><td>併發 spend 0 筆不一致</td><td><code>@US-WAL-001-AC5</code></td><td>Integration（併發壓測）</td><td>待執行</td></tr>
+<tr><td>TC-E2E-ENT-001-S01</td><td>US-ENT-001/AC-1</td><td>原子扣款+授予+buy ledger</td><td><code>@US-ENT-001-AC1</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-INT-ENT-002-E01</td><td>US-ENT-001/AC-2</td><td>已擁有回 409 不重複</td><td><code>@US-ENT-001-AC2</code></td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-INT-ENT-003-E01</td><td>US-ENT-001/AC-3</td><td>餘額不足回 402 交易回滾</td><td><code>@US-ENT-001-AC3</code></td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-UNIT-ENT-004-B01</td><td>US-ENT-001/AC-4</td><td>kind 非法/缺 itemId 回 400</td><td>—</td><td>Unit</td><td>待執行</td></tr>
+<tr><td>TC-E2E-ENT-005-S01</td><td>US-ENT-001/AC-5</td><td>破產後權益仍完整</td><td><code>@US-ENT-001-AC5</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-E2E-SAVE-001-S01</td><td>US-SAVE-001/AC-1</td><td>PUT /save upsert</td><td><code>@US-SAVE-001-AC1</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-E2E-SAVE-002-S01</td><td>US-SAVE-001/AC-2</td><td>GET /save 回最新</td><td><code>@US-SAVE-001-AC2</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-INT-SAVE-003-E01</td><td>US-SAVE-001/AC-3</td><td>無存檔回 <code>{save:null}</code>（非 404）</td><td><code>@US-SAVE-001-AC3</code></td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-UNIT-SAVE-004-B01</td><td>US-SAVE-001/AC-4</td><td>缺 data 回 400</td><td>—</td><td>Unit</td><td>待執行</td></tr>
+<tr><td>TC-E2E-SAVE-005-S01</td><td>US-SAVE-001/AC-5</td><td>跨裝置還原（≥ 99%）</td><td><code>@US-SAVE-001-AC5</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-E2E-PLAT-001-S01</td><td>US-PLAT-001/AC-1</td><td>殺 pod 錯誤率 &lt; 0.1%</td><td><code>@ha @US-PLAT-001-AC1</code></td><td>E2E（Chaos）</td><td>待執行</td></tr>
+<tr><td>TC-E2E-PLAT-002-S01</td><td>US-PLAT-001/AC-2</td><td>滾動更新 5xx &lt; 0.1%</td><td><code>@ha @graceful-shutdown</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-UNIT-ARCH-005-S01</td><td>US-PLAT-001/AC-3</td><td>ModularityTests 0 循環依賴（DAG）</td><td>SM-TEST-00</td><td>Unit（建置期）</td><td>待執行</td></tr>
+<tr><td>TC-INT-ARCH-002-S01</td><td>US-PLAT-001/AC-4</td><td>跨 BC 僅 Public API/Event</td><td>SM-TEST-01/02</td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-E2E-PLAT-005-S01</td><td>US-PLAT-001/AC-5</td><td>local-first 全綠</td><td><code>@US-PLAT-001-AC5</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-INT-REC-001-S01</td><td>US-REC-001/AC-1</td><td>經營史 append-only 寫入 + type 驗證</td><td><code>@US-REC-001-AC1</code></td><td>Integration</td><td>待執行</td></tr>
+<tr><td>TC-INT-LB-001-S01</td><td>US-LB-001/AC-1</td><td>公開 Top N 查詢 + 上榜 upsert 歸戶</td><td><code>@US-LB-001-AC1</code></td><td>Integration + Performance</td><td>待執行</td></tr>
+<tr><td>TC-E2E-DEP-001-S01</td><td>US-DEP-001/AC-1</td><td>公開查詢儲值包目錄</td><td><code>@US-DEP-001-AC1</code></td><td>E2E</td><td>待執行</td></tr>
+<tr><td>TC-E2E-DEP-002-S01</td><td>US-DEP-001/AC-2</td><td>冪等鍵建立已確認訂單 + 入帳</td><td><code>@US-DEP-001-AC2</code></td><td>E2E</td><td>待執行</td></tr>
+</table>
+<blockquote><p><strong>P0 AC 覆蓋率 = 26/26 = 100%</strong>（詳見 §15.3 AC 覆蓋率完整性）。</p></blockquote>
+<h3 id="152-unit-test-rtm目標藍圖class-inventorymd-26-個-class每-public-method-seb-為覆蓋政策目標">§15.2 Unit Test RTM（目標藍圖：class-inventory.md 26 個 class，每 public method S/E/B 為覆蓋政策目標）</h3>
+<blockquote><p><strong>列舉現況（SSOT = <a href="rtm.html" target="_blank" rel="noopener">RTM §3.2</a>）</strong>：本表為<strong>目標藍圖（target blueprint）</strong>，依覆蓋政策「每 public method ≥ 3 TC（S/E/B）」對 26 class 展開，呈現「完整覆蓋後」的理想單元測試集。<strong>目前權威已列舉（enumerated）的單元測試集為 14 個 TC、涵蓋 11 個核心 Method</strong>，完整清單見 RTM §3.2 追溯表與 RTM §6 索引。下表中尚未出現在 RTM §3.2 的 S/E/B 案例為 <strong>target/future（規劃中）</strong>，待排期補齊，<strong>不計入目前 14 TC 統計</strong>（切勿將本表 S/E/B 三案例數加總當成實際 TC 數）。RTM §15.4 提供本表各 class 與 §3.2 列舉集的逐項對照。</p></blockquote>
+<table>
+<tr><th>TC-ID（含 target/future）</th><th>Class</th><th>Layer</th><th>Test File</th><th>案例（S/E/B）</th></tr>
+<tr><td>TC-UNIT-WALLET-S01/E01/B01</td><td>Wallet</td><td>Domain</td><td><code>wallet/domain/WalletTest.java</code></td><td>扣款成功 / 餘額不足拒絕 / 餘額邊界=0</td></tr>
+<tr><td>TC-UNIT-LEDGERENTRY-S01/E01/B01</td><td>LedgerEntry</td><td>Domain</td><td><code>wallet/domain/LedgerEntryTest.java</code></td><td>建立成功 / 非法 reason / delta 邊界</td></tr>
+<tr><td>TC-UNIT-MONEY-S01/E01/B01</td><td>Money</td><td>Domain</td><td><code>shared/MoneyTest.java</code></td><td>加減成功 / 負值拒絕 / 0 與上限邊界</td></tr>
+<tr><td>TC-UNIT-ACCOUNTID-S01/E01/B01</td><td>AccountId</td><td>Domain</td><td><code>shared/AccountIdTest.java</code></td><td>建立 / 非法 ID / 邊界</td></tr>
+<tr><td>TC-UNIT-ACCOUNT-S01/E01/B01</td><td>Account</td><td>Domain</td><td><code>member/domain/AccountTest.java</code></td><td>建帳成功 / 重複 email / displayName 邊界</td></tr>
+<tr><td>TC-UNIT-SESSION-S01/E01/B01</td><td>Session</td><td>Domain</td><td><code>member/domain/SessionTest.java</code></td><td>簽發 / 過期判定 / TTL 邊界</td></tr>
+<tr><td>TC-UNIT-EMAIL-S01/E01/B01</td><td>Email</td><td>Domain</td><td><code>member/domain/EmailTest.java</code></td><td>合法 / 格式錯 / 邊界</td></tr>
+<tr><td>TC-UNIT-DISPLAYNAME-S01/E01/B01</td><td>DisplayName</td><td>Domain</td><td><code>member/domain/DisplayNameTest.java</code></td><td>1-24 字 / 0 字 / 25 字</td></tr>
+<tr><td>TC-UNIT-SPENDWALLET-S01/E01/B01</td><td>SpendWalletUseCase</td><td>Application</td><td><code>wallet/application/SpendWalletUseCaseTest.java</code></td><td>扣款+發事件 / 餘額不足 402 / 邊界（mock Repo）</td></tr>
+<tr><td>TC-UNIT-TOPUPWALLET-S01/E01/B01</td><td>TopUpWalletUseCase</td><td>Application</td><td><code>wallet/application/TopUpWalletUseCaseTest.java</code></td><td>入帳+事件 / 上限超過 / amount 邊界</td></tr>
+<tr><td>TC-UNIT-BUYENT-S01/E01/B01</td><td>BuyEntitlementUseCase</td><td>Application</td><td><code>entitlement/application/BuyEntitlementUseCaseTest.java</code></td><td>原子扣款授予 / 409 已擁有 / amount=0 免費</td></tr>
+<tr><td>TC-UNIT-REGMEMBER-S01/E01/B01</td><td>RegisterMemberUseCase</td><td>Application</td><td><code>member/application/RegisterMemberUseCaseTest.java</code></td><td>建帳發事件 / 409 / 邊界</td></tr>
+<tr><td>TC-UNIT-WALLETSVC-S01/E01/B01</td><td>WalletService</td><td>Application</td><td><code>wallet/api/WalletServiceTest.java</code></td><td>debit/credit / 餘額不足 / 邊界</td></tr>
+<tr><td>TC-UNIT-WALLETCTRL-S01/E01/B01</td><td>WalletController</td><td>Presentation</td><td><code>wallet/api/WalletControllerTest.java</code></td><td>200 / 400/402 / 邊界（MockMvc）</td></tr>
+<tr><td>TC-UNIT-AUTHCTRL-S01/E01/B01</td><td>AuthController</td><td>Presentation</td><td><code>member/api/AuthControllerTest.java</code></td><td>200 / 401/409 / 邊界</td></tr>
+<tr><td>TC-UNIT-SCRYPTENC-S01/E01/B01</td><td>ScryptPasswordEncoder</td><td>Infrastructure</td><td><code>member/infra/ScryptPasswordEncoderTest.java</code></td><td>雜湊+驗證 / 錯誤密碼 / timingSafeEqual</td></tr>
+<tr><td>TC-UNIT-BEARERFILTER-S01/E01/B01</td><td>BearerTokenFilter</td><td>Infrastructure</td><td><code>platform/BearerTokenFilterTest.java</code></td><td>有效 token / 過期無效 / 缺 header</td></tr>
+<tr><td>TC-IT-JDBCWALLETREPO-S01/E01/B01</td><td>JdbcWalletRepository</td><td>Infrastructure</td><td><code>wallet/infra/JdbcWalletRepositoryIT.java</code></td><td>FOR UPDATE 行鎖（§3.2 Integration）</td></tr>
+</table>
+<blockquote><p>純 enum/DomainEvent/Repository interface（Currency, LedgerReason, WalletBalanceChanged, MemberRegistered, WalletRepository, MemberRepository, DomainEventPublisher, ModulithEventPublisher）：僅需建構子/常數測試或由消費端合約測試覆蓋（class-inventory 標 <code>—</code>）。合計 26 class → 20 test file（Domain 10 / Application 5 / Presentation 2 / Infra 3）。上表 S/E/B 為<strong>目標覆蓋藍圖</strong>；<strong>目前實際已列舉的 14 個 TC（11 Method）見 RTM §3.2</strong>，其餘 S/E/B 為 target/future（規劃中）。</p></blockquote>
+<h3 id="153-ac-覆蓋率完整性a3r--未覆蓋-ac-清單">§15.3 AC 覆蓋率完整性（A3r — 未覆蓋 AC 清單）</h3>
+<p><strong>未覆蓋 Must-Have（P0）AC 清單：</strong></p>
+<table>
+<tr><th>AC-ID</th><th>PRD 需求</th><th>說明</th><th>風險</th></tr>
+<tr><td>（無）</td><td>—</td><td>所有 26 條 P0 AC 均有對應 TC</td><td>—</td></tr>
+</table>
+<blockquote><p><strong>P0 AC 覆蓋率 = 100%（空清單 = PASS）。</strong> Should-Have（P1）AC：record（US-REC-001/AC-1）、leaderboard（US-LB-001/AC-1）、deposit（US-DEP-001/AC-1~AC-2）均有 TC-E2E / TC-INT 覆蓋，P1 覆蓋率 ≥ 95%。</p></blockquote>
+<hr>
+<h2 id="16-test-summary-report-template">§16 Test Summary Report Template</h2>
+<blockquote><p>測試周期結束時填寫。</p></blockquote>
+<pre><code class="language-markdown"># Test Summary Report — yocat-office-backend v{VERSION}
+**測試期間**：{START_DATE} – {END_DATE}
+**測試環境**：Staging（版本 {STAGING_VERSION}）
+**測試負責人**：QA Architect
+
+### 執行摘要
+| 測試類型 | 計劃數 | 執行數 | 通過 | 失敗 | 跳過 | 通過率 |
+|---------|-------|-------|------|------|------|-------|
+| Unit Test | N | N | N | N | N | N% |
+| Integration Test | N | N | N | N | N | N% |
+| E2E Test | N | N | N | N | N | N% |
+| Performance Test | N | N | N | N | N | N% |
+
+### 覆蓋率
+- 程式碼覆蓋率：N%（目標 80%+，核心交易 100%）
+- PRD P0 AC 覆蓋率：N%（目標 100%）
+- 錢包對帳一致性：N 筆不一致（目標 0）
+
+### 缺陷摘要
+| 嚴重度 | 發現 | 已修復 | 殘留 |
+|-------|------|-------|------|
+| P0 CRITICAL | N | N | N |
+| P1 HIGH | N | N | N |
+
+### Go / No-Go 建議
+[ ] GO — 所有通過條件達成，建議上線
+[ ] NO-GO — 原因：{REASON}</code></pre>
+<p><strong>術語表：</strong></p>
+<table>
+<tr><th>術語</th><th>定義</th></tr>
+<tr><td>SLO</td><td>Service Level Objective：服務水準目標</td></tr>
+<tr><td>SLI</td><td>Service Level Indicator：服務水準指標</td></tr>
+<tr><td>P99</td><td>99 百分位延遲</td></tr>
+<tr><td>MTTR</td><td>Mean Time To Recovery：平均恢復時間</td></tr>
+<tr><td>TC-ID</td><td>Test Case ID</td></tr>
+<tr><td>Soak Test</td><td>長時間負載測試，發現記憶體洩漏</td></tr>
+<tr><td>SAST</td><td>Static Application Security Testing</td></tr>
+<tr><td>DAST</td><td>Dynamic Application Security Testing</td></tr>
+<tr><td>RTM</td><td>Requirements Traceability Matrix</td></tr>
+<tr><td>VU / PCU</td><td>Virtual User / Peak Concurrent Users</td></tr>
+<tr><td>DoD</td><td>Definition of Done</td></tr>
+<tr><td>HC-1~HC-5</td><td>Spring Modulith 邊界約束（Schema 隔離/公開介面/事件驅動/無共享可變狀態/DAG）</td></tr>
+</table>
+<hr>
+<h2 id="17-open-questions">§17 Open Questions</h2>
+<table>
+<tr><th>#</th><th>問題</th><th>影響範圍</th><th>負責人</th><th>目標釐清時間</th></tr>
+<tr><td>1</td><td>Phase B 真金流 Sandbox 是否支援 Webhook（DepositConfirmed）測試？</td><td>deposit 契約測試</td><td>Engineering Lead</td><td>Phase B 啟動前</td></tr>
+<tr><td>2</td><td>Loki/ELK 與 OpenTelemetry/Jaeger 的 local-first 方案選型確認</td><td>§3.7 A09 日誌測試</td><td>SRE</td><td>Sprint 1 前</td></tr>
+<tr><td>3</td><td>成長期跨 Region HA（HA-04 替換）測試環境何時就緒？</td><td>HA Failover</td><td>SRE</td><td>成長期規劃前</td></tr>
+<tr><td>4</td><td>HikariCP 連線池大小（依 Q4 容量）定稿值，供 Soak Test 設定</td><td>效能測試</td><td>Engineering</td><td>Load Test 前</td></tr>
+</table>
+<hr>
+<h2 id="18-approval-sign-off">§18 Approval Sign-off</h2>
+<table>
+<tr><th>角色</th><th>姓名</th><th>簽核日期</th><th>備注</th></tr>
+<tr><td>QA Lead（QA Architect）</td><td><strong><em>__</em></strong></td><td><strong><em>__</em></strong></td><td>測試策略與 RTM 驗收</td></tr>
+<tr><td>Engineering Lead</td><td><strong><em>__</em></strong></td><td><strong><em>__</em></strong></td><td>架構/HA/Modulith 驗收</td></tr>
+<tr><td>Product Manager</td><td><strong><em>__</em></strong></td><td><strong><em>__</em></strong></td><td>功能/業務驗收</td></tr>
+<tr><td>Product Owner（Executive Sponsor）</td><td><strong><em>__</em></strong></td><td><strong><em>__</em></strong></td><td>最終 Release 核准人</td></tr>
+</table>
+<hr>
+<h2 id="19-mobile-testing-strategy">§19 Mobile Testing Strategy</h2>
+<blockquote><p><strong>本產品為 api-only 信任層，無原生 Mobile App，§19 原生裝置矩陣不適用。</strong> 玩家透過客戶端（Web/未來 App）呼叫信任層 API；行動端測試責任歸客戶端團隊。本節定義信任層對行動客戶端的<strong>支援驗證</strong>：</p></blockquote>
+<p><strong>行動客戶端相容性驗證（信任層側）：</strong></p>
+<ul><li><strong>弱網環境測試</strong>：以 k6 / toxiproxy 模擬 3G（150ms 延遲 + 封包抖動），驗證 API 在高延遲下 timeout/retry 行為正確（EDD §8.2 Retry、§8.3 Circuit Breaker）。</li><li><strong>離線→重連</strong>：客戶端離線期間的存檔，重連後 PUT /save（last-write-wins upsert）正確合併，GET /save 還原。</li><li><strong>大存檔邊界</strong>：行動端上傳 data（JSONB）接近 4MB 上限時，驗證 request body max 行為（超過中斷連線，US-SAVE-001 邊界）。</li></ul>
+<p><strong>未來原生 App 版本（Future Scope）：</strong></p>
+<ul><li>裝置矩陣（iOS P0/P1/P2 + Android P0/P1/P2）、冷啟動 ≤ 2s / 熱啟動 ≤ 0.5s、包體積預算，將於客戶端 App 版本 Test Plan 另行規劃（待確認：客戶端團隊負責）。</li></ul>
+<hr>
+<h2 id="20-accessibility-testing-strategy無障礙測試">§20 Accessibility Testing Strategy（無障礙測試）</h2>
+<blockquote><p><strong>本產品為 api-only 信任層，無直接 C 端 UI，WCAG 2.1 AA 不直接適用於信任層。</strong> 無障礙目標適用於未來營運對帳 Console 與客戶端 UI（PRD §7.5/§18，由各該團隊負責）。本節定義信任層對無障礙的<strong>支援性要求</strong>與未來 UI 的測試框架：</p></blockquote>
+<p><strong>信任層支援性要求：</strong></p>
+<ul><li>API 錯誤訊息 zh-TW 可 i18n key 化（無 hardcode，PRD §9.5 DoD），供客戶端呈現無障礙友善訊息。</li><li>一致的錯誤碼契約（400/401/402/409/500）與 JSON 格式，供輔助技術（AT）友善客戶端解析。</li></ul>
+<p><strong>未來 UI（客戶端/Console）無障礙測試框架（供客戶端團隊採用）：</strong></p>
+<ul><li><strong>自動化掃描（axe-core + Playwright）</strong>：WCAG 2.1 AA tags <code>wcag2a/wcag2aa/wcag21aa</code>；CI Gate critical/serious violations 零容忍。</li><li><strong>AT 手動測試矩陣（三組合）</strong>：NVDA + Chrome / VoiceOver macOS + Safari / TalkBack + Chrome。</li><li><strong>A11y CI Gate</strong>：GitHub Actions workflow，失敗時阻斷 PR 合併。</li></ul>
+<pre><code class="language-yaml"># 供客戶端 UI 採用的 A11y CI Gate 範例
+name: a11y-gate
+on: [pull_request]
+jobs:
+  axe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx playwright test tests/a11y --config=playwright.a11y.config.ts
+      # axe-core critical/serious violations → exit 1，阻斷合併</code></pre>
+<h2 id="測試情境使用-nvda--chrome-完成使用者登入供客戶端-ui-參考樣板">測試情境：使用 NVDA + Chrome 完成使用者登入（供客戶端 UI 參考樣板）</h2>
+<blockquote><p>本情境為客戶端 UI 無障礙測試樣板（信任層無 UI，實際執行由客戶端團隊於其登入頁進行）：</p></blockquote>
+<pre><code class="language-gherkin">Feature: 無障礙登入（客戶端 UI，AT = NVDA + Chrome）
+  @a11y @wcag21aa
+  Scenario: 螢幕閱讀器使用者完成登入
+    Given 使用者以 NVDA + Chrome 開啟客戶端登入頁
+    When 以 Tab 鍵聚焦 email 欄位（NVDA 朗讀 label「電子郵件」）
+    And 輸入 email 與密碼並以 Enter 提交
+    Then 登入成功，NVDA 朗讀成功狀態（aria-live region）
+    And 錯誤情境（401）時 NVDA 朗讀 zh-TW 錯誤訊息「email 或密碼錯誤」
+    And 無 axe-core critical/serious 違規</code></pre>
+<hr>
+<h2 id="21-test-debt-management測試技術債管理">§21 Test Debt Management（測試技術債管理）</h2>
+<h3 id="211-flaky-test-管理流程">§21.1 Flaky Test 管理流程</h3>
+<ul><li><strong>標記</strong>：不穩定測試加 <code>@flaky</code> 標記 + 隔離清單（quarantine），不阻斷主 pipeline 但每日報告。</li><li><strong>SLA</strong>：1 週內修復；超時自動刪除 + Slack 通知負責人。</li><li><strong>根因</strong>：優先排查 HA/併發測試的時序依賴、Testcontainers 啟動競態、Redis/DB 清理不完整。</li></ul>
+<h3 id="212-測試健康儀表板6-項週度指標">§21.2 測試健康儀表板（6 項週度指標）</h3>
+<ol><li>測試覆蓋率（行 / 分支）— 目標 ≥ 80% / ≥ 70%。</li><li>Mutation Score（PIT Mutation Testing）— 目標 ≥ 70%。</li><li>Flaky Test 數量 — 目標趨近 0。</li><li>CI 平均執行時間 — PR CI &lt; 10 分鐘。</li><li>測試失敗率 — 監測趨勢。</li><li>ModularityTests / Pact 合約通過率 — 100%。</li></ol>
+<h3 id="213-測試債登記與償還">§21.3 測試債登記與償還</h3>
+<ul><li>新增測試債（跳過的 TC、<code>@Disabled</code>、降低的斷言）必須登記於 <code>docs/test-debt.md</code> 並標 SLA。</li><li>每 Sprint Retro 審視測試債清單，P0/P1 相關測試債優先償還。</li><li><code>@Disabled</code> 測試須附原因與追蹤 ticket，禁止無說明停用核心交易/HA/安全測試。</li></ul></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

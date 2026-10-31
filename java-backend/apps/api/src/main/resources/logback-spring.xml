@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Source: EDD §13 (OWASP A09 — 結構化 JSON log) + §10.1 Observability + Iron Law §2 (Logging 格式 = structured JSON).
+
+  Transport format only — PII/secret/token masking is enforced at call sites (A09), never here.
+    - k8s runtime profiles (dev | staging | prod): one JSON object per line on stdout, so Promtail/Loki/
+      Fluent Bit can index per field. Uses Logback's built-in JsonEncoder (Logback 1.5.x ships with
+      Spring Boot 3.3.5) — no extra dependency.
+    - local workstation, test, and the no-profile default: Spring Boot's human-readable console pattern,
+      so developer/CI output is unchanged (no test-log regression).
+-->
+<configuration>
+    <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="yocat-office-backend"/>
+
+    <!-- Spring Boot defaults provide CONSOLE_LOG_PATTERN + the CONSOLE appender for readable output. -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- Structured JSON to stdout (one line per event) for the K8s-deployed environments. -->
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.JsonEncoder"/>
+    </appender>
+
+    <!-- K8s environments (dev/staging/prod) → JSON -->
+    <springProfile name="dev | staging | prod">
+        <root level="INFO">
+            <appender-ref ref="JSON"/>
+        </root>
+    </springProfile>
+
+    <!-- local / test / no-profile default → readable console (unchanged Spring Boot behaviour) -->
+    <springProfile name="!dev &amp; !staging &amp; !prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+</configuration>

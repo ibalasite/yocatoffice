@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>構想文件 (IDEA) — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">構想文件 (IDEA)</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">構想文件 (IDEA)</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link active" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control">Document Control</a></li><li><a class="toc__link" href="#0-input-source輸入素材說明">0. Input Source（輸入素材說明）</a></li><li><a class="toc__link" href="#1-idea-essence核心本質">1. Idea Essence（核心本質）</a></li><li><a class="toc__link toc__link--h3" href="#11-一句話描述elevator-pitch">1.1 一句話描述（Elevator Pitch）</a></li><li><a class="toc__link toc__link--h3" href="#12-核心假說lean-hypothesis">1.2 核心假說（Lean Hypothesis）</a></li><li><a class="toc__link toc__link--h3" href="#13-成功願景success-vision">1.3 成功願景（Success Vision）</a></li><li><a class="toc__link toc__link--h3" href="#14-innovation-type-classification創新類型分類">1.4 Innovation Type Classification（創新類型分類）</a></li><li><a class="toc__link" href="#2-problem-statement問題陳述">2. Problem Statement（問題陳述）</a></li><li><a class="toc__link toc__link--h3" href="#21-現狀描述as-is-narrative">2.1 現狀描述（As-Is Narrative）</a></li><li><a class="toc__link toc__link--h3" href="#22-根本原因分析5-whys">2.2 根本原因分析（5 Whys）</a></li><li><a class="toc__link toc__link--h3" href="#23-問題規模量化估算">2.3 問題規模（量化估算）</a></li><li><a class="toc__link" href="#3-target-users目標使用者">3. Target Users（目標使用者）</a></li><li><a class="toc__link toc__link--h3" href="#31-主要使用者群q1-澄清結果">3.1 主要使用者群（Q1 澄清結果）</a></li><li><a class="toc__link toc__link--h3" href="#32-jobs-to-be-done用戶核心任務">3.2 Jobs to Be Done（用戶核心任務）</a></li><li><a class="toc__link toc__link--h3" href="#33-非目標使用者not-our-users">3.3 非目標使用者（Not Our Users）</a></li><li><a class="toc__link" href="#4-value-hypothesis價值假說">4. Value Hypothesis（價值假說）</a></li><li><a class="toc__link toc__link--h3" href="#41-核心價值主張value-proposition-canvas">4.1 核心價值主張（Value Proposition Canvas）</a></li><li><a class="toc__link toc__link--h3" href="#42-差異化定位">4.2 差異化定位</a></li><li><a class="toc__link" href="#5-mvp--learning-plan最小可行驗證計畫">5. MVP &amp;amp; Learning Plan（最小可行驗證計畫）</a></li><li><a class="toc__link toc__link--h3" href="#51-mvp-邊界定義">5.1 MVP 邊界定義</a></li><li><a class="toc__link toc__link--h3" href="#52-validation-metrics驗證指標pre-brd-階段">5.2 Validation Metrics（驗證指標，Pre-BRD 階段）</a></li><li><a class="toc__link toc__link--h3" href="#53-riskiest-assumption最高風險假設leap-of-faith">5.3 Riskiest Assumption（最高風險假設，Leap of Faith）</a></li><li><a class="toc__link" href="#6-clarification-interview-record澄清訪談記錄">6. Clarification Interview Record（澄清訪談記錄）</a></li><li><a class="toc__link toc__link--h3" href="#q1--主要使用者">Q1 — 主要使用者</a></li><li><a class="toc__link toc__link--h3" href="#q2--核心痛點">Q2 — 核心痛點</a></li><li><a class="toc__link toc__link--h3" href="#q3--技術限制或偏好">Q3 — 技術限制或偏好</a></li><li><a class="toc__link toc__link--h3" href="#q4--預估流量規模pm-expert-研究推估">Q4 — 預估流量規模（PM Expert 研究推估）</a></li><li><a class="toc__link toc__link--h3" href="#q5--其他補充說明動態追問">Q5 — 其他補充說明（動態追問）</a></li><li><a class="toc__link toc__link--h3" href="#原始-idea使用者輸入原文逐字保留">原始 IDEA（使用者輸入原文，逐字保留）</a></li><li><a class="toc__link" href="#7-market--competitive-intelligence市場與競品情報">7. Market &amp;amp; Competitive Intelligence（市場與競品情報）</a></li><li><a class="toc__link toc__link--h3" href="#71-競品--參考資源">7.1 競品 / 參考資源</a></li><li><a class="toc__link toc__link--h3" href="#72-技術生態建議">7.2 技術生態建議</a></li><li><a class="toc__link toc__link--h3" href="#73-研究來源">7.3 研究來源</a></li><li><a class="toc__link" href="#8-initial-risk-assessment初始風險評估">8. Initial Risk Assessment（初始風險評估）</a></li><li><a class="toc__link toc__link--h3" href="#81-風險矩陣">8.1 風險矩陣</a></li><li><a class="toc__link toc__link--h3" href="#82-kill-conditions專案終止條件">8.2 Kill Conditions（專案終止條件）</a></li><li><a class="toc__link toc__link--h3" href="#83-dependencies--external-risks依賴與外部風險">8.3 Dependencies &amp;amp; External Risks（依賴與外部風險）</a></li><li><a class="toc__link toc__link--h3" href="#84-pre-mortem-exercise失敗前情境模擬">8.4 Pre-mortem Exercise（失敗前情境模擬）</a></li><li><a class="toc__link" href="#9-business-potential初步商業潛力">9. Business Potential（初步商業潛力）</a></li><li><a class="toc__link toc__link--h3" href="#91-商業模式假說">9.1 商業模式假說</a></li><li><a class="toc__link toc__link--h3" href="#92-戰略對齊">9.2 戰略對齊</a></li><li><a class="toc__link" href="#10-executive-sponsorship--stakeholder-alignment執行贊助與關鍵利害關係人對齊">10. Executive Sponsorship &amp;amp; Stakeholder Alignment（執行贊助與關鍵利害關係人對齊）</a></li><li><a class="toc__link toc__link--h3" href="#101-executive-sponsor">10.1 Executive Sponsor</a></li><li><a class="toc__link toc__link--h3" href="#102-stakeholder-pre-alignment-matrix">10.2 Stakeholder Pre-alignment Matrix</a></li><li><a class="toc__link toc__link--h3" href="#103-communication-plan溝通計畫">10.3 Communication Plan（溝通計畫）</a></li><li><a class="toc__link" href="#11-idea-quality-score構想品質評分">11. IDEA Quality Score（構想品質評分）</a></li><li><a class="toc__link" href="#12-critical-assumptions關鍵假設清單">12. Critical Assumptions（關鍵假設清單）</a></li><li><a class="toc__link" href="#13-open-questions待解問題">13. Open Questions（待解問題）</a></li><li><a class="toc__link" href="#14-idea--brd-handoff-checklist">14. IDEA → BRD Handoff Checklist</a></li><li><a class="toc__link" href="#15-traceability-note溯源說明">15. Traceability Note（溯源說明）</a></li><li><a class="toc__link" href="#appendix-aresearch-raw-data研究原始資料">Appendix A：Research Raw Data（研究原始資料）</a></li><li><a class="toc__link toc__link--h3" href="#搜尋-1競品與開源專案">搜尋 1：競品與開源專案</a></li><li><a class="toc__link toc__link--h3" href="#搜尋-2技術最佳實踐">搜尋 2：技術最佳實踐</a></li><li><a class="toc__link toc__link--h3" href="#搜尋-3已知挑戰與陷阱">搜尋 3：已知挑戰與陷阱</a></li><li><a class="toc__link" href="#appendix-bdocument-history">Appendix B：Document History</a></li><li><a class="toc__link" href="#appendix-c素材清單docsreq-引用">Appendix C：素材清單（docs/req/ 引用）</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="idea-document--yocat-office-後端信任層">IDEA Document — yoCat Office 後端信任層</h1>
+<h2 id="document-control">Document Control</h2>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>DOC-ID</strong></td><td>IDEA-YOCAT-OFFICE-BACKEND-20261030</td></tr>
+<tr><td><strong>專案名稱</strong></td><td>yoCat Office 後端信任層（yocat-office-backend）</td></tr>
+<tr><td><strong>文件版本</strong></td><td>v0.1-capture</td></tr>
+<tr><td><strong>狀態</strong></td><td>DRAFT</td></tr>
+<tr><td><strong>作者</strong></td><td>AI Generated (gendoc-gen-idea)</td></tr>
+<tr><td><strong>建立日期</strong></td><td>2026-10-30</td></tr>
+<tr><td><strong>最後更新</strong></td><td>2026-10-30</td></tr>
+<tr><td><strong>輸入模式</strong></td><td>AI 自動填入（codebase_local 既有原型 + Q1–Q5 澄清）</td></tr>
+<tr><td><strong>建立方式</strong></td><td>/gendoc idea 自動捕捉；請執行 /reviewdoc brd 審查後方可升版</td></tr>
+<tr><td><strong>下游文件</strong></td><td>docs/BRD.md（由本文件產生）</td></tr>
+<tr><td><strong>client_type</strong></td><td>api-only（state 確認）</td></tr>
+</table>
+<hr>
+<h2 id="0-input-source輸入素材說明">0. Input Source（輸入素材說明）</h2>
+<ul><li><strong>輸入類型</strong>：<code>codebase_local</code> — 既有 Node/TypeScript 後端原型 + PostgreSQL schema + k8s manifest，加上 Q1–Q5 澄清結果與 Web Research 摘要。</li><li><strong>輸入來源</strong>：<code>&lt;project-root&gt;</code>（yoCat Office / yoCat Office 專案）。</li><li><strong>本次讀取的 docs/req/ 素材</strong>：</li><li style="margin-left:1.0rem"><code>docs/req/企画.md</code>（交接聖經，含 §17 會員系統與雲端架構）</li><li style="margin-left:1.0rem"><code>docs/req/schema.sql</code>（8 張表的伺服器權威 schema）</li><li style="margin-left:1.0rem"><code>docs/req/postgres.yaml</code>（Rancher Desktop k8s 的 PostgreSQL manifest）</li><li style="margin-left:1.0rem"><code>docs/req/server-src/index.ts</code>（HTTP server + LLM router + 靜態服務）</li><li style="margin-left:1.0rem"><code>docs/req/server-src/accounts.ts</code>（信任層 API：帳號/錢包/權益/存檔/記錄/排行）</li><li style="margin-left:1.0rem"><code>docs/req/server-src/db.ts</code>（PostgreSQL 連線池與交易封裝）</li><li style="margin-left:1.0rem"><code>docs/req/codebase-tree.txt</code>（專案目錄樹）</li><li><strong>定位說明</strong>：本 IDEA 聚焦於 <strong>yoCat Office 的「後端信任層」</strong>，不涵蓋本地遊戲模擬、LLM 推論與前端渲染（那些依核心理念「算力留本地」留在玩家端）。</li></ul>
+<hr>
+<h2 id="1-idea-essence核心本質">1. Idea Essence（核心本質）</h2>
+<h3 id="11-一句話描述elevator-pitch">1.1 一句話描述（Elevator Pitch）</h3>
+<blockquote><p><strong>yoCat Office 後端信任層幫助「要對遊戲收真錢的獨立遊戲團隊與其玩家」解決「身分、錢包、已購權益與經營記錄無伺服器權威、可被竄改且無法跨裝置」的問題，方式是把『算力留本地、信任上雲端』——只讓身分/錢包/權益/記錄/排行/存檔這條瘦信任層上雲，以 Spring Modulith 有界上下文 + Clean Architecture + Day1 HA 設計保證一致性與防作弊。</strong></p></blockquote>
+<p><strong>Elevator Pitch 五要素：</strong></p>
+<ol><li><strong>Who（目標使用者）</strong>：代表玩家發出信任層請求的遊戲前端客戶端；以及遊戲營運/客服（對帳與風控）。終端受益者是會為「心愛的員工與自己建立的公司」付費的玩家。</li><li><strong>Problem（面對的問題）</strong>：一旦要收真錢，錢包放 <code>localStorage</code> 被 F12 一行 <code>W.gems=99999</code> 就破功；失敗/破產/成就等經營記錄無法歸戶、無法跨裝置、無法防作弊與對帳。</li><li><strong>Solution（如何解決）</strong>：伺服器權威的信任層——scrypt 密碼雜湊 + session token 身分、append-only ledger 的權威錢包、原子扣款+授權的權益購買、跨裝置存檔、經營史記錄與全域排行；以 7 個 Spring Modulith 有界上下文承載，Clean Architecture 四層分離，Day1 即 HA（≥2 replicas、無 SPOF）。</li><li><strong>Why Now（為什麼現在）</strong>：核心玩法（P0 經濟、P1 關係/事件、P2 存檔/離線、情感依附迴圈、破產 recycle）皆已實作，變現軌道（商店/劇本/分享）已鋪好；差的就是「收真錢需要的伺服器權威」。既有 Node 原型已端到端驗證可行，正是把它依工程原則重構為可維運雲端信任層的時機。</li><li><strong>Key Differentiator（核心差異）</strong>：競品的 AI NPC 遊戲把「AI 互動」上雲並按量計費；本專案反其道——<strong>AI 推論與遊戲模擬零邊際成本留本地，只有信任層上雲</strong>，伺服器負載與成本遠低於同類即時遊戲後端，同時仍具備收費所需的防竄改與對帳能力。</li></ol>
+<hr>
+<h3 id="12-核心假說lean-hypothesis">1.2 核心假說（Lean Hypothesis）</h3>
+<blockquote><p><strong>If we build</strong> 一條「算力留本地、信任上雲端」的伺服器權威後端（身分/錢包/權益/記錄/排行/存檔），以 Spring Modulith 7 有界上下文 + Clean Architecture + Day1 HA 實作，</p></blockquote>
+<blockquote><p><strong>then</strong> 要收真錢的遊戲團隊與其玩家</p></blockquote>
+<blockquote><p><strong>will</strong> 能在不把遊戲算力搬上雲（維持零邊際成本護城河）的前提下，安全地儲值、購買與跨裝置延續其經營史，且營運方能對帳與防作弊，</p></blockquote>
+<blockquote><p><strong>which will lead to</strong> 遊戲得以商業化（買斷 → F2P），後端成本可控、可水平擴展，並成為 §15/§16 變現模式（人才庫、破產 recycle、儲值注資）的可信底座。</p></blockquote>
+<p><em>此假說可測：以既有 8 表 schema + API 已端到端驗證（§17.6 test_api.mjs 全綠）為基礎，重構版只需在 HA/模組邊界/一致性三面向達標即算成立。</em></p>
+<hr>
+<h3 id="13-成功願景success-vision">1.3 成功願景（Success Vision）</h3>
+<p><strong>12 個月後，若本專案成功，以下情境將成真：</strong></p>
+<ul><li><strong>用戶維度</strong>：玩家可用帳號登入在任何裝置延續「我的辦公室」，儲值的💎資本與特聘夢想員工永不因破產消失（信任底線）；客戶端只讀顯示伺服器權威餘額，F12 竄改失效。</li><li><strong>業務維度</strong>：遊戲可安全收真錢（買斷 + 外觀/劇本/季票 + 儲值注資），每一筆錢包異動都有 ledger 可稽核，營運/客服能對帳與風控；後端因「只有信任層上雲」而維持低成本結構。</li><li><strong>技術維度</strong>：7 個有界上下文（member/wallet/deposit/entitlement/record/leaderboard/game-save）以 Spring Modulith 落地，Day1 單體 HA（≥2 replicas、無 SPOF），可依流量在不改邊界的前提下逐一拆為獨立微服務；全程可在 Rancher Desktop k8s（local-first）跑完開發與驗收。</li></ul>
+<h3 id="14-innovation-type-classification創新類型分類">1.4 Innovation Type Classification（創新類型分類）</h3>
+<table>
+<tr><th>類型</th><th>定義</th><th>是否適用</th></tr>
+<tr><td><strong>Incremental</strong>（漸進式）</td><td>改善既有產品功能或流程效率</td><td>☐</td></tr>
+<tr><td><strong>Sustaining</strong>（持續性）</td><td>在既有市場中競爭，提供更好的解法</td><td>☑</td></tr>
+<tr><td><strong>Adjacent</strong>（鄰近式）</td><td>現有能力進入新市場或新用戶群</td><td>☐</td></tr>
+<tr><td><strong>Disruptive</strong>（顛覆性）</td><td>從低端或全新市場切入，重塑現有市場</td><td>☑</td></tr>
+<tr><td><strong>Radical / Breakthrough</strong>（突破性）</td><td>基於新技術或商業模式，創造新市場</td><td>☐</td></tr>
+</table>
+<p><strong>本 IDEA 的分類</strong>：Sustaining（對「遊戲會員/金流後端」這一成熟領域提供更嚴謹的工程實作）＋ Disruptive（對「AI NPC 遊戲」的成本模型——把 AI 算力留本地、只上雲信任層——是顛覆性的成本結構差異）。</p>
+<p><strong>分類依據</strong>：信任層本身（帳號/錢包/權益）是成熟領域，採業界最佳實務（Sustaining）；但「算力位置」的商業決策（§15.1）讓本專案相對「AI 上雲按量計費」競品具備結構性成本優勢，屬顛覆性定位。</p>
+<p><em>分類影響資源投入策略：Sustaining 部分走快速、穩健、依既有原型重構的 ROI 路徑；Disruptive 的成本護城河需在架構上持續守住「信任層薄、算力不上雲」的邊界。</em></p>
+<hr>
+<h2 id="2-problem-statement問題陳述">2. Problem Statement（問題陳述）</h2>
+<h3 id="21-現狀描述as-is-narrative">2.1 現狀描述（As-Is Narrative）</h3>
+<p>既有 yoCat Office 原型把錢包、已購項目、存檔都放在客戶端 <code>localStorage</code>（§14/§16 的 <code>W.gems</code>、<code>W.crush</code>、自動存檔約每 4 秒）。這在「免費自帶算力、零成本」階段沒問題，但一旦要收真錢（§16 儲值注資、夢想人才、外觀/季票），就出現根本矛盾：</p>
+<ul><li><strong>Workaround 現況</strong>：目前以 <code>localStorage</code> 當唯一真實來源，玩家可按 F12 直接改 <code>W.gems=99999</code>；排行榜分數由客戶端自報；存檔綁單一裝置、換機即失。</li><li><strong>原型過渡</strong>：為了解決上述問題，團隊已寫出一版 Node 後端（<code>accounts.ts</code>）與 8 表 schema，端到端測試全綠（§17.6），但它是「零依賴、單一行程」的原型——無 HA、無模組邊界、無事件驅動、無對帳/風控工具鏈，不適合作為收真錢的長期可維運底座。</li><li><strong>痛點頻率</strong>：金流/竄改風險在「每一次付費與每一次上榜」都發生；跨裝置需求在「每一次換機/重灌」發生。</li></ul>
+<h3 id="22-根本原因分析5-whys">2.2 根本原因分析（5 Whys）</h3>
+<pre><code class="">問題現象：要對遊戲收費，但沒有伺服器權威的身分與錢包
+  Why 1：錢包/權益/記錄都放客戶端 localStorage
+    Why 2：早期設計以「算力與狀態全留本地、零成本」為最高原則
+      Why 3：核心護城河是「AI 互動零邊際成本」，團隊刻意避免任何上雲成本
+        Why 4：但「收真錢」要求的防竄改/對帳/跨裝置，本質上無法由客戶端自證
+          Why 5（根本原因）：缺少一條「與遊戲算力解耦、可獨立上雲」的伺服器權威信任層 ← 我們要解決的是這個</code></pre>
+<p><em>根因不是「要不要上雲」，而是「把什麼上雲」——必須把薄薄的信任層（身分/錢包/權益/記錄/排行/存檔）與胖胖的本地算力切開，只上雲前者。</em></p>
+<h3 id="23-問題規模量化估算">2.3 問題規模（量化估算）</h3>
+<table>
+<tr><th>指標</th><th>估算數字</th><th>資料來源</th><th>信心水準</th></tr>
+<tr><td>受影響使用者數（全球）</td><td>所有要在本遊戲付費或跨裝置的玩家（全量付費意圖玩家）</td><td>企画 §15/§16 變現設計</td><td>中</td></tr>
+<tr><td>受影響使用者數（目標市場）</td><td>啟動期 5,000 DAU、成長期目標 50,000 DAU</td><td>state q4（PM Expert 推估）</td><td>中</td></tr>
+<tr><td>竄改/對帳風險暴露面</td><td>每筆儲值、每筆花費、每次上榜（100% 金流動作）</td><td>schema.sql wallet_ledger 設計</td><td>高</td></tr>
+<tr><td>跨裝置需求頻率</td><td>每次換機/重灌/多裝置玩家（定性：高）</td><td>企画 §17.5 玩家體驗流程</td><td>中</td></tr>
+<tr><td>可定址市場規模（TAM）</td><td>全球休閒/模擬手遊付費市場為數十億美元級；本類型（辦公室經營模擬 + 伺服器權威金流）可定址子集估 ~ USD 100–300M／年</td><td>企画 §15.6 GTM + 行業休閒手遊營收級距（AI 推斷）</td><td>低</td></tr>
+<tr><td>可服務市場規模（SAM）</td><td>本遊戲 A→B→C 路線實際可觸及之付費玩家：成長期 50,000 DAU × 年 ARPPU 推估 ~ USD 1–3M／年</td><td>企画 §15.1 + state q4</td><td>低</td></tr>
+<tr><td>可獲取市場規模（SOM，預估 12 月）</td><td>啟動期 ~5,000 DAU × 付費轉化 2–5% × 年 ARPPU ~USD 20–40 ≈ 年營收 USD 2K–10K 級起步</td><td>state q4 + 企画 §16</td><td>低</td></tr>
+</table>
+<p><em>以上數字為初始估算，需在 PRD 階段的營運數據後更新。</em></p>
+<hr>
+<h2 id="3-target-users目標使用者">3. Target Users（目標使用者）</h2>
+<h3 id="31-主要使用者群q1-澄清結果">3.1 主要使用者群（Q1 澄清結果）</h3>
+<p><strong>使用者描述</strong>：遊戲前端客戶端（代表玩家發出信任層請求的程式化消費者）與其背後的終端玩家；以及遊戲營運/客服（後台對帳與風控）。</p>
+<table>
+<tr><th>屬性</th><th>描述</th></tr>
+<tr><td>職業 / 角色</td><td>(A) 遊戲客戶端工程/客戶端本身（API 消費者）；(B) 終端玩家（辦公室模擬老闆）；(C) 營運/客服（對帳、風控、退款處理）</td></tr>
+<tr><td>行業 / 情境</td><td>獨立/休閒模擬手遊；登入/儲值/購買/存檔/上榜等「低頻信任動作」，非每幀即時</td></tr>
+<tr><td>技術成熟度</td><td>客戶端＝進階（HTTP/OpenAPI 整合）；玩家＝初階；營運＝中階</td></tr>
+<tr><td>使用頻率</td><td>客戶端＝每次登入/金流/存檔觸發；玩家＝每日/每週；營運＝每日對帳</td></tr>
+<tr><td>決策角色</td><td>客戶端＝使用者；玩家＝使用者/付費者；營運＝風控決策者</td></tr>
+</table>
+<h3 id="32-jobs-to-be-done用戶核心任務">3.2 Jobs to Be Done（用戶核心任務）</h3>
+<table>
+<tr><th>任務類型</th><th>用戶任務描述</th></tr>
+<tr><td><strong>Functional</strong>（功能性）</td><td>當我（客戶端代表玩家）發起儲值/購買/存檔/上榜，我想要伺服器以權威方式記錄並回傳最新狀態，以便玩家在任何裝置看到一致、不可竄改的錢包與權益。</td></tr>
+<tr><td><strong>Functional 2</strong></td><td>當玩家換裝置，我想要用帳號登入還原「我的辦公室」存檔與經營史，以便延續遊戲進度。</td></tr>
+<tr><td><strong>Functional 3</strong>（營運）</td><td>當營運要對帳或查作弊，我想要逐筆查詢 append-only 錢包 ledger 與經營記錄，以便稽核與風控。</td></tr>
+<tr><td><strong>Emotional</strong>（情感性）</td><td>玩家要「我儲值的資本與特聘的夢想員工永遠不會被搞丟」的安全感（§16.9 不作惡底線）。</td></tr>
+<tr><td><strong>Social</strong>（社交性）</td><td>玩家要在全域排行榜以公司名登榜、分享經營傳奇（§15.3 病毒成長）。</td></tr>
+</table>
+<h3 id="33-非目標使用者not-our-users">3.3 非目標使用者（Not Our Users）</h3>
+<table>
+<tr><th>排除群體</th><th>排除原因</th></tr>
+<tr><td>❌ 需要後端承載 LLM 推論/遊戲即時模擬的使用者</td><td>核心理念：算力留本地（玩家端），信任層不承擔遊戲運算</td></tr>
+<tr><td>❌ 需要即時每幀同步的競技/對戰遊戲後端</td><td>本信任層為低頻信任動作設計（登入/儲值/存檔/上榜），非即時狀態同步</td></tr>
+<tr><td>❌ 需要完整第三方真金流清算的 Phase A 使用者</td><td>金流先「假付費」，真金流 SDK 為 Phase B（接口已預留）</td></tr>
+</table>
+<p><em>明確定義「不服務誰」與「服務誰」同等重要，防止把遊戲算力或即時同步塞進信任層而破壞成本護城河。</em></p>
+<hr>
+<h2 id="4-value-hypothesis價值假說">4. Value Hypothesis（價值假說）</h2>
+<h3 id="41-核心價值主張value-proposition-canvas">4.1 核心價值主張（Value Proposition Canvas）</h3>
+<p><strong>Pain Relievers（痛點緩解）：</strong></p>
+<table>
+<tr><th>使用者痛點</th><th>我們的緩解方式</th></tr>
+<tr><td>錢包放 localStorage 可被竄改（Q2）</td><td>伺服器權威錢包：<code>wallets</code> + append-only <code>wallet_ledger</code>，花費走交易 + <code>SELECT FOR UPDATE</code> + 餘額不足回 402；客戶端只讀顯示</td></tr>
+<tr><td>經營記錄無法歸戶、無法跨裝置（Q2）</td><td>記錄/存檔以 <code>account_id</code> 命名空間；<code>/save</code> GET/PUT 跨裝置；<code>records</code>（破產/成就/傳承）掛帳號</td></tr>
+<tr><td>無法防作弊與對帳（Q2）</td><td>每筆異動進 ledger（含 reason/balance/meta）；排行寫入需登入且歸戶；營運可逐筆稽核</td></tr>
+<tr><td>單點故障 / 停機風險</td><td>Day1 HA：所有服務 ≥2 replicas、無 SPOF、HPA + PodDisruptionBudget、BCP from Day1</td></tr>
+<tr><td>模組耦合、難維護難擴展</td><td>Spring Modulith 7 有界上下文（HC-1~HC-5）+ Clean Architecture 4 層 + SOLID</td></tr>
+</table>
+<p><strong>Gain Creators（增益創造）：</strong></p>
+<table>
+<tr><th>使用者期望收益</th><th>我們如何創造</th></tr>
+<tr><td>收真錢的同時維持零邊際成本護城河</td><td>只有信任層上雲，LLM/模擬留本地；後端負載遠低於即時遊戲</td></tr>
+<tr><td>Day1 可分可合、隨規模演進</td><td>7 BC 單體 HA 起步（最小成本），不改邊界即可逐一拆微服務（最大擴展）</td></tr>
+<tr><td>本機即可完整開發驗收</td><td>local-first：全程可在 Rancher Desktop k8s（k3s）跑完</td></tr>
+</table>
+<h3 id="42-差異化定位">4.2 差異化定位</h3>
+<blockquote><p><strong>相對於「把 AI 互動與全部遊戲狀態都上雲、按量計費」的 AI NPC 遊戲後端，yoCat Office 後端信任層只上雲『薄信任層』、把 AI 與模擬算力零成本留在玩家端；相對於 Firebase/PlayFab 等通用 BaaS，我們以 Spring Modulith 有界上下文 + Clean Architecture 提供可自主維運、可逐步拆分、Day1 HA 的自建信任層，不被供應商鎖定、資料留本機、對帳/風控可完全掌控。</strong></p></blockquote>
+<p><em>差異化真實且可持續：成本護城河來自「算力位置」的架構決策，不是臨時優惠；工程護城河來自嚴格的模組邊界與 HA 設計。</em></p>
+<hr>
+<h2 id="5-mvp--learning-plan最小可行驗證計畫">5. MVP &amp; Learning Plan（最小可行驗證計畫）</h2>
+<h3 id="51-mvp-邊界定義">5.1 MVP 邊界定義</h3>
+<blockquote><p><strong>MVP 的目的是驗證「薄信任層 + Day1 HA + Spring Modulith 邊界」能在 local k8s 上承載收真錢所需的一致性與防竄改，而非交付完整金流清算。</strong></p></blockquote>
+<table>
+<tr><th>MVP 功能（P0，≤5 項）</th><th>驗證假設</th><th>最低可接受標準</th></tr>
+<tr><td>member BC：註冊/登入/登出/我的資料（scrypt + session）</td><td>伺服器可權威管理身分</td><td>scrypt 雜湊 + token 驗證端到端通過，未授權請求回 401</td></tr>
+<tr><td>wallet BC：topup（假付費）/spend，append-only ledger</td><td>錢包竄改可被根除、異動可稽核</td><td>花費走交易 + <code>SELECT FOR UPDATE</code>，餘額不足回 402，每筆進 ledger</td></tr>
+<tr><td>entitlement BC：購買（原子扣款+授予）/列出</td><td>已購權益永不重複、永不遺失</td><td>重複購買回 409，扣款與授予同一交易，破產不消失</td></tr>
+<tr><td>game-save BC：/save GET/PUT（跨裝置）</td><td>存檔可跨裝置還原</td><td>以 account_id+slot upsert，換裝置登入可取回</td></tr>
+<tr><td>平台底座：7 BC Spring Modulith 單體，Day1 HA（≥2 replicas）在 local k8s</td><td>薄信任層可 HA 且模組邊界成立</td><td>ModularityTests 綠、≥2 replicas 滾動更新不中斷服務</td></tr>
+</table>
+<p><strong>明確不在 MVP 範圍（Non-MVP）：</strong></p>
+<ul><li>❌ 真金流清算/發票/退款（推遲原因：Phase B 真金流 SDK，接口先預留）</li><li>❌ leaderboard/record 的進階反作弊與風控儀表板（推遲原因：先驗證權威寫入，風控工具後置）</li><li>❌ 跨 BC 全面拆分為獨立微服務（推遲原因：Day1 以單體 HA 最小成本起步，邊界已可分）</li></ul>
+<h3 id="52-validation-metrics驗證指標pre-brd-階段">5.2 Validation Metrics（驗證指標，Pre-BRD 階段）</h3>
+<table>
+<tr><th>指標</th><th>測量方式</th><th>通過閾值（Go）</th><th>失敗閾值（Pivot/Kill）</th><th>追蹤週期</th></tr>
+<tr><td>防竄改有效性</td><td>客戶端無法改動伺服器餘額（滲透測試）</td><td>100% 改動被拒</td><td>任一路徑可竄改餘額</td><td>開發週 1–2</td></tr>
+<tr><td>錢包一致性</td><td>併發 spend 壓測（failover 下餘額不為負、ledger 與餘額相符）</td><td>0 筆不一致</td><td>出現負餘額或對不上帳</td><td>開發週 2–3</td></tr>
+<tr><td>HA 可用性</td><td>滾動更新/殺 1 pod 時的服務可用性</td><td>無停機、錯誤率 &lt; 0.1%</td><td>出現服務中斷</td><td>開發週 3</td></tr>
+<tr><td>模組邊界合規</td><td>Spring Modulith ModularityTests + 依賴圖為 DAG</td><td>全綠、無循環依賴</td><td>任一 HC 違規</td><td>每次建置</td></tr>
+<tr><td>local-first 可跑通</td><td>全流程在 Rancher Desktop k8s 完成</td><td>一鍵部署+測試全綠</td><td>需外部雲端才能跑</td><td>開發週 1</td></tr>
+</table>
+<p><strong>驗證計畫時程：</strong></p>
+<pre><code class="">Week 1：member + wallet BC 骨架，local k8s 部署，防竄改與 local-first 驗證
+Week 2：entitlement + game-save BC，併發一致性壓測
+Week 3：record + leaderboard BC、HA/failover 驗收，ModularityTests 全綠 → 決策 Go/Pivot/Kill</code></pre>
+<h3 id="53-riskiest-assumption最高風險假設leap-of-faith">5.3 Riskiest Assumption（最高風險假設，Leap of Faith）</h3>
+<blockquote><p><strong>核心 Leap of Faith：</strong> 我們假設 <strong>「把信任層與遊戲算力徹底解耦後，一條薄的伺服器權威信任層就足以支撐收真錢所需的防竄改、一致性與對帳，而不需要把任何遊戲模擬/AI 推論上雲」</strong>。</p></blockquote>
+<blockquote><p>若此假設為假（例如防作弊必須依賴伺服器重算遊戲邏輯），則 <strong>成本護城河崩解、後端被迫承載遊戲運算</strong>，專案應 <strong>根本性 Pivot（重新定義信任邊界）</strong>。</p></blockquote>
+<blockquote><p>我們將透過 <strong>MVP 的防竄改滲透測試 + 排行榜/記錄的歸戶驗證</strong> 在 <strong>開發週 3（§5.1 驗收）</strong> 前驗證此假設。</p></blockquote>
+<table>
+<tr><th>假設</th><th>驗證方法</th><th>驗證期限</th><th>若錯誤的後果</th></tr>
+<tr><td>薄信任層足以防竄改且無需上雲遊戲算力（最高風險）</td><td>滲透測試 + 歸戶/對帳驗證</td><td>開發週 3</td><td>根本性 Pivot</td></tr>
+<tr><td>7 BC 單體 Day1 HA 可在不改邊界下逐一拆微服務</td><td>ModularityTests + 依賴 DAG 檢查</td><td>每次建置</td><td>調整模組切分</td></tr>
+</table>
+<hr>
+<h2 id="6-clarification-interview-record澄清訪談記錄">6. Clarification Interview Record（澄清訪談記錄）</h2>
+<blockquote><p>本節記錄 Step 2 澄清提問的完整結果，是 BRD 各章節的原始輸入來源。原文保存，不摘要改寫。</p></blockquote>
+<h3 id="q1--主要使用者">Q1 — 主要使用者</h3>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>回答</strong></td><td>遊戲客戶端與玩家(終端)、營運/客服(後台對帳風控)</td></tr>
+<tr><td><strong>選擇方式</strong></td><td>AI 推薦預設（依 codebase 與企画推斷）</td></tr>
+<tr><td><strong>影響範疇</strong></td><td>BRD §4 Stakeholders、PDD Persona、RTM 使用者欄位</td></tr>
+</table>
+<h3 id="q2--核心痛點">Q2 — 核心痛點</h3>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>回答</strong></td><td>要對遊戲收費但沒有伺服器權威的身分與錢包：錢包放 localStorage 可被竄改、失敗/經營記錄無法歸戶、無法跨裝置、無法防作弊與對帳</td></tr>
+<tr><td><strong>選擇方式</strong></td><td>AI 推薦預設（依企画 §17 推斷）</td></tr>
+<tr><td><strong>影響範疇</strong></td><td>BRD §2 Problem Statement、§5 Proposed Solution、§7 Success Metrics</td></tr>
+</table>
+<h3 id="q3--技術限制或偏好">Q3 — 技術限制或偏好</h3>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>回答</strong></td><td>算力留本地(LLM/遊戲模擬在玩家端)，只有信任層上雲端；本機開發全程可在 Rancher Desktop k8s 跑完(local-first)；需遵循 gendoc 原則(HA≥2、Spring Modulith HC-1~HC-5、Clean Architecture+SOLID、SECS、SSOT)</td></tr>
+<tr><td><strong>選擇方式</strong></td><td>指定技術 + 整合限制</td></tr>
+<tr><td><strong>影響範疇</strong></td><td>BRD §8 Constraints、EDD 技術選型、ARCH 架構設計</td></tr>
+</table>
+<h3 id="q4--預估流量規模pm-expert-研究推估">Q4 — 預估流量規模（PM Expert 研究推估）</h3>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>日活用戶（DAU）</strong></td><td>啟動期 5,000 DAU（遊戲早期），成長期目標 50,000 DAU</td></tr>
+<tr><td><strong>同時在線峰值（PCU）</strong></td><td>啟動期 500 PCU，成長期 3,000 PCU</td></tr>
+<tr><td><strong>推估依據</strong></td><td>參考同類休閒/模擬手遊上線首季常見量級（獨立手遊啟動期 DAU 多落在數千級），取 5,000 DAU 為啟動保守值、成長期目標 50,000 DAU（×10）；PCU 以休閒手遊線上同時率經驗值 ~DAU 的 10% 推估 ≈ 500（成長期因時區分散略低於線性，取 3,000）。信任層請求頻率低（登入/儲值/存檔/上榜為主，非每幀），故後端負載遠低於即時對戰遊戲</td></tr>
+<tr><td><strong>影響範疇</strong></td><td>EDD 容量規劃數值、ARCH HPA 觸發閾值、DB 連線池大小</td></tr>
+</table>
+<blockquote><p>以上數值由 PM Expert 依競品研究與行業基準自動推估，僅供容量規劃使用，不影響架構選型（架構均採 HA 設計，≥ 2 replica）。</p></blockquote>
+<h3 id="q5--其他補充說明動態追問">Q5 — 其他補充說明（動態追問）</h3>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>回答</strong></td><td>七個有界上下文 Day1 即可分可合(單體 HA 最小成本 / 獨立微服務最大擴展)；金流先假付費、接口預留 Phase B 真金流 SDK</td></tr>
+<tr><td><strong>追問觸發原因</strong></td><td>需釐清 Day1 架構形態與金流階段邊界</td></tr>
+<tr><td><strong>影響範疇</strong></td><td>§5 MVP 邊界、EDD 模組拆分策略、API 金流接口設計</td></tr>
+</table>
+<hr>
+<h3 id="原始-idea使用者輸入原文逐字保留">原始 IDEA（使用者輸入原文，逐字保留）</h3>
+<pre><code class="">yoCat Office 後端信任層：member/wallet/deposit/entitlement/record/leaderboard/game-save
+七個有界上下文；算力留本地、信任上雲端；現有 Node/TS 原型 + PostgreSQL(8表) + Rancher
+Desktop k8s。依 gendoc 原則重新設計為 HA/Spring Modulith/Clean Architecture 架構。
+
+（來自企画.md §17 會員系統與雲端架構）
+17.1 核心原則：算力留本地，信任上雲端。一旦要收真錢，錢包就不能放 localStorage
+（F12 一行 W.gems=99999 就破功）。身分／錢包／已購項目／記錄／排行必須由伺服器當權威。
+但這不違反「不對 AI 收費」哲學——LLM 推論與遊戲模擬仍留本地（零成本），只有「信任層」上伺服器。
+17.2 基礎設施全 local：Rancher Desktop k8s(k3s) + PostgreSQL 16 (Deployment+PVC+NodePort 30432)。
+17.3 資料模型：schema-per-BC（7 個 BC：member/wallet/deposit/entitlement/record/leaderboard/game_save）。
+17.4 API：/auth/*、/wallet/topup|spend、/entitlements(/buy)、/save、/records、/leaderboard。
+17.6 進度：基礎設施✅、後端 API 全套✅（Java Spring Modulith，含 JUnit/BDD/合約/E2E 測試）、客戶端整合✅；之後真金流 SDK（Phase B，接口已預留）。</code></pre>
+<p><em>保留原文供未來 ECR（Engineering Change Request）審查時比對，確認需求變更屬 BUG 修正還是範圍擴充。</em></p>
+<hr>
+<h2 id="7-market--competitive-intelligence市場與競品情報">7. Market &amp; Competitive Intelligence（市場與競品情報）</h2>
+<h3 id="71-競品--參考資源">7.1 競品 / 參考資源</h3>
+<table>
+<tr><th>競品 / 工具</th><th>核心定位</th><th>優勢</th><th>劣勢</th><th>我們的差異</th></tr>
+<tr><td>PlayFab / Firebase（遊戲 BaaS）</td><td>託管遊戲後端（身分/經濟/排行/存檔）</td><td>開箱即用、全託管、擴展快</td><td>供應商鎖定、資料不在本機、對帳/風控受限、成本隨量增</td><td>自建 Spring Modulith 信任層、資料留本機、可自主拆分與維運、不鎖定</td></tr>
+<tr><td>Spring Modulith 範例（payment-system）</td><td>模組化單體參考架構</td><td>module=bounded context、跨模組走 domain events、Event Publication Registry=Transactional Outbox、ModularityTests 強制邊界</td><td>為範例非產品、需自行補 HA/金流</td><td>直接採其邊界與 outbox 範式，疊上 Day1 HA 與遊戲信任層語意（wallet/entitlement/record）</td></tr>
+<tr><td>一般「AI NPC 遊戲」雲端後端</td><td>AI 互動與遊戲狀態全上雲</td><td>玩家零硬體門檻</td><td>AI 推論按量計費、成本高、延遲與隱私問題</td><td>算力留本地零成本，只上雲薄信任層，成本結構結構性更低</td></tr>
+</table>
+<h3 id="72-技術生態建議">7.2 技術生態建議</h3>
+<table>
+<tr><th>層次</th><th>建議方案</th><th>選擇理由</th></tr>
+<tr><td>程式語言 / 框架</td><td>Spring Boot 3 + Spring Modulith</td><td>7 有界上下文可在單一應用內落地、ModularityTests 強制 HC-1~HC-5、events.jdbc outbox 保證事件可靠；Day1 可分可合</td></tr>
+<tr><td>資料庫</td><td>PostgreSQL 16</td><td>既有 8 表 schema、交易 + <code>SELECT FOR UPDATE</code> 保錢包一致、JSONB 承載 save/record/detail；local 以 PVC 持久化</td></tr>
+<tr><td>核心套件 / 服務</td><td>Spring Modulith Events（JDBC Outbox）、Spring Security（身分/session）、連線池（HikariCP）</td><td>非同步事件驅動模組間通訊（HC-3）、scrypt/session 身分權威、連線池依 Q4 容量設定</td></tr>
+<tr><td>基礎設施</td><td>Kubernetes（Rancher Desktop k3s，local-first）：Deployment ≥2 replicas + HPA + PodDisruptionBudget + PVC</td><td>HA/SCALE/無 SPOF/BCP from Day1；全程本機可跑完</td></tr>
+</table>
+<p><em>技術建議基於 Q3（算力留本地、信任上雲、local-first、gendoc 原則）；容量規劃基於 PM Expert 推估 — DAU 5,000（成長期 50,000）、同時在線峰值 500（成長期 3,000）。</em></p>
+<h4 id="服務角色識別">服務角色識別</h4>
+<table>
+<tr><th>角色名</th><th>用途</th><th>建議技術</th></tr>
+<tr><td>trust-api（信任層應用）</td><td>承載 7 BC 的 HTTP 入口（Presentation 層），代理玩家發出身分/錢包/權益/記錄/排行/存檔請求</td><td>Spring Boot 3 + Spring MVC/WebFlux，Deployment ≥2 replicas + HPA</td></tr>
+<tr><td>postgres（權威資料庫）</td><td>帳號/session/錢包/ledger/權益/存檔/記錄/排行的唯一真實來源</td><td>PostgreSQL 16，Deployment + PVC（local-path）+ NodePort 30432，HA/備援規劃</td></tr>
+<tr><td>modulith-event-outbox（事件投遞）</td><td>BC 間非同步事件可靠投遞（Transactional Outbox）</td><td>Spring Modulith Event Publication Registry（events.jdbc），落在同一 PostgreSQL</td></tr>
+</table>
+<h3 id="73-研究來源">7.3 研究來源</h3>
+<table>
+<tr><th>搜尋關鍵字</th><th>主要發現</th><th>可信度</th></tr>
+<tr><td>Spring Modulith bounded context / event publication registry</td><td>module=bounded context、跨模組走 domain events、outbox 保證事件可靠、ModularityTests 強制邊界</td><td>高</td></tr>
+<tr><td>遊戲後端 server-authoritative wallet / anti-cheat</td><td>跨玩家邊界一律 server-authoritative；append-only ledger 審計；密碼學摘要防竄改；write-behind worker 經 broker 落庫</td><td>高</td></tr>
+<tr><td>錢包餘額一致性 / idempotency</td><td>需交易 + <code>SELECT FOR UPDATE</code> + 冪等鍵；事件可靠投遞走 outbox；金流冪等與對帳</td><td>高</td></tr>
+</table>
+<hr>
+<h2 id="8-initial-risk-assessment初始風險評估">8. Initial Risk Assessment（初始風險評估）</h2>
+<h3 id="81-風險矩陣">8.1 風險矩陣</h3>
+<table>
+<tr><th>#</th><th>風險描述</th><th>類型</th><th>可能性</th><th>影響</th><th>風險等級</th><th>初步緩解策略</th></tr>
+<tr><td>R1</td><td>錢包餘額跨 failover 不一致（併發扣款/重啟）</td><td>技術</td><td>MEDIUM</td><td>HIGH</td><td>🔴 HIGH</td><td>交易 + <code>SELECT FOR UPDATE</code> + 冪等鍵；append-only ledger 對帳；HA 下驗證</td></tr>
+<tr><td>R2</td><td>事件未可靠投遞導致 BC 間狀態分歧</td><td>技術</td><td>MEDIUM</td><td>HIGH</td><td>🔴 HIGH</td><td>Spring Modulith Event Publication Registry（Transactional Outbox），失敗重投</td></tr>
+<tr><td>R3</td><td>PostgreSQL 單點成為 SPOF</td><td>技術</td><td>MEDIUM</td><td>HIGH</td><td>🔴 HIGH</td><td>DB HA/備援規劃（主從/備份還原 BCP）、PodDisruptionBudget、連線池重試</td></tr>
+<tr><td>R4</td><td>Phase B 真金流冪等與對帳缺口</td><td>執行</td><td>MEDIUM</td><td>HIGH</td><td>🔴 HIGH</td><td>先預留冪等鍵/對帳接口；假付費期即走 ledger，真金流接入時沿用</td></tr>
+<tr><td>R5</td><td>過度工程：薄信任層被塞進遊戲邏輯而破壞成本護城河</td><td>執行</td><td>MEDIUM</td><td>MEDIUM</td><td>🟡 MEDIUM</td><td>嚴守信任邊界（§3.3 非目標）、ModularityTests、架構守則審查</td></tr>
+<tr><td>R6</td><td>Phase B 真金流與個資合規缺口（金流清算/發票/隱私法規，如 GDPR/個資法、各地金流監管）</td><td>法規</td><td>MEDIUM</td><td>HIGH</td><td>🔴 HIGH</td><td>真金流接入前法務介入（§10.2）；個資最小化、ledger 僅存必要欄位；依目標市場金流/稅務法規設計對帳與發票接口</td></tr>
+</table>
+<p>風險等級 = 可能性 × 影響：HIGH/HIGH = 🔴，其他組合 = 🟡 或 🟢。</p>
+<h3 id="82-kill-conditions專案終止條件">8.2 Kill Conditions（專案終止條件）</h3>
+<table>
+<tr><th>終止條件</th><th>觸發閾值</th><th>檢查時機</th></tr>
+<tr><td>防竄改假設不成立</td><td>滲透測試中仍有任一路徑可由客戶端竄改伺服器餘額，且修復需把遊戲邏輯上雲重算</td><td>MVP 驗收（開發週 3）</td></tr>
+<tr><td>一致性無法達標</td><td>併發/failover 壓測出現負餘額或 ledger 與餘額對不上，且無法在不犧牲 HA 下解決</td><td>併發壓測（開發週 2–3）</td></tr>
+<tr><td>成本護城河崩解</td><td>為滿足需求必須把 LLM 推論或遊戲模擬搬上雲（違反「算力留本地」核心理念）</td><td>任一階段審查</td></tr>
+<tr><td>local-first 破局</td><td>全流程無法在 Rancher Desktop k8s 跑完，必須依賴外部雲端才能開發驗收</td><td>開發週 1</td></tr>
+</table>
+<h3 id="83-dependencies--external-risks依賴與外部風險">8.3 Dependencies &amp; External Risks（依賴與外部風險）</h3>
+<table>
+<tr><th>依賴項</th><th>類型</th><th>關鍵性</th><th>若失效的影響</th><th>備援方案</th></tr>
+<tr><td>PostgreSQL（權威資料庫）</td><td>技術</td><td>高</td><td>全信任層不可用、金流停擺</td><td>HA/備援（主從+備份還原 BCP）、PodDisruptionBudget、連線重試</td></tr>
+<tr><td>Rancher Desktop k8s（k3s，local）</td><td>技術</td><td>高</td><td>無法本機開發/驗收</td><td>標準 k8s manifest，可移植至任一相容叢集</td></tr>
+<tr><td>Phase B 真金流 SDK（第三方金流）</td><td>市場/技術</td><td>中</td><td>無法收真錢（但假付費與 ledger 不受影響）</td><td>接口已預留、冪等/對帳先行；Phase A 以假付費驗證</td></tr>
+</table>
+<p><em>本節聚焦「我們無法完全控制」的外部因素，與 §8.1 內部風險區隔。</em></p>
+<h3 id="84-pre-mortem-exercise失敗前情境模擬">8.4 Pre-mortem Exercise（失敗前情境模擬）</h3>
+<table>
+<tr><th>#</th><th>失敗情境</th><th>根本原因</th><th>預防措施</th><th>早期預警訊號</th></tr>
+<tr><td>F1</td><td>failover 時錢包出現負餘額/對不上帳，玩家信任崩潰</td><td>併發與分散式一致性低估</td><td>交易+行鎖+冪等鍵、HA 壓測前置</td><td>壓測出現不一致筆數 &gt; 0</td></tr>
+<tr><td>F2</td><td>為防作弊把遊戲邏輯搬上雲，成本護城河消失</td><td>信任邊界未守住</td><td>§3.3 非目標 + 架構守則審查 + ModularityTests</td><td>出現「伺服器重算遊戲邏輯」的需求</td></tr>
+<tr><td>F3</td><td>Spring Modulith 邊界腐化成大泥球，無法拆分</td><td>跨模組直接呼叫、共享可變狀態</td><td>HC-1~HC-5 強制、依賴 DAG、events 驅動</td><td>ModularityTests 出現違規</td></tr>
+<tr><td>F4</td><td>DB 成 SPOF，一掛全停</td><td>未做 DB HA/BCP</td><td>主從/備份還原、PodDisruptionBudget</td><td>單 DB 無備援、無還原演練</td></tr>
+<tr><td>F5</td><td>真金流接入時冪等/對帳缺口導致重複扣款</td><td>Phase A 未預留冪等接口</td><td>冪等鍵與對帳接口 Day1 預留</td><td>假付費期出現重複 ledger</td></tr>
+<tr><td>F6</td><td>破產/recycle 機制誤刪玩家特聘夢想員工或已購權益，觸發信任崩潰與退款潮（產品特定，呼應 §16.9 不作惡底線）</td><td>entitlement/record 與遊戲 recycle 邏輯邊界不清、已購權益未隔離於遊戲狀態重置</td><td>已購權益走 entitlement BC（原子授予、破產不消失，§5.1）、記錄 append-only、recycle 僅影響遊戲內狀態不觸及權威權益</td><td>客服出現「我特聘的員工/已購項目不見了」申訴</td></tr>
+</table>
+<p><strong>Pre-mortem 結論：</strong> 最可能的失敗路徑是 <strong>F1（錢包一致性在 HA/failover 下失守）</strong>，需在 BRD/EDD 階段優先設計交易、行鎖、冪等與對帳機制，並在 MVP 即壓測。</p>
+<hr>
+<h2 id="9-business-potential初步商業潛力">9. Business Potential（初步商業潛力）</h2>
+<h3 id="91-商業模式假說">9.1 商業模式假說</h3>
+<table>
+<tr><th>項目</th><th>初步假設</th></tr>
+<tr><td>收入來源</td><td>本信任層是變現底座：承載買斷（Steam/itch $10–15）、外觀/劇本/季票、儲值注資（真錢→💎資本，Phase B）。本身不直接定價，但是所有付費的可信前提</td></tr>
+<tr><td>主要定價策略</td><td>A 期自帶算力買斷 → B 期雲端 F2P + IAP/訂閱（離線營運 Pass）；永不對 AI 互動收費</td></tr>
+<tr><td>主要成本驅動因子</td><td>信任層雲端成本（DB + API pods，因「只上雲信任層」而低）；真金流手續費（Phase B）</td></tr>
+<tr><td>核心資源</td><td>PostgreSQL 權威資料、Spring Modulith 信任層、local-first k8s 可移植性</td></tr>
+<tr><td>獲客管道</td><td>遊戲本體病毒分享（drama clip）帶動；信任層為留存/付費轉化服務</td></tr>
+</table>
+<p><em>以上為概念階段假設，需在 BRD §11 Business Model 深化。</em></p>
+<h3 id="92-戰略對齊">9.2 戰略對齊</h3>
+<table>
+<tr><th>公司策略目標</th><th>本 IDEA 的貢獻方式</th><th>對齊強度</th></tr>
+<tr><td>「不對 AI 收費、賣內容/外觀/規模」的護城河（企画 §15）</td><td>把收費所需的信任層與 AI 算力解耦，守住零邊際成本</td><td>強</td></tr>
+<tr><td>A→B→C 算力路線並行、程式與算力位置解耦（企画 §15.7）</td><td>信任層獨立於算力位置，client 僅切換生成來源不影響信任（屬使能/間接貢獻，非直接驅動此策略）</td><td>中</td></tr>
+<tr><td>情感變現引擎（人才庫/破產 recycle/儲值注資，企画 §16）</td><td>以伺服器權威保證「付費與心愛的人永不永久失去」的不作惡底線</td><td>強</td></tr>
+</table>
+<hr>
+<h2 id="10-executive-sponsorship--stakeholder-alignment執行贊助與關鍵利害關係人對齊">10. Executive Sponsorship &amp; Stakeholder Alignment（執行贊助與關鍵利害關係人對齊）</h2>
+<h3 id="101-executive-sponsor">10.1 Executive Sponsor</h3>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>贊助人</strong></td><td>TBD — 由 BRD 釐清（專案發起者：yoCat Office 維護團隊，boss@yocat.example）</td></tr>
+<tr><td><strong>贊助原因</strong></td><td>收真錢的前提是伺服器權威信任層，直接決定商業化可行性</td></tr>
+<tr><td><strong>授權範圍</strong></td><td>預算上限 by BRD；技術決策自主範圍＝信任層架構與 local k8s 基礎設施</td></tr>
+<tr><td><strong>核可日期</strong></td><td>待 BRD 審查</td></tr>
+<tr><td><strong>升級路徑</strong></td><td>若遇阻礙，升級至專案發起者/董事（企画維護者）</td></tr>
+</table>
+<h3 id="102-stakeholder-pre-alignment-matrix">10.2 Stakeholder Pre-alignment Matrix</h3>
+<table>
+<tr><th>利害關係人</th><th>角色</th><th>對本 IDEA 的態度</th><th>主要顧慮</th><th>對齊策略</th><th>對齊期限</th></tr>
+<tr><td>遊戲客戶端團隊</td><td>API 消費者</td><td>支持</td><td>API 穩定性與向後相容</td><td>OpenAPI 契約先行、假付費接口不變</td><td>BRD 前</td></tr>
+<tr><td>遊戲營運/客服</td><td>風控/對帳</td><td>支持</td><td>能否逐筆稽核與退款</td><td>ledger append-only + 記錄歸戶 + 對帳接口</td><td>PRD 前</td></tr>
+<tr><td>架構/工程</td><td>實作</td><td>中立</td><td>HA/模組邊界/一致性成本</td><td>gendoc 原則 + ModularityTests 強制</td><td>BRD 前</td></tr>
+<tr><td>法務</td><td>Legal</td><td>中立</td><td>真金流合規、個資</td><td>Phase B 金流前法務介入、個資最小化</td><td>真金流接入前</td></tr>
+</table>
+<h3 id="103-communication-plan溝通計畫">10.3 Communication Plan（溝通計畫）</h3>
+<table>
+<tr><th>里程碑</th><th>溝通對象</th><th>溝通形式</th><th>期限</th></tr>
+<tr><td>IDEA 核准</td><td>Executive Sponsor</td><td>1-pager + 口頭簡報</td><td>BRD 啟動前</td></tr>
+<tr><td>BRD 完成</td><td>All Stakeholders</td><td>文件分享 + 審查會議</td><td>BRD 生成後</td></tr>
+<tr><td>MVP 驗收</td><td>工程 + 營運</td><td>local k8s demo + 壓測報告</td><td>開發週 3</td></tr>
+</table>
+<hr>
+<h2 id="11-idea-quality-score構想品質評分">11. IDEA Quality Score（構想品質評分）</h2>
+<p><strong>整體評分</strong>：★★★★★（5/5）</p>
+<table>
+<tr><th>評分維度</th><th>分數</th><th>評估說明</th><th>改進建議</th></tr>
+<tr><td>目標清晰度</td><td>1 / 1</td><td>明確：薄信任層上雲、算力留本地，邊界清楚</td><td>維持邊界守則</td></tr>
+<tr><td>使用者具體度</td><td>1 / 1</td><td>客戶端/玩家/營運三類，含職業/行為/痛點</td><td>於 PRD 補 persona 細節</td></tr>
+<tr><td>痛點可量化</td><td>1 / 1</td><td>竄改/對帳/跨裝置痛點具體，金流動作 100% 暴露面</td><td>以營運數據驗證頻率</td></tr>
+<tr><td>範圍邊界明確</td><td>1 / 1</td><td>§3.3 非目標 + §5.1 Non-MVP + Phase A/B 分界</td><td>—</td></tr>
+<tr><td>技術可行性初判</td><td>1 / 1</td><td>既有原型端到端全綠，重構目標明確、技術棧成熟</td><td>HA/一致性壓測驗證</td></tr>
+</table>
+<p><strong>本次評分說明：</strong></p>
+<pre><code class="">【IDEA 品質評分】★★★★★（5/5）
+  問題與使用者具體、痛點明確且有既有原型佐證可行性
+  架構方向（Spring Modulith 7 BC + Clean Architecture + Day1 HA）清晰且可落地
+  最大不確定性在 HA/failover 下的錢包一致性，已列為最高風險假設與 Kill Condition</code></pre>
+<hr>
+<h2 id="12-critical-assumptions關鍵假設清單">12. Critical Assumptions（關鍵假設清單）</h2>
+<table>
+<tr><th>#</th><th>假設陳述</th><th>影響層級</th><th>不確定性</th><th>驗證方式</th><th>驗證期限</th></tr>
+<tr><td>A1</td><td>薄信任層足以防竄改且無需上雲遊戲算力（基於 Q2 痛點 + Q3 核心理念）</td><td>HIGH</td><td>HIGH</td><td>滲透測試 + 歸戶/對帳驗證</td><td>MVP 驗收（開發週 3）</td></tr>
+<tr><td>A2</td><td>啟動期 5,000 DAU / 500 PCU 量級下，單體 HA（≥2 replicas）足以承載（基於 Q4 規模）</td><td>HIGH</td><td>MEDIUM</td><td>容量/壓力測試</td><td>BRD/EDD 審查前</td></tr>
+<tr><td>A3</td><td>7 BC 可以 Spring Modulith 單體 Day1 落地，並在不改邊界下逐一拆微服務（基於 Q3/Q5 技術）</td><td>MEDIUM</td><td>HIGH</td><td>ModularityTests + 依賴 DAG（PoC）</td><td>EDD 完成前</td></tr>
+<tr><td>A4</td><td>錢包一致性可用「交易 + <code>SELECT FOR UPDATE</code> + 冪等鍵 + outbox」在 HA 下達成（基於研究建議）</td><td>HIGH</td><td>HIGH</td><td>併發/failover 壓測</td><td>MVP 驗收</td></tr>
+<tr><td>A5</td><td>既有 8 表 schema 與 API 契約可作為重構基礎而不需大改（基於既有原型全綠）</td><td>MEDIUM</td><td>LOW</td><td>契約比對 + 回歸測試</td><td>BRD 前</td></tr>
+</table>
+<p><em>A1/A4 若假設錯誤，專案應終止或根本性調整方向（見 §8.2 Kill Conditions）。優先驗證順序：A1 → A4 → A2 → A3 → A5。</em></p>
+<hr>
+<h2 id="13-open-questions待解問題">13. Open Questions（待解問題）</h2>
+<table>
+<tr><th>#</th><th>問題</th><th>影響層級</th><th>若不解決的後果</th><th>負責人</th><th>狀態</th></tr>
+<tr><td>OQ1</td><td>PostgreSQL 的 HA/BCP 具體形態（主從？備份還原 RPO/RTO？）</td><td>策略</td><td>DB 仍為 SPOF，違反 Day1 無單點</td><td>Engineering</td><td>🔲 OPEN</td></tr>
+<tr><td>OQ2</td><td>Phase B 真金流 SDK 選型與冪等/對帳契約</td><td>範圍</td><td>真金流接入時可能重複扣款</td><td>PM + Engineering</td><td>🔲 OPEN</td></tr>
+<tr><td>OQ3</td><td>7 BC 中 deposit 與 wallet 的邊界劃分（儲值 vs 錢包異動的職責切割）</td><td>範圍</td><td>影響模組邊界與 outbox 事件設計</td><td>Engineering</td><td>🔲 OPEN</td></tr>
+<tr><td>OQ4</td><td>個資/金流合規範圍（真金流接入前的法務要求）</td><td>法規</td><td>可能影響上市時程</td><td>Legal</td><td>🔲 OPEN</td></tr>
+</table>
+<hr>
+<h2 id="14-idea--brd-handoff-checklist">14. IDEA → BRD Handoff Checklist</h2>
+<table>
+<tr><th>#</th><th>Checklist 項目</th><th>狀態</th><th>負責人</th></tr>
+<tr><td>C1</td><td>一句話描述（§1.1）已清晰表達，無模糊詞</td><td>✅</td><td>PM</td></tr>
+<tr><td>C2</td><td>核心假說（§1.2）符合可測試格式</td><td>✅</td><td>PM</td></tr>
+<tr><td>C3</td><td>Q1 使用者描述具體（非「所有人」）</td><td>✅</td><td>PM</td></tr>
+<tr><td>C4</td><td>Q2 痛點已量化（竄改/對帳/跨裝置暴露面有估算）</td><td>✅</td><td>PM</td></tr>
+<tr><td>C5</td><td>Q4 規模已選定（DAU/PCU 已推估）</td><td>✅</td><td>PM</td></tr>
+<tr><td>C6</td><td>至少 1 個競品在 §7 已識別（本文件 3 個）</td><td>✅</td><td>PM</td></tr>
+<tr><td>C7</td><td>至少 3 項風險在 §8 已識別（本文件 5 項）</td><td>✅</td><td>PM</td></tr>
+<tr><td>C8</td><td>Kill Conditions（§8.2）已定義（本文件 4 條）</td><td>✅</td><td>PM</td></tr>
+<tr><td>C9</td><td>關鍵假設 A1（§12）已識別並有驗證計畫</td><td>✅</td><td>PM</td></tr>
+<tr><td>C10</td><td>IDEA Quality Score ≥ 3（本文件 5/5）</td><td>✅</td><td>AI 自動</td></tr>
+<tr><td>C11</td><td>原始 IDEA 原文已逐字保留（§6 末段）</td><td>✅</td><td>AI 自動</td></tr>
+<tr><td>C12</td><td>Open Questions 中無 P0 級別未解技術問題（OQ 皆 BRD/EDD 階段可解）</td><td>✅</td><td>Engineering</td></tr>
+</table>
+<hr>
+<h2 id="15-traceability-note溯源說明">15. Traceability Note（溯源說明）</h2>
+<p><em>此文件是需求鏈的起點，扮演「原始意圖記錄者」的角色。</em></p>
+<p><strong>向下追溯（Forward）：</strong></p>
+<pre><code class="">IDEA.md （本文件）
+  └─► BRD.md       ← /gendoc brd
+        └─► PRD.md      ← /gendoc prd
+              └─► PDD.md      ← /gendoc pdd
+                    └─► EDD.md      ← /gendoc edd
+                          └─► ARCH / API / SCHEMA / BDD → 實作</code></pre>
+<p><strong>章節 ← 素材對應：</strong></p>
+<table>
+<tr><th>§章節</th><th>來源素材</th></tr>
+<tr><td>§1 Idea Essence</td><td>docs/req/企画.md §15–§17、state q1–q5</td></tr>
+<tr><td>§2 Problem Statement</td><td>docs/req/企画.md §17.1、state q2</td></tr>
+<tr><td>§3 Target Users</td><td>state q1、docs/req/企画.md §17.5</td></tr>
+<tr><td>§4 Value Hypothesis</td><td>docs/req/server-src/accounts.ts、schema.sql、research_summary</td></tr>
+<tr><td>§5 MVP Plan</td><td>docs/req/server-src/accounts.ts、state key_features、q5</td></tr>
+<tr><td>§6 Interview Record</td><td>state q1–q5、企画.md §17</td></tr>
+<tr><td>§7 Market Intelligence</td><td>state research_summary、q4</td></tr>
+<tr><td>§8 Risk Assessment</td><td>research_summary（已知風險）、企画.md §17</td></tr>
+<tr><td>§9 Business Potential</td><td>docs/req/企画.md §15–§16</td></tr>
+</table>
+<p><strong>需求變更判斷準則：</strong></p>
+<table>
+<tr><th>場景</th><th>對比依據</th><th>分類</th></tr>
+<tr><td>功能行為與原始 IDEA Q1/Q2 一致但實作有誤</td><td>IDEA §6 原文</td><td><strong>BUG</strong>（修正，不需 ECR）</td></tr>
+<tr><td>功能需求超出原始 Q1/Q2 描述範圍（如把遊戲邏輯上雲）</td><td>IDEA §6 原文 + §3.3 非目標</td><td><strong>ECR</strong>（需人工評估變更範圍）</td></tr>
+<tr><td>技術選型偏離 Q3（如放棄 HA/模組邊界）且理由不足</td><td>IDEA §6 Q3</td><td><strong>ECR 或 ADR</strong>（需說明決策依據）</td></tr>
+</table>
+<hr>
+<h2 id="appendix-aresearch-raw-data研究原始資料">Appendix A：Research Raw Data（研究原始資料）</h2>
+<h3 id="搜尋-1競品與開源專案">搜尋 1：競品與開源專案</h3>
+<pre><code class="">查詢：Spring Modulith bounded context event publication registry payment system
+結果：
+- module = bounded context；跨模組只走 domain events（不直接呼叫對方內部）。
+- ModularityTests 在建置期強制邊界（HC-1~HC-5 的落地工具）。
+- Event Publication Registry = Transactional Outbox，保證事件可靠投遞。
+- wallet 為獨立模組；重複請求視為狀態記錄（冪等思維）。</code></pre>
+<h3 id="搜尋-2技術最佳實踐">搜尋 2：技術最佳實踐</h3>
+<pre><code class="">查詢：game backend server-authoritative wallet anti-cheat architecture
+結果：
+- 跨玩家邊界一律 server-authoritative。
+- auth / persistence / anti-cheat 拆服務。
+- write-behind worker 經 broker（Kafka/NATS）落庫。
+- append-only ledger 審計；密碼學摘要防竄改。
+- 建議：Spring Boot 3 + Spring Modulith（@ApplicationModule、events.jdbc outbox）；
+  Clean Architecture 4 層 + SOLID；PostgreSQL；K8s ≥2 replicas + HPA + PodDisruptionBudget。</code></pre>
+<h3 id="搜尋-3已知挑戰與陷阱">搜尋 3：已知挑戰與陷阱</h3>
+<pre><code class="">查詢：wallet balance consistency failover idempotency outbox
+結果：
+- 錢包餘額跨 failover 一致性：需交易 + SELECT FOR UPDATE + 冪等鍵。
+- 事件可靠投遞：outbox 模式。
+- 金流冪等與對帳：需冪等鍵與逐筆對帳。</code></pre>
+<hr>
+<h2 id="appendix-bdocument-history">Appendix B：Document History</h2>
+<table>
+<tr><th>版本</th><th>日期</th><th>作者</th><th>修改摘要</th></tr>
+<tr><td>v0.1-capture</td><td>2026-10-30</td><td>/gendoc idea</td><td>初始捕捉，由 AI 自動填寫（後端信任層聚焦）</td></tr>
+<tr><td>v0.2</td><td>—</td><td>—</td><td>—</td></tr>
+</table>
+<hr>
+<h2 id="appendix-c素材清單docsreq-引用">Appendix C：素材清單（docs/req/ 引用）</h2>
+<table>
+<tr><th>檔案路徑</th><th>素材類型</th><th>應用於（對應章節）</th></tr>
+<tr><td><code>docs/req/企画.md</code></td><td>產品企画/交接聖經（§15 商業化、§16 獲利、§17 會員系統與雲端架構）</td><td>§1、§2、§6、§9、§15、Appendix A</td></tr>
+<tr><td><code>docs/req/schema.sql</code></td><td>資料庫 schema（8 表伺服器權威）</td><td>§4、§5、§12（A5）</td></tr>
+<tr><td><code>docs/req/postgres.yaml</code></td><td>k8s PostgreSQL manifest（Rancher Desktop）</td><td>§7.2、§8.3</td></tr>
+<tr><td><code>docs/req/server-src/index.ts</code></td><td>HTTP server + LLM router + 靜態服務</td><td>§3、§4</td></tr>
+<tr><td><code>docs/req/server-src/accounts.ts</code></td><td>信任層 API（帳號/錢包/權益/存檔/記錄/排行）</td><td>§4、§5、§7</td></tr>
+<tr><td><code>docs/req/server-src/db.ts</code></td><td>PostgreSQL 連線池與交易封裝</td><td>§7.2、§8.1</td></tr>
+<tr><td><code>docs/req/codebase-tree.txt</code></td><td>專案目錄樹</td><td>§0</td></tr>
+</table>
+<hr>
+<p><em>此 IDEA.md 由 /gendoc idea 自動生成並保存，聚焦 yoCat Office 後端信任層。它記錄了需求探索過程的原始輸入、假設與品質評分，是未來 BUG vs ECR 判斷的一級依據。核心理念：算力留本地（零成本護城河），信任上雲端（收真錢的伺服器權威），全程 local-first 可在 Rancher Desktop k8s 跑完。</em></p><section style="margin-top:2rem;padding:1.5rem;background:#fff;border:1px solid var(--border);border-radius:8px;"><h2 style="margin-top:0">📎 附件與素材 (req/)</h2><p style="color:var(--text-muted);font-size:0.875rem;margin-bottom:0.75rem">共 4 個附件，點擊下載</p><ul style="list-style:none;padding:0;margin:0"><li style="padding:0.5rem 0;border-bottom:1px solid var(--border)">📎 codebase-tree.txt <span style="color:var(--text-muted);font-size:0.8125rem">(2 KB)</span></li><li style="padding:0.5rem 0;border-bottom:1px solid var(--border)">📎 postgres.yaml <span style="color:var(--text-muted);font-size:0.8125rem">(1 KB)</span></li><li style="padding:0.5rem 0;border-bottom:1px solid var(--border)">📎 schema.sql <span style="color:var(--text-muted);font-size:0.8125rem">(3 KB)</span></li><li style="padding:0.5rem 0;border-bottom:1px solid var(--border)">📎 企画.md <span style="color:var(--text-muted);font-size:0.8125rem">(27 KB)</span></li></ul></section></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

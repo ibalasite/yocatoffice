@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: yocat-pg-data
+  namespace: yocat
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yocat-pg
+  namespace: yocat
+  labels: { app: yocat-pg }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: yocat-pg }
+  template:
+    metadata:
+      labels: { app: yocat-pg }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          envFrom:
+            - secretRef: { name: yocat-pg }
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "yocat", "-d", "yocat"] }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec: { command: ["pg_isready", "-U", "yocat", "-d", "yocat"] }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: yocat-pg-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: yocat-pg
+  namespace: yocat
+spec:
+  type: NodePort
+  selector: { app: yocat-pg }
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: 5432
+      nodePort: 30432

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/LeaderboardResponse",
+  "title": "LeaderboardResponse",
+  "description": "GET /leaderboard 回應",
+  "type": "object",
+  "properties": {
+    "leaderboard": {
+      "type": "array",
+      "items": {
+        "$ref": "LeaderboardEntryView.schema.json"
+      }
+    }
+  },
+  "required": [
+    "leaderboard"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ResponseDTO>>"
+}

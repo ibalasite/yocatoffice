@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>產品需求文件 (PRD) — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">產品需求文件 (PRD)</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">產品需求文件 (PRD)</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link active" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control">Document Control</a></li><li><a class="toc__link" href="#change-log">Change Log</a></li><li><a class="toc__link" href="#1-executive-summary">1. Executive Summary</a></li><li><a class="toc__link" href="#2-problem-statement">2. Problem Statement</a></li><li><a class="toc__link toc__link--h3" href="#21-現狀痛點">2.1 現狀痛點</a></li><li><a class="toc__link toc__link--h3" href="#22-根本原因分析">2.2 根本原因分析</a></li><li><a class="toc__link toc__link--h3" href="#23-機會假設">2.3 機會假設</a></li><li><a class="toc__link toc__link--h3" href="#24-system-context-diagram">2.4 System Context Diagram</a></li><li><a class="toc__link" href="#3-stakeholders--users">3. Stakeholders &amp;amp; Users</a></li><li><a class="toc__link toc__link--h3" href="#31-stakeholder-map">3.1 Stakeholder Map</a></li><li><a class="toc__link toc__link--h3" href="#32-user-personas">3.2 User Personas</a></li><li><a class="toc__link" href="#4-scope">4. Scope</a></li><li><a class="toc__link toc__link--h3" href="#41-in-scope本版本交付">4.1 In Scope（本版本交付）</a></li><li><a class="toc__link toc__link--h3" href="#42-out-of-scope明確排除">4.2 Out of Scope（明確排除）</a></li><li><a class="toc__link toc__link--h3" href="#43-future-scope下個版本候選">4.3 Future Scope（下個版本候選）</a></li><li><a class="toc__link toc__link--h3" href="#44-moscow-優先度對照表">4.4 MoSCoW 優先度對照表</a></li><li><a class="toc__link" href="#5-user-stories--acceptance-criteria">5. User Stories &amp;amp; Acceptance Criteria</a></li><li><a class="toc__link toc__link--h3" href="#51-member--會員身分p0--must-have">5.1 member — 會員身分（P0 / Must Have）</a></li><li><a class="toc__link toc__link--h3" href="#52-wallet--伺服器權威錢包p0--must-have">5.2 wallet — 伺服器權威錢包（P0 / Must Have）</a></li><li><a class="toc__link toc__link--h3" href="#53-entitlement--已購權益p0--must-have">5.3 entitlement — 已購權益（P0 / Must Have）</a></li><li><a class="toc__link toc__link--h3" href="#54-game-save--跨裝置存檔p0--must-have">5.4 game-save — 跨裝置存檔（P0 / Must Have）</a></li><li><a class="toc__link toc__link--h3" href="#55-平台底座--7-bc-spring-modulith--day1-hap0--must-have">5.5 平台底座 — 7 BC Spring Modulith + Day1 HA（P0 / Must Have）</a></li><li><a class="toc__link toc__link--h3" href="#56-record--經營史記錄p1--should-have">5.6 record — 經營史記錄（P1 / Should Have）</a></li><li><a class="toc__link toc__link--h3" href="#57-leaderboard--全域排行p1--should-have">5.7 leaderboard — 全域排行（P1 / Should Have）</a></li><li><a class="toc__link toc__link--h3" href="#58-deposit--儲值接口p1--should-have">5.8 deposit — 儲值接口（P1 / Should Have）</a></li><li><a class="toc__link" href="#6-user-flows">6. User Flows</a></li><li><a class="toc__link toc__link--h3" href="#61-主流程happy-path-登入--儲值--購買--存檔">6.1 主流程（Happy Path）— 登入 → 儲值 → 購買 → 存檔</a></li><li><a class="toc__link toc__link--h3" href="#62-錯誤流程error-flow">6.2 錯誤流程（Error Flow）</a></li><li><a class="toc__link toc__link--h3" href="#63-狀態機state-machine-存檔--經營史生命週期">6.3 狀態機（State Machine）— 存檔 / 經營史生命週期</a></li><li><a class="toc__link" href="#7-non-functional-requirements-nfr">7. Non-Functional Requirements (NFR)</a></li><li><a class="toc__link toc__link--h3" href="#71-效能performance">7.1 效能（Performance）</a></li><li><a class="toc__link toc__link--h3" href="#72-可用性availability">7.2 可用性（Availability）</a></li><li><a class="toc__link toc__link--h3" href="#73-可擴展性scalability">7.3 可擴展性（Scalability）</a></li><li><a class="toc__link toc__link--h3" href="#74-安全性security">7.4 安全性（Security）</a></li><li><a class="toc__link toc__link--h3" href="#75-可用性usability">7.5 可用性（Usability）</a></li><li><a class="toc__link toc__link--h3" href="#76-可維護性maintainability">7.6 可維護性（Maintainability）</a></li><li><a class="toc__link toc__link--h3" href="#77-可觀測性observability">7.7 可觀測性（Observability）</a></li><li><a class="toc__link toc__link--h3" href="#78-analytics-event-instrumentation-map分析事件儀器化">7.8 Analytics Event Instrumentation Map（分析事件儀器化）</a></li><li><a class="toc__link" href="#8-constraints--dependencies">8. Constraints &amp;amp; Dependencies</a></li><li><a class="toc__link toc__link--h3" href="#81-技術限制">8.1 技術限制</a></li><li><a class="toc__link toc__link--h3" href="#82-技術依賴">8.2 技術依賴</a></li><li><a class="toc__link toc__link--h3" href="#83-外部依賴">8.3 外部依賴</a></li><li><a class="toc__link toc__link--h3" href="#84-關鍵假設assumptions">8.4 關鍵假設（Assumptions）</a></li><li><a class="toc__link toc__link--h3" href="#85-向後相容性宣告backward-compatibility">8.5 向後相容性宣告（Backward Compatibility）</a></li><li><a class="toc__link" href="#9-success-metrics--launch-criteria">9. Success Metrics &amp;amp; Launch Criteria</a></li><li><a class="toc__link toc__link--h3" href="#91-成功指標kpis">9.1 成功指標（KPIs）</a></li><li><a class="toc__link toc__link--h3" href="#92-護欄指標guardrail-metrics">9.2 護欄指標（Guardrail Metrics）</a></li><li><a class="toc__link toc__link--h3" href="#93-上線-go--no-go-清單">9.3 上線 Go / No-Go 清單</a></li><li><a class="toc__link" href="#94-experiment--ab-test-plan實驗與-ab-測試計畫">9.4 Experiment &amp;amp; A/B Test Plan（實驗與 A/B 測試計畫）</a></li><li><a class="toc__link" href="#95-definition-of-done完成定義">9.5 Definition of Done（完成定義）</a></li><li><a class="toc__link" href="#10-rollout-plan">10. Rollout Plan</a></li><li><a class="toc__link toc__link--h3" href="#102-feature-flag-規格">10.2 Feature Flag 規格</a></li><li><a class="toc__link" href="#11-data-requirements">11. Data Requirements</a></li><li><a class="toc__link toc__link--h3" href="#111-新增資料欄位--資料表">11.1 新增資料欄位 / 資料表</a></li><li><a class="toc__link toc__link--h3" href="#112-data-dictionary">11.2 Data Dictionary</a></li><li><a class="toc__link toc__link--h3" href="#113-資料來源">11.3 資料來源</a></li><li><a class="toc__link toc__link--h3" href="#114-資料品質要求">11.4 資料品質要求</a></li><li><a class="toc__link toc__link--h3" href="#115-pii-欄位清單">11.5 PII 欄位清單</a></li><li><a class="toc__link" href="#12-open-questions">12. Open Questions</a></li><li><a class="toc__link" href="#13-glossary">13. Glossary</a></li><li><a class="toc__link" href="#14-references">14. References</a></li><li><a class="toc__link" href="#15-requirement-traceability-matrix-rtm">15. Requirement Traceability Matrix (RTM)</a></li><li><a class="toc__link" href="#16-approval-sign-off">16. Approval Sign-off</a></li><li><a class="toc__link" href="#17-privacy-by-design--data-protection">17. Privacy by Design &amp;amp; Data Protection</a></li><li><a class="toc__link toc__link--h3" href="#171-privacy-by-design-七大原則合規檢查">17.1 Privacy by Design 七大原則合規檢查</a></li><li><a class="toc__link toc__link--h3" href="#172-個人資料盤點pii-inventory">17.2 個人資料盤點（PII Inventory）</a></li><li><a class="toc__link toc__link--h3" href="#173-使用者隱私權實作矩陣">17.3 使用者隱私權實作矩陣</a></li><li><a class="toc__link toc__link--h3" href="#174-同意管理consent-management">17.4 同意管理（Consent Management）</a></li><li><a class="toc__link toc__link--h3" href="#175-dpia資料保護影響評估觸發條件">17.5 DPIA（資料保護影響評估）觸發條件</a></li><li><a class="toc__link" href="#18-accessibility-requirements無障礙需求">18. Accessibility Requirements（無障礙需求）</a></li><li><a class="toc__link toc__link--h3" href="#181-wcag-21-合規目標">18.1 WCAG 2.1 合規目標</a></li><li><a class="toc__link toc__link--h3" href="#182-無障礙需求清單">18.2 無障礙需求清單</a></li><li><a class="toc__link" href="#19-admin-backend-requirements管理後台需求">19. Admin Backend Requirements（管理後台需求）</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="prd--product-requirements-document">PRD — Product Requirements Document</h1>
+<h2 id="document-control">Document Control</h2>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>DOC-ID</strong></td><td>PRD-YOCAT-OFFICE-BACKEND-20261030</td></tr>
+<tr><td><strong>產品名稱</strong></td><td>yoCat Office 後端信任層（yocat-office-backend）</td></tr>
+<tr><td><strong>文件版本</strong></td><td>v1.0</td></tr>
+<tr><td><strong>狀態</strong></td><td>DRAFT</td></tr>
+<tr><td><strong>作者（PM）</strong></td><td>AI Generated（gendoc gen-prd）／ Product Lead 待指派</td></tr>
+<tr><td><strong>日期</strong></td><td>2026-10-30</td></tr>
+<tr><td><strong>上游 BRD</strong></td><td><a href="brd.html" target="_blank" rel="noopener">BRD.md</a> §3（商業目標）、§5（Proposed Solution）、§7（Success Metrics）、§8（Constraints）、§9（Compliance）</td></tr>
+<tr><td><strong>上游 IDEA</strong></td><td><a href="idea.html" target="_blank" rel="noopener">IDEA.md</a>（IDEA-YOCAT-OFFICE-BACKEND-20261030）</td></tr>
+<tr><td><strong>審閱者</strong></td><td>資深 UX Expert、資深 PM Expert、資深 QA Expert</td></tr>
+<tr><td><strong>核准者</strong></td><td>Executive Sponsor（Sayyo Games / 聖祐遊戲，boss@yocat.example，待確認）</td></tr>
+<tr><td><strong>client_type</strong></td><td>api-only（state 確認；信任層對外為 HTTP/JSON API，無直接 C 端 UI）</td></tr>
+<tr><td><strong>has_admin_backend</strong></td><td>false（本版本無 Admin 後台，見 §19）</td></tr>
+</table>
+<hr>
+<h2 id="change-log">Change Log</h2>
+<table>
+<tr><th>版本</th><th>日期</th><th>作者</th><th>變更摘要</th></tr>
+<tr><td>v0.1</td><td>2026-10-30</td><td>AI Generated (gendoc-gen-prd)</td><td>初始生成</td></tr>
+<tr><td>v1.0</td><td>2026-10-30</td><td>gendoc gen-prd</td><td>初稿，由 IDEA.md + BRD.md + docs/req/（企画.md §17、schema.sql、server-src/accounts.ts）生成</td></tr>
+</table>
+<hr>
+<h2 id="1-executive-summary">1. Executive Summary</h2>
+<blockquote><p><strong>一段話</strong>：本產品解決什麼問題、為誰解決、預期產生什麼價值。</p></blockquote>
+<p>yoCat Office 後端信任層是一條「算力留本地、信任上雲端」的<strong>伺服器權威後端 API 服務</strong>，為代表玩家發出信任層請求的遊戲前端客戶端、以及遊戲營運/客服（對帳與風控）而建。它解決「要對遊戲收真錢，但身分、錢包、已購權益與經營記錄放在客戶端 <code>localStorage</code>、可被 F12 一行 <code>W.gems=99999</code> 竄改、無法歸戶、無法跨裝置、無法對帳」的根本矛盾。解法是把薄薄的信任層（身分/錢包/權益/記錄/排行/存檔）與胖胖的本地算力（LLM 推論、遊戲模擬）切開，只讓信任層上雲：以 scrypt + session token 管理身分、以 <code>wallets</code> + append-only <code>wallet_ledger</code> 作伺服器權威錢包（花費走交易 + <code>SELECT FOR UPDATE</code>、餘額不足回 402）、以原子扣款+授予的 entitlement 保證已購權益永不重複永不因破產消失，並提供跨裝置存檔、經營史記錄與全域排行。全部以 7 個 Spring Modulith 有界上下文（member / wallet / deposit / entitlement / record / leaderboard / game-save）承載、Clean Architecture 四層 + SOLID 分離、Day1 即 HA（≥2 replicas、無 SPOF、HPA + PodDisruptionBudget、BCP from Day1），全程可在 Rancher Desktop k8s（local-first）開發驗收。預期價值：解鎖遊戲商業化（買斷 → F2P），後端因「只上雲信任層」維持零邊際成本護城河，且每一筆金流動作皆可稽核對帳。</p>
+<hr>
+<h2 id="2-problem-statement">2. Problem Statement</h2>
+<h3 id="21-現狀痛點">2.1 現狀痛點</h3>
+<p>既有 yoCat Office 原型把錢包、已購項目、存檔都放在客戶端 <code>localStorage</code>（企画 §14/§16 的 <code>W.gems</code>、<code>W.crush</code>、自動存檔約每 4 秒）。在「免費自帶算力、零成本」階段沒問題，但一旦要收真錢（企画 §16 儲值注資、夢想人才、外觀/季票），就出現根本矛盾：</p>
+<ul><li><strong>竄改成本為零</strong>：玩家按 F12 一行 <code>W.gems=99999</code> 即可竄改餘額；排行榜分數由客戶端自報；已購權益可偽造。</li><li><strong>無法歸戶、無法跨裝置</strong>：存檔與經營史綁單一裝置的 <code>localStorage</code>，換手機或重灌即全失。</li><li><strong>無法對帳與風控</strong>：營運/客服無任何逐筆帳本可稽核，無法處理退款爭議、無法查作弊。</li><li><strong>原型不可維運</strong>：團隊已寫出一版 Node 後端（<code>accounts.ts</code>）與 8 表 schema，端到端測試全綠（企画 §17.6），但它是「零依賴、單一行程」的原型——無 HA、無模組邊界、無事件驅動、無對帳工具鏈，不適合作為收真錢的長期底座。</li></ul>
+<p><strong>痛點頻率</strong>：金流/竄改風險在「每一次付費與每一次上榜」都發生（100% 金流動作暴露）；跨裝置需求在「每一次換機/重灌」發生。</p>
+<h3 id="22-根本原因分析">2.2 根本原因分析</h3>
+<p>為什麼現狀存在這個問題？早期設計以「算力與狀態全留本地、零成本」為最高原則（護城河是 AI 互動零邊際成本），但「收真錢」要求的防竄改/對帳/跨裝置，本質上無法由客戶端自證。根本原因（5 Whys 收斂）是：<strong>缺少一條「與遊戲算力解耦、可獨立上雲」的伺服器權威信任層</strong>。根因不是「要不要上雲」，而是「把什麼上雲」——必須把薄信任層與本地算力切開，只上雲前者。</p>
+<h3 id="23-機會假設">2.3 機會假設</h3>
+<blockquote><p>如果我們解決這個問題，我們假設會發生什麼？（可驗證的假設）</p></blockquote>
+<ul><li>假設 1：若提供伺服器權威錢包與權益，則客戶端可竄改伺服器餘額的路徑數將由 100%（localStorage）降至 0 條（滲透測試驗證，MVP 開發週 3）。</li><li>假設 2：若提供跨裝置存檔與歸戶，則付費轉化率（DAU → 付費）將由 0% 提升至 ≥ 2%（GA + 3 個月）。</li><li>假設 3：若信任層與遊戲算力解耦、只上雲前者，則後端單位成本將維持在「每付費用戶雲端成本 &lt; 收益 20%」（GA + 12 個月）。</li></ul>
+<h3 id="24-system-context-diagram">2.4 System Context Diagram</h3>
+<div class="diagram-container"><pre class="mermaid">C4Context
+    title yoCat Office 後端信任層 — System Context
+    Person(client, &quot;遊戲前端客戶端&quot;, &quot;代表玩家發出登入/儲值/購買/存檔/上榜等信任層請求&quot;)
+    Person(ops, &quot;遊戲營運 / 客服&quot;, &quot;逐筆查詢 ledger 與記錄，對帳與風控&quot;)
+    System(trust, &quot;yoCat Office 後端信任層&quot;, &quot;伺服器權威：身分/錢包/權益/記錄/排行/存檔，7 BC Spring Modulith&quot;)
+    System_Ext(pg, &quot;PostgreSQL 16&quot;, &quot;唯一真實來源：accounts/sessions/wallets/ledger/entitlements/saves/records/leaderboard + Outbox&quot;)
+    System_Ext(k8s, &quot;Rancher Desktop k8s (k3s)&quot;, &quot;local-first 部署平台：Deployment ≥2 replicas + HPA + PDB&quot;)
+    System_Ext(psp, &quot;Phase B 真金流 SDK&quot;, &quot;第三方支付（接口預留，Phase A 假付費不接）&quot;)
+    Rel(client, trust, &quot;呼叫信任層 API&quot;, &quot;HTTPS / JSON (Bearer token)&quot;)
+    Rel(ops, trust, &quot;對帳 / 風控查詢&quot;, &quot;HTTPS / JSON&quot;)
+    Rel(trust, pg, &quot;交易讀寫、SELECT FOR UPDATE、Outbox&quot;, &quot;JDBC / SQL&quot;)
+    Rel(trust, k8s, &quot;部署於&quot;, &quot;Container / k8s API&quot;)
+    Rel(trust, psp, &quot;儲值清算（Phase B）&quot;, &quot;REST API（預留）&quot;)</pre></div>
+<blockquote><p><strong>圖例說明：</strong></p></blockquote>
+<blockquote><p>- <code>Person</code>：直接與系統互動的使用者或外部角色（客戶端、營運）</p></blockquote>
+<blockquote><p>- <code>System</code>：本次交付的系統邊界（In Scope）</p></blockquote>
+<blockquote><p>- <code>System_Ext</code>：現有外部系統，本次不修改（PostgreSQL、k8s、Phase B 金流）</p></blockquote>
+<blockquote><p>- <code>Rel</code>：關係標註格式為（來源, 目標, 動詞標籤, 協定）</p></blockquote>
+<hr>
+<h2 id="3-stakeholders--users">3. Stakeholders &amp; Users</h2>
+<h3 id="31-stakeholder-map">3.1 Stakeholder Map</h3>
+<table>
+<tr><th>角色</th><th>關係</th><th>主要關切</th><th>溝通頻率</th></tr>
+<tr><td>Executive Sponsor（Sayyo Games）</td><td>出資 / 核准</td><td>ROI、商業化可行性、上市時間</td><td>月</td></tr>
+<tr><td>Product Manager（待指派）</td><td>負責人</td><td>範圍、優先順序、付費轉化</td><td>每日</td></tr>
+<tr><td>Engineering Lead（待指派）</td><td>技術實作</td><td>HA、一致性、模組邊界、技術債</td><td>每日</td></tr>
+<tr><td>遊戲客戶端團隊</td><td>API 消費者</td><td>API 穩定性、向後相容、整合成本</td><td>每週</td></tr>
+<tr><td>遊戲營運 / 客服</td><td>對帳 / 風控</td><td>逐筆稽核、退款處理、作弊偵測</td><td>每日</td></tr>
+<tr><td>Legal / Compliance</td><td>合規</td><td>真金流合規、個資（Phase B）</td><td>里程碑</td></tr>
+<tr><td>Finance</td><td>財務</td><td>後端單位成本、對帳正確性</td><td>月</td></tr>
+<tr><td>終端玩家</td><td>使用者 / 付費者</td><td>跨裝置、儲值與員工永不失去</td><td>-</td></tr>
+</table>
+<h3 id="32-user-personas">3.2 User Personas</h3>
+<h4 id="persona-a客戶端整合工程師-kevinapi-消費者">Persona A：客戶端整合工程師 Kevin（API 消費者）</h4>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>背景</strong></td><td>28 歲，遊戲客戶端工程師，負責把 yoCat Office 前端從 localStorage 權威改為呼叫伺服器信任層</td></tr>
+<tr><td><strong>目標</strong></td><td>(1) 以穩定 OpenAPI 契約整合登入/儲值/購買/存檔/上榜；(2) 假付費與真金流接口不變，升級無痛</td></tr>
+<tr><td><strong>痛點</strong></td><td>(1) 怕 API 破壞向後相容導致回歸；(2) 怕錯誤碼語意不清無法處理 402/409；(3) 怕整合文件缺失</td></tr>
+<tr><td><strong>技術熟悉度</strong></td><td>高（HTTP / OpenAPI / JSON）</td></tr>
+<tr><td><strong>使用頻率</strong></td><td>每次登入 / 金流 / 存檔觸發（整合期每日）</td></tr>
+<tr><td><strong>成功樣貌</strong></td><td>照契約串接即可通過，錯誤路徑（402/409/401）行為可預期，無需追問後端</td></tr>
+</table>
+<h4 id="persona-b辦公室模擬老闆-阿凱終端玩家--付費者">Persona B：辦公室模擬老闆 阿凱（終端玩家 / 付費者）</h4>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>背景</strong></td><td>32 歲，上班族，重度辦公室模擬玩家，會為「心愛的員工與自己建立的公司」付費</td></tr>
+<tr><td><strong>目標</strong></td><td>(1) 跨裝置延續「我的辦公室」；(2) 儲值的💎資本與特聘夢想員工永不因破產消失</td></tr>
+<tr><td><strong>痛點</strong></td><td>(1) 換手機就全失；(2) 怕花了錢餘額被判無效或消失；(3) 怕破產時心愛角色被清掉</td></tr>
+<tr><td><strong>技術熟悉度</strong></td><td>低（只透過客戶端操作，不直接碰 API）</td></tr>
+<tr><td><strong>使用頻率</strong></td><td>每日 / 每週遊玩，偶發儲值</td></tr>
+<tr><td><strong>成功樣貌</strong></td><td>換手機登入辦公室原封不動、儲值即時到帳且永久保存——「這才敢花錢」</td></tr>
+</table>
+<h4 id="persona-c營運客服-小婷對帳--風控">Persona C：營運客服 小婷（對帳 / 風控）</h4>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>背景</strong></td><td>30 歲，遊戲營運/客服，負責每日對帳、退款爭議與作弊偵測</td></tr>
+<tr><td><strong>目標</strong></td><td>(1) 逐筆查詢某帳號的 append-only 錢包 ledger 與經營記錄；(2) 判斷爭議交易真偽</td></tr>
+<tr><td><strong>痛點</strong></td><td>(1) 原型無任何對帳工具；(2) 無法證明某筆異動是否伺服器權威產生</td></tr>
+<tr><td><strong>技術熟悉度</strong></td><td>中（能讀 ledger 查詢結果、理解帳本語意）</td></tr>
+<tr><td><strong>使用頻率</strong></td><td>每日對帳</td></tr>
+<tr><td><strong>成功樣貌</strong></td><td>每筆爭議都能在 ledger 中逐筆追溯（含 reason/delta/balance/meta），退款有據</td></tr>
+</table>
+<hr>
+<h2 id="4-scope">4. Scope</h2>
+<h3 id="41-in-scope本版本交付">4.1 In Scope（本版本交付）</h3>
+<p><strong>In Scope（P0 / Must Have，MVP 收真錢最小閉環）：</strong></p>
+<ul><li style="list-style:none"><input type="checkbox" disabled> member BC：註冊 / 登入 / 登出 / 我的資料（scrypt + session token）</li><li style="list-style:none"><input type="checkbox" disabled> wallet BC：topup（假付費）/ spend（扣款），append-only <code>wallet_ledger</code></li><li style="list-style:none"><input type="checkbox" disabled> entitlement BC：購買（原子扣款 + 授予）/ 列出，破產不消失</li><li style="list-style:none"><input type="checkbox" disabled> game-save BC：/save GET / PUT（跨裝置 slot upsert）</li><li style="list-style:none"><input type="checkbox" disabled> 平台底座：7 BC Spring Modulith 單體 + Clean Architecture 4 層，Day1 HA（≥2 replicas）於 local k8s</li></ul>
+<p><strong>In Scope（P1 / Should Have，Phase 2）：</strong></p>
+<ul><li style="list-style:none"><input type="checkbox" disabled> record BC：經營史記錄（破產 / 成就 / 傳承，append-only）</li><li style="list-style:none"><input type="checkbox" disabled> leaderboard BC：全域排行（歸戶寫入 + 公開 Top N 查詢）</li><li style="list-style:none"><input type="checkbox" disabled> deposit BC：儲值接口（假付費走 ledger；Phase B 真金流冪等/對帳接口預留）</li></ul>
+<h3 id="42-out-of-scope明確排除">4.2 Out of Scope（明確排除）</h3>
+<ul><li>❌ 真金流清算 / 發票 / 退款（原因：Phase B 真金流 SDK，接口先預留；Phase A 以假付費驗證信任底座）</li><li>❌ leaderboard/record 的進階反作弊與風控儀表板（原因：先驗證權威寫入，風控工具列 Could Have 後置）</li><li>❌ 跨 BC 全面拆分為獨立微服務（原因：Day1 以單體 HA 最小成本起步，模組邊界已可分）</li><li>❌ 後端承載 LLM 推論 / 遊戲即時模擬（原因：核心理念算力留本地，上雲將破壞成本護城河）</li><li>❌ 即時每幀狀態同步（原因：本信任層為低頻信任動作設計，非即時對戰同步）</li></ul>
+<h3 id="43-future-scope下個版本候選">4.3 Future Scope（下個版本候選）</h3>
+<ul><li>🔮 Phase B 真金流 SDK 接入（真錢 → 💎資本）</li><li>🔮 風控 / 對帳儀表板、進階反作弊</li><li>🔮 依流量將 wallet / deposit 等 BC 拆為獨立微服務</li><li>🔮 PostgreSQL 主從 HA + 讀寫分離擴展</li></ul>
+<h3 id="44-moscow-優先度對照表">4.4 MoSCoW 優先度對照表</h3>
+<table>
+<tr><th>功能 / 能力</th><th>MoSCoW</th><th>REQ-ID</th><th>對應 BRD 目標</th><th>優先度</th></tr>
+<tr><td>member：身分權威（scrypt + session）</td><td>Must</td><td>US-MEM-001</td><td>O1</td><td>P0</td></tr>
+<tr><td>wallet：權威錢包 + append-only ledger</td><td>Must</td><td>US-WAL-001</td><td>O1, O3</td><td>P0</td></tr>
+<tr><td>entitlement：原子扣款+授予、破產不消失</td><td>Must</td><td>US-ENT-001</td><td>O1, O4</td><td>P0</td></tr>
+<tr><td>game-save：跨裝置存檔</td><td>Must</td><td>US-SAVE-001</td><td>O4</td><td>P0</td></tr>
+<tr><td>平台底座：7 BC Spring Modulith + Day1 HA</td><td>Must</td><td>US-PLAT-001</td><td>O2, O5</td><td>P0</td></tr>
+<tr><td>record：經營史（破產/成就/傳承）</td><td>Should</td><td>US-REC-001</td><td>O4</td><td>P1</td></tr>
+<tr><td>leaderboard：全域排行（歸戶寫入）</td><td>Should</td><td>US-LB-001</td><td>O4</td><td>P1</td></tr>
+<tr><td>deposit：儲值接口（假付費 → Phase B 預留）</td><td>Should</td><td>US-DEP-001</td><td>O3, O4</td><td>P1</td></tr>
+<tr><td>風控 / 對帳儀表板</td><td>Could</td><td>—</td><td>O3</td><td>P2</td></tr>
+<tr><td>真金流清算 / 發票 / 退款</td><td>Won&#x27;t（本版）</td><td>—</td><td>—</td><td>Out</td></tr>
+<tr><td>跨 BC 全面微服務拆分</td><td>Won&#x27;t（本版）</td><td>—</td><td>—</td><td>Out</td></tr>
+</table>
+<hr>
+<h2 id="5-user-stories--acceptance-criteria">5. User Stories &amp; Acceptance Criteria</h2>
+<blockquote><p><strong>分組（Epic）</strong>：Epic 1 身分與信任底座（MEM, PLAT）；Epic 2 錢包與金流（WAL, DEP）；Epic 3 權益與存檔（ENT, SAVE）；Epic 4 經營史與社交（REC, LB）。優先級標準：Must=P0（缺則無法上線），Should=P1（高價值不阻擋上線）。<strong>估算標準</strong>：每個 P0 US 附 T-Shirt Size（S/M/L/XL）作為 Sprint Planning 起點，標注估算假設；XL 建議拆分為更小 Story（符合 INVEST）。</p></blockquote>
+<h3 id="51-member--會員身分p0--must-have">5.1 member — 會員身分（P0 / Must Have）</h3>
+<p><strong>User Story：</strong></p>
+<blockquote><p>作為 <strong>客戶端整合工程師 Kevin（代表玩家）</strong>，</p></blockquote>
+<blockquote><p>我希望能 <strong>以 email + 密碼註冊 / 登入取得 session token，並查詢「我的資料」（帳號 + 錢包 + 權益）</strong>，</p></blockquote>
+<blockquote><p>以便 <strong>讓伺服器以權威方式識別並歸戶每一位玩家，使後續錢包與存檔都有可信的身分錨點</strong>。</p></blockquote>
+<p><strong>REQ-ID：</strong> US-MEM-001（對應 BRD §3 O1、§5.5 member）</p>
+<p><strong>優先度：</strong> P0（Must Have）</p>
+<p><strong>關聯 BRD 目標：</strong> §3 O1（防竄改伺服器權威）</p>
+<p><strong>活動圖（Activity Diagram）：</strong> activity-member-login.md（[待生成：/gendoc-gen-diagrams]）</p>
+<p><strong>估算（T-Shirt Size）：</strong> M（假設：沿用既有 scrypt+session 原型邏輯，重構為 Clean Architecture member BC；符合 INVEST）</p>
+<p><strong>Acceptance Criteria（可測試、無歧義）：</strong></p>
+<table>
+<tr><th>REQ-ID / AC#</th><th>Given（前提）</th><th>When（行動）</th><th>Then（結果）</th><th>測試類型</th></tr>
+<tr><td>US-MEM-001 / AC-1</td><td>email 格式合法、名稱 1–24 字、密碼 ≥ 6 碼且 email 未註冊</td><td>POST /auth/register</td><td>回 200，建立 accounts + wallets(cash=0,gems=0) + 一筆 <code>init</code> ledger，回傳 token + account + wallet</td><td>E2E</td></tr>
+<tr><td>US-MEM-001 / AC-2</td><td>email 已存在</td><td>POST /auth/register</td><td>回 409 <code>{error:&quot;這個 email 已經註冊過了&quot;}</code>，不建立重複帳號</td><td>Integration</td></tr>
+<tr><td>US-MEM-001 / AC-3</td><td>email 格式錯誤 / 名稱 &gt; 24 字 / 密碼 &lt; 6 碼</td><td>POST /auth/register</td><td>回 400，附欄位錯誤訊息，不寫入任何資料</td><td>Unit</td></tr>
+<tr><td>US-MEM-001 / AC-4</td><td>正確 email + 密碼</td><td>POST /auth/login</td><td>回 200，簽發新 session token（TTL 30 天），回傳 account + wallet</td><td>E2E</td></tr>
+<tr><td>US-MEM-001 / AC-5</td><td>錯誤 email 或密碼</td><td>POST /auth/login</td><td>回 401 <code>{error:&quot;email 或密碼錯誤&quot;}</code>；密碼比對使用 <code>timingSafeEqual</code> 防時序攻擊</td><td>Integration</td></tr>
+<tr><td>US-MEM-001 / AC-6</td><td>無 / 過期 / 無效 Bearer token</td><td>GET /auth/me</td><td>回 401 <code>{error:&quot;請先登入&quot;}</code></td><td>Integration</td></tr>
+</table>
+<p><strong>邊界條件 / Edge Cases：</strong></p>
+<ul><li>名稱邊界：長度 = 0 → 400；長度 = 24 → 通過；長度 = 25 → 400。</li><li>密碼邊界：長度 = 5 → 400；長度 = 6 → 通過。</li><li>session 過期：<code>expires_at &lt;= now()</code> → 視為未登入回 401。</li><li>並發：同一 email 併發註冊 → DB <code>UNIQUE(email)</code> 約束保證僅一筆成功，其餘回 409。</li><li>登出：POST /auth/logout 刪除該 token；無 token 亦回 200（冪等）。</li></ul>
+<h3 id="52-wallet--伺服器權威錢包p0--must-have">5.2 wallet — 伺服器權威錢包（P0 / Must Have）</h3>
+<p><strong>User Story：</strong></p>
+<blockquote><p>作為 <strong>客戶端整合工程師 Kevin（代表玩家）</strong>，</p></blockquote>
+<blockquote><p>我希望能 <strong>呼叫儲值（topup）與花費（spend）使伺服器權威變更餘額，且每一筆異動都寫入 append-only ledger</strong>，</p></blockquote>
+<blockquote><p>以便 <strong>根除 localStorage 竄改、讓餘額成為不可偽造的唯一真實來源，並使營運可逐筆對帳</strong>。</p></blockquote>
+<p><strong>REQ-ID：</strong> US-WAL-001（對應 BRD §3 O1/O3、§5.5 wallet）</p>
+<p><strong>優先度：</strong> P0（Must Have）</p>
+<p><strong>關聯 BRD 目標：</strong> §3 O1（防竄改）、O3（錢包一致可對帳）</p>
+<p><strong>活動圖（Activity Diagram）：</strong> activity-wallet-spend.md（[待生成：/gendoc-gen-diagrams]）</p>
+<p><strong>估算（T-Shirt Size）：</strong> L（假設：含交易 + SELECT FOR UPDATE + append-only ledger + 併發一致性壓測，風險較高故偏大）</p>
+<p><strong>Acceptance Criteria：</strong></p>
+<table>
+<tr><th>REQ-ID / AC#</th><th>Given（前提）</th><th>When（行動）</th><th>Then（結果）</th><th>測試類型</th></tr>
+<tr><td>US-WAL-001 / AC-1</td><td>已登入、amount 介於 1 與 10,000,000</td><td>POST /wallet/topup</td><td>回 200，餘額於同一交易增加並寫入 <code>reason=&#x27;topup&#x27;</code> ledger（balance = 異動後餘額），回傳最新 wallet</td><td>E2E</td></tr>
+<tr><td>US-WAL-001 / AC-2</td><td>已登入、餘額 ≥ amount</td><td>POST /wallet/spend</td><td>回 200，<code>SELECT ... FOR UPDATE</code> 行鎖後扣款，寫入負 delta ledger，回傳最新 wallet</td><td>E2E</td></tr>
+<tr><td>US-WAL-001 / AC-3</td><td>已登入、餘額 &lt; amount</td><td>POST /wallet/spend</td><td>回 402 <code>{error:&quot;餘額不足&quot;}</code>，餘額不變、不寫 ledger</td><td>Integration</td></tr>
+<tr><td>US-WAL-001 / AC-4</td><td>amount ≤ 0 或非數字</td><td>POST /wallet/topup 或 /spend</td><td>回 400 <code>{error:&quot;金額不正確&quot;}</code></td><td>Unit</td></tr>
+<tr><td>US-WAL-001 / AC-5</td><td>同帳號併發多筆 spend</td><td>併發 POST /wallet/spend</td><td>行鎖序列化執行，最終餘額 ≥ 0 且 = 初始 − Σ 成功扣款，ledger 筆數與餘額可對帳（0 筆不一致）</td><td>Integration（併發壓測）</td></tr>
+</table>
+<p><strong>邊界條件 / Edge Cases：</strong></p>
+<ul><li>金額邊界：amount = 0 → 400；amount = 1 → 通過；amount = 10,000,000 → 通過；amount &gt; 10,000,000 → 400（topup 上限）。</li><li>幣別：currency ∈ {cash, gems}，非法值預設 cash。</li><li>並發：同一 wallet 併發扣款以 <code>SELECT FOR UPDATE</code> 序列化，保證餘額永遠 ≥ 0。</li><li>failover：交易中途 pod 被殺 → 交易回滾，不產生半筆異動（ledger 與餘額恆一致）。</li><li>冪等（Phase B 預留）：真金流 topup 將以冪等鍵防重複入帳。</li></ul>
+<h3 id="53-entitlement--已購權益p0--must-have">5.3 entitlement — 已購權益（P0 / Must Have）</h3>
+<p><strong>User Story：</strong></p>
+<blockquote><p>作為 <strong>辦公室模擬老闆 阿凱（透過客戶端）</strong>，</p></blockquote>
+<blockquote><p>我希望能 <strong>以原子交易購買外觀 / 夢想員工 / 劇本（扣款與授予同一交易），且已購權益不重複、不因破產消失</strong>，</p></blockquote>
+<blockquote><p>以便 <strong>確保「我花錢買的與特聘的夢想員工永遠不會被搞丟」的不作惡底線</strong>。</p></blockquote>
+<p><strong>REQ-ID：</strong> US-ENT-001（對應 BRD §3 O1/O4、§5.5 entitlement）</p>
+<p><strong>優先度：</strong> P0（Must Have）</p>
+<p><strong>關聯 BRD 目標：</strong> §3 O1（防竄改）、O4（支撐變現）</p>
+<p><strong>活動圖（Activity Diagram）：</strong> activity-entitlement-buy.md（[待生成：/gendoc-gen-diagrams]）</p>
+<p><strong>估算（T-Shirt Size）：</strong> M（假設：原子扣款+授予同一交易、UNIQUE 約束防重複；依賴 wallet BC 扣款）</p>
+<p><strong>Acceptance Criteria：</strong></p>
+<table>
+<tr><th>REQ-ID / AC#</th><th>Given（前提）</th><th>When（行動）</th><th>Then（結果）</th><th>測試類型</th></tr>
+<tr><td>US-ENT-001 / AC-1</td><td>已登入、kind ∈ {cosmetic,dream,scenario}、未擁有、餘額足</td><td>POST /entitlements/buy</td><td>回 200，同一交易扣款 + 寫 <code>buy_&lt;kind&gt;</code> ledger + 插入 entitlement，回傳最新 wallet + entitlements</td><td>E2E</td></tr>
+<tr><td>US-ENT-001 / AC-2</td><td>已擁有同一 (kind,item_id)</td><td>POST /entitlements/buy</td><td>回 409 <code>{error:&quot;已經擁有這個項目&quot;}</code>，不重複扣款、不重複授予</td><td>Integration</td></tr>
+<tr><td>US-ENT-001 / AC-3</td><td>餘額 &lt; amount</td><td>POST /entitlements/buy</td><td>回 402 <code>{error:&quot;餘額不足&quot;}</code>，不扣款、不授予（交易回滾）</td><td>Integration</td></tr>
+<tr><td>US-ENT-001 / AC-4</td><td>kind 非法或缺 itemId</td><td>POST /entitlements/buy</td><td>回 400 <code>{error:&quot;項目不正確&quot;}</code></td><td>Unit</td></tr>
+<tr><td>US-ENT-001 / AC-5</td><td>帳號曾破產（遊戲內 recycle）</td><td>GET /entitlements</td><td>已購權益仍完整列出（recycle 僅影響遊戲內狀態，不觸及 entitlement BC）</td><td>E2E</td></tr>
+</table>
+<p><strong>邊界條件 / Edge Cases：</strong></p>
+<ul><li>重複購買：<code>UNIQUE(account_id, kind, item_id)</code> + 交易內先查 owned → 409，保證冪等。</li><li>amount = 0：允許免費授予（如活動贈與），不寫 ledger 僅插 entitlement。</li><li>並發：同帳號併發購買同項目 → 行鎖 + UNIQUE 約束保證僅一次授予，其餘 409。</li><li>破產 recycle：記錄 append-only、權益隔離於遊戲狀態重置（呼應不作惡底線）。</li></ul>
+<h3 id="54-game-save--跨裝置存檔p0--must-have">5.4 game-save — 跨裝置存檔（P0 / Must Have）</h3>
+<p><strong>User Story：</strong></p>
+<blockquote><p>作為 <strong>辦公室模擬老闆 阿凱（透過客戶端）</strong>，</p></blockquote>
+<blockquote><p>我希望能 <strong>以帳號將「我的辦公室」存檔上傳（PUT /save）並在任何裝置還原（GET /save）</strong>，</p></blockquote>
+<blockquote><p>以便 <strong>換手機或重灌後延續公司經營進度，不再因綁單一裝置而全失</strong>。</p></blockquote>
+<p><strong>REQ-ID：</strong> US-SAVE-001（對應 BRD §3 O4、§5.5 game-save）</p>
+<p><strong>優先度：</strong> P0（Must Have）</p>
+<p><strong>關聯 BRD 目標：</strong> §3 O4（支撐變現 / 跨裝置留存）</p>
+<p><strong>活動圖（Activity Diagram）：</strong> activity-game-save-sync.md（[待生成：/gendoc-gen-diagrams]）</p>
+<p><strong>估算（T-Shirt Size）：</strong> S（假設：單純 (account_id, slot) upsert + GET，JSONB 直存，邏輯單純）</p>
+<p><strong>Acceptance Criteria：</strong></p>
+<table>
+<tr><th>REQ-ID / AC#</th><th>Given（前提）</th><th>When（行動）</th><th>Then（結果）</th><th>測試類型</th></tr>
+<tr><td>US-SAVE-001 / AC-1</td><td>已登入、body 含 data（JSON）</td><td>PUT /save（slot 預設 main）</td><td>回 200，以 (account_id, slot) upsert 寫入 saves，updated_at 更新</td><td>E2E</td></tr>
+<tr><td>US-SAVE-001 / AC-2</td><td>已登入、該 slot 已有存檔</td><td>GET /save?slot=main</td><td>回 200，回傳最新 data + updatedAt</td><td>E2E</td></tr>
+<tr><td>US-SAVE-001 / AC-3</td><td>已登入、該 slot 無存檔</td><td>GET /save?slot=main</td><td>回 200 <code>{save:null}</code>（非 404，供客戶端判斷首次）</td><td>Integration</td></tr>
+<tr><td>US-SAVE-001 / AC-4</td><td>body 缺 data</td><td>PUT /save</td><td>回 400 <code>{error:&quot;缺 data&quot;}</code>，不寫入</td><td>Unit</td></tr>
+<tr><td>US-SAVE-001 / AC-5</td><td>裝置 A PUT 後、裝置 B 登入</td><td>裝置 B GET /save</td><td>回傳裝置 A 寫入的最新存檔（跨裝置還原成功率目標 ≥ 99%）</td><td>E2E</td></tr>
+</table>
+<p><strong>邊界條件 / Edge Cases：</strong></p>
+<ul><li>slot 預設 main；多 slot 以 (account_id, slot) 主鍵區分。</li><li>大存檔：data 為 JSONB，單筆請求 body 上限 4MB（原型 readBody 限制），超過則中斷連線。</li><li>並發：同 slot 併發 PUT → 後寫覆蓋（last-write-wins，upsert），updated_at 作時間戳參考。</li><li>空 data 物件 <code>{}</code> → 視為合法存檔寫入（非 null）。</li></ul>
+<h3 id="55-平台底座--7-bc-spring-modulith--day1-hap0--must-have">5.5 平台底座 — 7 BC Spring Modulith + Day1 HA（P0 / Must Have）</h3>
+<p><strong>User Story：</strong></p>
+<blockquote><p>作為 <strong>Engineering Lead（代表維運團隊）</strong>，</p></blockquote>
+<blockquote><p>我希望能 <strong>以 7 個 Spring Modulith 有界上下文（Clean Architecture 4 層）承載信任層，並以 Day1 HA（≥2 replicas、HPA、PodDisruptionBudget）部署於 local k8s</strong>，</p></blockquote>
+<blockquote><p>以便 <strong>讓信任層無單點故障、滾動更新不中斷，且模組邊界可在不改邊界下逐一拆微服務，達成可維運地收真錢</strong>。</p></blockquote>
+<p><strong>REQ-ID：</strong> US-PLAT-001（對應 BRD §3 O2/O5、§8.3 技術約束）</p>
+<p><strong>優先度：</strong> P0（Must Have）</p>
+<p><strong>關聯 BRD 目標：</strong> §3 O2（Day1 HA 無單點）、O5（模組可分可合）</p>
+<p><strong>活動圖（Activity Diagram）：</strong> activity-platform-rolling-update.md（[待生成：/gendoc-gen-diagrams]）</p>
+<p><strong>估算（T-Shirt Size）：</strong> XL（假設：7 BC Modulith 骨架 + Clean Architecture 分層 + Outbox + k8s HA/HPA/PDB；建議拆為「模組骨架」「HA 部署」「Outbox 事件」等子 Story）</p>
+<p><strong>Acceptance Criteria：</strong></p>
+<table>
+<tr><th>REQ-ID / AC#</th><th>Given（前提）</th><th>When（行動）</th><th>Then（結果）</th><th>測試類型</th></tr>
+<tr><td>US-PLAT-001 / AC-1</td><td>服務以 ≥ 2 replicas 部署於 local k8s</td><td>殺 1 個 pod</td><td>服務持續可用、錯誤率 &lt; 0.1%、無請求中斷</td><td>E2E（混沌測試）</td></tr>
+<tr><td>US-PLAT-001 / AC-2</td><td>新版本部署</td><td>執行滾動更新（rolling update）</td><td>無停機、HTTP 5xx 比率 &lt; 0.1%，PodDisruptionBudget 保證最小可用數</td><td>E2E</td></tr>
+<tr><td>US-PLAT-001 / AC-3</td><td>7 BC 原始碼</td><td>執行 Spring Modulith ModularityTests</td><td>100% 綠、BC 間依賴為 DAG、0 循環依賴（HC-1~HC-5 合規）</td><td>Unit（建置期）</td></tr>
+<tr><td>US-PLAT-001 / AC-4</td><td>跨 BC 需通訊（如 deposit → wallet 入帳）</td><td>觸發跨 BC 事件</td><td>僅透過 Public API 或 Domain Event（Transactional Outbox），無跨 BC DB FK、無共享可變狀態</td><td>Integration</td></tr>
+<tr><td>US-PLAT-001 / AC-5</td><td>全新 clone 的開發環境</td><td>於 Rancher Desktop k8s 一鍵部署 + 測試</td><td>全流程本機跑完、測試全綠，無需外部雲端（local-first）</td><td>E2E</td></tr>
+</table>
+<p><strong>邊界條件 / Edge Cases：</strong></p>
+<ul><li>HPA 觸發：CPU / 請求量達閾值時自動擴容（基準 PCU 500，上限 3,000）。</li><li>DB 連線池：依 Q4 容量設定 HikariCP 池大小，pod 重啟時連線重試。</li><li>Outbox failover：事件投遞失敗 → 重投（at-least-once），消費端冪等。</li><li>單 pod 啟動期 readiness probe 未通過前不接流量。</li></ul>
+<h3 id="56-record--經營史記錄p1--should-have">5.6 record — 經營史記錄（P1 / Should Have）</h3>
+<p><strong>User Story：</strong></p>
+<blockquote><p>作為 <strong>辦公室模擬老闆 阿凱（透過客戶端）</strong>，</p></blockquote>
+<blockquote><p>我希望能 <strong>以 append-only 方式記錄破產 / 成就 / 傳承等經營史，並可依時間或類型查詢</strong>，</p></blockquote>
+<blockquote><p>以便 <strong>保留公司的情感軌跡、且破產記錄歸戶後不因重經營而消失，並供營運逐筆對帳</strong>。</p></blockquote>
+<p><strong>REQ-ID：</strong> US-REC-001（對應 BRD §3 O4、§4.4 MoSCoW record）</p>
+<p><strong>優先度：</strong> P1（Should Have）</p>
+<p><strong>關聯 BRD 目標：</strong> §3 O4（支撐變現 / 情感留存）</p>
+<p><strong>估算（T-Shirt Size）：</strong> S（假設：append-only INSERT + 依 account_id/type 查詢，JSONB meta 直存，邏輯單純）</p>
+<p><strong>Acceptance Criteria：</strong></p>
+<table>
+<tr><th>REQ-ID / AC#</th><th>Given（前提）</th><th>When（行動）</th><th>Then（結果）</th><th>測試類型</th></tr>
+<tr><td>US-REC-001 / AC-1</td><td>已登入、type ∈ {bankruptcy,achievement,legacy}</td><td>POST /records</td><td>回 200，以 append-only 方式寫入 <code>records</code> 並歸屬該 account_id；GET /records 可依建立時間由新到舊回傳，並可依 type 篩選（單次上限 100 筆）</td><td>Integration</td></tr>
+</table>
+<p><strong>邊界條件 / Edge Cases：</strong></p>
+<ul><li>type 非法（如 victory / refund / 空字串）→ 400 <code>{error:&quot;type 不正確&quot;}</code>，不寫入任何記錄。</li><li>無 / 過期 / 無效 Bearer token 寫入或查詢 → 401 <code>{error:&quot;請先登入&quot;}</code>，不寫入任何記錄。</li><li>查詢排序：預設依 <code>created_at</code> DESC（由新到舊）；type 篩選只回傳符合類型的記錄。</li><li>查詢筆數：單次回傳上限 100 筆。</li><li>append-only：記錄一經寫入不可修改 / 刪除；破產 recycle 不觸及既有 record（與 entitlement 相同的不作惡底線）。</li></ul>
+<h3 id="57-leaderboard--全域排行p1--should-have">5.7 leaderboard — 全域排行（P1 / Should Have）</h3>
+<p><strong>User Story：</strong></p>
+<blockquote><p>作為 <strong>客戶端整合工程師 Kevin（代表玩家）</strong>，</p></blockquote>
+<blockquote><p>我希望能 <strong>公開查詢全域排行榜 Top N（不需登入），並以歸戶方式上榜、同一場次（run_id）重複提交只更新一筆</strong>，</p></blockquote>
+<blockquote><p>以便 <strong>支撐社交參與，同時確保分數由伺服器權威歸戶、不可由客戶端自報竄改</strong>。</p></blockquote>
+<p><strong>REQ-ID：</strong> US-LB-001（對應 BRD §3 O4、§4.4 MoSCoW leaderboard）</p>
+<p><strong>優先度：</strong> P1（Should Have）</p>
+<p><strong>關聯 BRD 目標：</strong> §3 O4（支撐變現 / 社交參與）</p>
+<p><strong>估算（T-Shirt Size）：</strong> S（假設：以 run_id upsert 歸戶寫入 + 公開 Top N 查詢，依 <code>idx_lb_mode_score</code> 取序）</p>
+<p><strong>Acceptance Criteria：</strong></p>
+<table>
+<tr><th>REQ-ID / AC#</th><th>Given（前提）</th><th>When（行動）</th><th>Then（結果）</th><th>測試類型</th></tr>
+<tr><td>US-LB-001 / AC-1</td><td>排行榜已有若干既有分數</td><td>GET /leaderboard（公開，不需登入）＋ 已登入者 POST /leaderboard</td><td>查詢回 200，依分數由高到低回傳（每筆含 run_id / 顯示名稱 / mode / score，limit 夾擠於 1–100）；上榜回 200，以帳號顯示名稱歸戶寫入，同一 run_id 重複提交以 upsert 只保留一筆</td><td>Integration</td></tr>
+</table>
+<p><strong>邊界條件 / Edge Cases：</strong></p>
+<ul><li>limit 夾擠：limit=1 → 回 1 筆；limit=20 → 回 20 筆；limit=500 → 回上限 100 筆。</li><li>冪等：同一 run_id 再次提交更高分 → 更新同一筆記錄，排行榜中該場次仍只有一筆。</li><li>缺 runId 上榜 → 400 <code>{error:&quot;缺 runId&quot;}</code>，不寫入任何排行記錄。</li><li>無 / 過期 / 無效 Bearer token 上榜 → 401 <code>{error:&quot;請先登入&quot;}</code>，不寫入任何排行記錄（查詢 Top N 不需登入）。</li><li>歸戶：score 由伺服器以 session 歸戶寫入，客戶端不可指定他人帳號。</li></ul>
+<h3 id="58-deposit--儲值接口p1--should-have">5.8 deposit — 儲值接口（P1 / Should Have）</h3>
+<p><strong>User Story：</strong></p>
+<blockquote><p>作為 <strong>客戶端整合工程師 Kevin（代表玩家）</strong>，</p></blockquote>
+<blockquote><p>我希望能 <strong>公開查詢可購買的儲值包目錄，並以冪等鍵（Idempotency-Key）建立儲值訂單（Phase A 假付費直接確認、經 DepositConfirmed 事件由 wallet BC 入帳）</strong>，</p></blockquote>
+<blockquote><p>以便 <strong>讓玩家儲值可信、可對帳，且重試不重複入帳，並為 Phase B 真金流預留冪等/對帳接口</strong>。</p></blockquote>
+<p><strong>REQ-ID：</strong> US-DEP-001（對應 BRD §3 O3/O4、§4.4 MoSCoW deposit）</p>
+<p><strong>優先度：</strong> P1（Should Have）</p>
+<p><strong>關聯 BRD 目標：</strong> §3 O3（錢包一致可對帳）、O4（支撐變現）</p>
+<p><strong>活動圖（Activity Diagram）：</strong> API §1.3.4 序列圖（Idempotency-Key 冪等儲值）</p>
+<p><strong>估算（T-Shirt Size）：</strong> M（假設：冪等鍵入帳 + 跨 BC DepositConfirmed 事件至 wallet；Phase B 真金流對帳接口預留，風險偏中）</p>
+<p><strong>Acceptance Criteria：</strong></p>
+<table>
+<tr><th>REQ-ID / AC#</th><th>Given（前提）</th><th>When（行動）</th><th>Then（結果）</th><th>測試類型</th></tr>
+<tr><td>US-DEP-001 / AC-1</td><td>儲值目錄已載入（含寶石包 / 資本包）</td><td>GET /deposit/packs（公開，不需登入）</td><td>回 200，回傳所有可購買儲值包，每個含 pack_id / 幣別 / 入帳數量 / 顯示名稱</td><td>E2E</td></tr>
+<tr><td>US-DEP-001 / AC-2</td><td>已登入、pack 存在於目錄、提供全新 Idempotency-Key</td><td>POST /deposit/checkout</td><td>回 200，建立狀態為「已確認」的訂單（含 order_id / pack_id / 幣別 / 入帳數量），經 DepositConfirmed 事件由 wallet BC 入帳；相同冪等鍵重放回放原訂單且錢包僅入帳一次</td><td>E2E</td></tr>
+</table>
+<p><strong>邊界條件 / Edge Cases：</strong></p>
+<ul><li>冪等重放：相同 Idempotency-Key + 相同請求 → 回放原訂單結果，錢包僅入帳一次（orderId dedup）。</li><li>冪等鍵衝突：相同 Idempotency-Key 但請求內容不同（如不同 pack）→ 409，不建立新訂單。</li><li>儲值包不存在：以不在目錄的 pack 建立訂單 → 400 <code>{error:&quot;儲值包不正確&quot;}</code>，不建立任何訂單。</li><li>缺冪等鍵：未提供 Idempotency-Key → 400，要求提供冪等鍵，不建立任何訂單。</li><li>無 / 過期 / 無效 Bearer token 建立訂單 → 401 <code>{error:&quot;請先登入&quot;}</code>，不建立任何訂單（目錄查詢不需登入）。</li><li>Phase B 預留：真金流以 <code>idempotency_keys</code> 表保證防重複入帳，接口在 Phase B 前保持不變。</li></ul>
+<hr>
+<h2 id="6-user-flows">6. User Flows</h2>
+<h3 id="61-主流程happy-path-登入--儲值--購買--存檔">6.1 主流程（Happy Path）— 登入 → 儲值 → 購買 → 存檔</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+    A([客戶端代表玩家]) --&gt; B[POST /auth/login]
+    B --&gt; C{驗證 email/密碼}
+    C --&gt;|成功| D[簽發 session token]
+    C --&gt;|失敗| E[401 email 或密碼錯誤]
+    D --&gt; F[POST /wallet/topup 假付費]
+    F --&gt; G[交易內 +餘額 + 寫 ledger]
+    G --&gt; H[POST /entitlements/buy]
+    H --&gt; I{未擁有 &amp;&amp; 餘額足}
+    I --&gt;|是| J[原子扣款 + 授予權益]
+    I --&gt;|否| K[409 已擁有 / 402 餘額不足]
+    J --&gt; L[PUT /save 上傳辦公室存檔]
+    L --&gt; M([完成：伺服器權威狀態已更新])
+    E --&gt; B</pre></div>
+<h3 id="62-錯誤流程error-flow">6.2 錯誤流程（Error Flow）</h3>
+<div class="diagram-container"><pre class="mermaid">flowchart TD
+    A[客戶端信任層請求] --&gt; B{Bearer token 驗證}
+    B --&gt;|&quot;無/過期&quot;| C[401 請先登入 → 導向重新登入]
+    B --&gt;|有效| D{請求驗證}
+    D --&gt;|&quot;格式錯誤/金額不正確&quot;| E[400 + 欄位錯誤訊息]
+    D --&gt;|通過| F{後端交易處理}
+    F --&gt;|餘額不足| G[402 餘額不足 + 回傳現有 wallet]
+    F --&gt;|已擁有項目| H[409 已經擁有這個項目]
+    F --&gt;|&quot;DB 交易失敗/pod 被殺&quot;| I[交易回滾 → 500，不產生半筆異動]
+    F --&gt;|成功| J[200 + 最新權威狀態]
+    I --&gt; K[客戶端 retry（冪等保證）]</pre></div>
+<h3 id="63-狀態機state-machine-存檔--經營史生命週期">6.3 狀態機（State Machine）— 存檔 / 經營史生命週期</h3>
+<div class="diagram-container"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; NoAccount: 未註冊
+    NoAccount --&gt; Active: 註冊/登入成功
+    Active --&gt; Saved: PUT /save 上傳存檔
+    Saved --&gt; Saved: 再次 PUT（upsert 覆蓋）
+    Saved --&gt; Restored: 新裝置 GET /save 還原
+    Restored --&gt; Saved: 繼續遊玩後再存檔
+    Active --&gt; Bankrupt: 遊戲內破產（寫 records bankruptcy）
+    Bankrupt --&gt; Active: recycle 重經營
+    note right of Bankrupt
+        recycle 僅重置遊戲內現金/營運
+        已購權益與記錄不消失（不作惡底線）
+    end note
+    Active --&gt; Deleted: 帳號刪除
+    Deleted --&gt; [*]: ON DELETE CASCADE（ledger 依法保留匿名化）</pre></div>
+<hr>
+<h2 id="7-non-functional-requirements-nfr">7. Non-Functional Requirements (NFR)</h2>
+<h3 id="71-效能performance">7.1 效能（Performance）</h3>
+<table>
+<tr><th>指標</th><th>目標值</th><th>量測方式</th><th>降級策略</th></tr>
+<tr><td>API 回應時間 P50</td><td>&lt; 200ms @ 500 PCU</td><td>APM（Micrometer + Prometheus）</td><td>連線池調校 / 快取 Top N</td></tr>
+<tr><td>API 回應時間 P99</td><td>&lt; 1000ms @ 500 PCU（成長期 3,000 PCU 維持 &lt; 1500ms）</td><td>APM</td><td>Circuit Breaker / 限流</td></tr>
+<tr><td>排行榜 Top N 查詢</td><td>P99 &lt; 300ms（limit ≤ 100）</td><td>APM + <code>idx_lb_mode_score</code></td><td>快取 + CDN（公開查詢）</td></tr>
+<tr><td>寫入交易吞吐量</td><td>≥ 200 txn/sec（wallet/entitlement 交易）</td><td>壓測（k6 / Gatling）</td><td>批次 / 佇列削峰</td></tr>
+</table>
+<blockquote><p>數值依 BRD §7 與 IDEA §6 Q4（啟動期 5,000 DAU / 500 PCU，成長期 50,000 DAU / 3,000 PCU；信任層為低頻動作）推估，標注為「參考值，需 Engineering 於 EDD SLO 確認」。</p></blockquote>
+<h3 id="72-可用性availability">7.2 可用性（Availability）</h3>
+<table>
+<tr><th>環境</th><th>SLA</th><th>RTO</th><th>RPO</th></tr>
+<tr><td>Production（local k8s / 未來雲端）</td><td>99.9%（&lt; 8.7h/year）</td><td>30 min</td><td>5 min</td></tr>
+<tr><td>Staging</td><td>99.0%</td><td>4h</td><td>1h</td></tr>
+</table>
+<ul><li>Day1 HA：所有服務 ≥ 2 replicas、無 SPOF、HPA + PodDisruptionBudget、BCP from Day1。</li><li>維護視窗：滾動更新無停機，不需維護視窗；DB 備份於低峰時段執行。</li></ul>
+<h3 id="73-可擴展性scalability">7.3 可擴展性（Scalability）</h3>
+<ul><li>短期：支援啟動期 5,000 DAU / 500 PCU。</li><li>長期：支援成長期 50,000 DAU / 3,000 PCU（10x 增長），不需重構核心架構（HPA 水平擴展 + 不改 BC 邊界即可拆微服務）。</li><li>資料量：wallet_ledger append-only 持續增長，以 <code>idx_ledger_acct(account_id, created_at DESC)</code> 保查詢效能不退化；歷史分區（Phase B）。</li></ul>
+<h3 id="74-安全性security">7.4 安全性（Security）</h3>
+<ul><li>認證：Bearer session token（scrypt 密碼雜湊，salt$hash；session TTL 30 天，可設 <code>SESSION_TTL_DAYS</code>）。</li><li>授權：以 session 歸戶，所有錢包/權益/存檔/記錄操作限本人（經 account_id）；排行 Top N 查詢公開不需登入。</li><li>密碼比對：<code>crypto.timingSafeEqual</code> 防時序攻擊；密碼永不明文記錄。</li><li>資料加密：傳輸中 TLS 1.3+（入口層）；靜態敏感欄位（pass_hash 已為單向雜湊，PII email 建議 AES-256 靜態加密，見 §17）。</li><li>PII 處理：email / display_name 最小化收集，Log 遮罩（見 §11.5、§17）。</li><li>合規要求：台灣個資法（Phase A）、GDPR（若觸及歐盟玩家）、PCI-DSS（Phase B 真金流，不自持卡號），需 Legal 確認。</li></ul>
+<h3 id="75-可用性usability">7.5 可用性（Usability）</h3>
+<ul><li>本產品為 <strong>api-only 信任層</strong>，無直接 C 端 UI；可用性要求聚焦 <strong>API 契約一致性與開發者體驗（DX）</strong>：所有端點提供 OpenAPI 3.1 spec、一致的錯誤碼（400/401/402/409/500）與 JSON 錯誤格式。</li><li>無障礙標準：信任層本身無 UI，WCAG 2.1 Level AA 目標適用於未來營運對帳 Console 與客戶端 UI（由客戶端團隊負責，見 §18）。</li><li>支援語言：API 錯誤訊息 zh-TW（可 i18n key 化）；支援裝置 / 瀏覽器由客戶端決定。</li></ul>
+<h3 id="76-可維護性maintainability">7.6 可維護性（Maintainability）</h3>
+<ul><li>測試覆蓋率：≥ 80%（unit + integration；核心錢包/權益交易邏輯 100%）。</li><li>程式碼複雜度：Cyclomatic Complexity ≤ 10。</li><li>架構守則：Clean Architecture 4 層 + SOLID；Spring Modulith ModularityTests 於建置期強制 HC-1~HC-5。</li><li>文件完整性：所有公開 API 有 OpenAPI spec；BC 邊界有 ArchUnit / ModularityTests 守護。</li></ul>
+<h3 id="77-可觀測性observability">7.7 可觀測性（Observability）</h3>
+<h4 id="771-logging-規格">7.7.1 Logging 規格</h4>
+<table>
+<tr><th>欄位</th><th>要求</th></tr>
+<tr><td>格式</td><td>結構化 JSON（含 timestamp、level、service、trace_id、span_id、message）</td></tr>
+<tr><td>等級</td><td>ERROR / WARN / INFO / DEBUG（Production 預設 INFO）</td></tr>
+<tr><td>必含欄位</td><td><code>request_id</code>、<code>account_id</code>（遮罩 PII）、<code>duration_ms</code>、<code>http_status</code>、<code>bc</code>（哪個有界上下文）</td></tr>
+<tr><td>禁止記錄</td><td>明文密碼、pass_hash、session token 明文、未遮罩 email</td></tr>
+<tr><td>保留期</td><td>Production：90 天（熱）/ 1 年（冷）；Staging：14 天</td></tr>
+<tr><td>收集工具</td><td>Loki / ELK（local-first 可用輕量方案），待 Engineering 確認</td></tr>
+</table>
+<h4 id="772-metrics-必須項目">7.7.2 Metrics 必須項目</h4>
+<table>
+<tr><th>指標名稱</th><th>類型</th><th>說明</th><th>告警觸發條件</th></tr>
+<tr><td><code>trust_request_total</code></td><td>Counter</td><td>所有 API 請求總數（含 status_code、path label）</td><td>-</td></tr>
+<tr><td><code>trust_request_duration_seconds</code></td><td>Histogram</td><td>請求延遲分佈（P50 / P95 / P99）</td><td>P99 &gt; 1000ms</td></tr>
+<tr><td><code>trust_error_rate</code></td><td>Gauge</td><td>5xx 錯誤比率</td><td>&gt; 1%</td></tr>
+<tr><td><code>trust_wallet_spend_total</code></td><td>Counter</td><td>錢包扣款次數（含 402 失敗計數）</td><td>-</td></tr>
+<tr><td><code>trust_outbox_pending</code></td><td>Gauge</td><td>Outbox 未投遞事件積壓數</td><td>&gt; 100 持續 5 分鐘</td></tr>
+<tr><td><code>trust_trusted_payment_completion_rate</code></td><td>Gauge</td><td><strong>北極星：可信付費動作完成率</strong>（權威記錄且不可竄改之金流/權益動作比率）</td><td>&lt; 99.9%</td></tr>
+</table>
+<h4 id="773-distributed-tracing-需求">7.7.3 Distributed Tracing 需求</h4>
+<ul><li>所有跨 BC 呼叫 / 跨服務呼叫必須傳遞 <code>trace_id</code> / <code>span_id</code>（W3C TraceContext 格式）。</li><li>採樣率：Production 10%（錯誤請求 100% 採樣）；Staging 100%。</li><li>工具：OpenTelemetry + Jaeger（local-first 可部署），待 Engineering 確認。</li><li>Trace 保留期：7 天。</li></ul>
+<h4 id="774-alert-閾值定義">7.7.4 Alert 閾值定義</h4>
+<table>
+<tr><th>告警名稱</th><th>觸發條件</th><th>嚴重度</th><th>通知管道</th><th>處置 SLA</th></tr>
+<tr><td>HighErrorRate</td><td>trust_error_rate &gt; 1% 持續 5 分鐘</td><td>P1</td><td>Slack + On-Call</td><td>回應 15 分鐘</td></tr>
+<tr><td>HighLatency</td><td>P99 &gt; 1000ms 持續 3 分鐘</td><td>P2</td><td>Slack</td><td>回應 30 分鐘</td></tr>
+<tr><td>ServiceDown</td><td>health check 連續失敗 3 次</td><td>P0</td><td>On-Call（電話）</td><td>回應 5 分鐘</td></tr>
+<tr><td>OutboxBacklog</td><td>trust_outbox_pending &gt; 100 持續 5 分鐘</td><td>P2</td><td>Slack</td><td>回應 30 分鐘</td></tr>
+<tr><td>WalletInconsistency</td><td>ledger 與 wallet 餘額對帳不符 &gt; 0 筆</td><td>P0</td><td>On-Call + Finance</td><td>回應 5 分鐘</td></tr>
+</table>
+<h4 id="775-dashboard-要求">7.7.5 Dashboard 要求</h4>
+<table>
+<tr><th>Dashboard 名稱</th><th>受眾</th><th>必含面板</th></tr>
+<tr><td>Service Health</td><td>On-Call 工程師</td><td>Request Rate、Error Rate、P99 Latency、Active Replicas</td></tr>
+<tr><td>Business KPI</td><td>PM / 業務</td><td>可信付費動作完成率、付費轉化率、topup/spend 量、跨裝置還原成功率</td></tr>
+<tr><td>Reconciliation</td><td>營運 / Finance</td><td>ledger 與餘額對帳差異、Outbox 積壓、402/409 趨勢</td></tr>
+</table>
+<h3 id="78-analytics-event-instrumentation-map分析事件儀器化">7.8 Analytics Event Instrumentation Map（分析事件儀器化）</h3>
+<blockquote><p>本產品為 api-only，Analytics Event 為<strong>伺服器端業務事件</strong>（非前端埋點）。每個 P0/P1 功能至少 1 個 Event。</p></blockquote>
+<table>
+<tr><th>功能</th><th>Event Name</th><th>觸發動作</th><th>必要 Payload 欄位</th><th>關聯 KPI</th><th>實作狀態</th></tr>
+<tr><td>member</td><td><code>member_register_completed</code></td><td>註冊成功</td><td><code>{account_id, session_id, ts}</code></td><td>新帳號數</td><td>🔲</td></tr>
+<tr><td>member</td><td><code>member_login_completed</code></td><td>登入成功</td><td><code>{account_id, session_id, ts}</code></td><td>DAU</td><td>🔲</td></tr>
+<tr><td>wallet</td><td><code>wallet_topup_completed</code></td><td>儲值成功</td><td><code>{account_id, currency, amount, balance, fake:true}</code></td><td>儲值量</td><td>🔲</td></tr>
+<tr><td>wallet</td><td><code>wallet_spend_completed</code></td><td>扣款成功</td><td><code>{account_id, currency, amount, balance, reason}</code></td><td>消費量</td><td>🔲</td></tr>
+<tr><td>wallet</td><td><code>wallet_spend_rejected</code></td><td>餘額不足（402）</td><td><code>{account_id, currency, amount, reason:&quot;insufficient&quot;}</code></td><td>轉化漏斗</td><td>🔲</td></tr>
+<tr><td>entitlement</td><td><code>entitlement_purchase_completed</code></td><td>購買成功</td><td><code>{account_id, kind, item_id, currency, amount}</code></td><td>付費轉化率</td><td>🔲</td></tr>
+<tr><td>game-save</td><td><code>game_save_synced</code></td><td>跨裝置存檔/還原</td><td>`{account_id, slot, direction:&quot;put&quot;\</td><td>&quot;get&quot;}`</td><td>跨裝置留存</td><td>🔲</td></tr>
+<tr><td>deposit</td><td><code>deposit_requested</code></td><td>儲值請求（假付費/預留真金流）</td><td><code>{account_id, pack, idempotency_key}</code></td><td>儲值轉化</td><td>🔲</td></tr>
+<tr><td>record</td><td><code>record_created</code></td><td>經營史記錄寫入</td><td><code>{account_id, type}</code></td><td>情感留存</td><td>🔲</td></tr>
+<tr><td>leaderboard</td><td><code>leaderboard_score_submitted</code></td><td>上榜寫入</td><td><code>{account_id, run_id, mode, score}</code></td><td>社交參與</td><td>🔲</td></tr>
+</table>
+<p><strong>Event 命名規範：</strong> <code>{object}<em>{action}</em>{result}</code> 全小寫底線（例：<code>wallet_topup_completed</code>）。</p>
+<p><strong>Analytics 工具鏈：</strong> 以 ledger / 業務事件表為真實來源，可接 Metabase / 自建報表（local-first），待確認。</p>
+<p><strong>驗收條件：</strong> 功能進入 Staging 前，需在報表確認 Event 成功觸發 ≥ 5 次測試。</p>
+<hr>
+<h2 id="8-constraints--dependencies">8. Constraints &amp; Dependencies</h2>
+<h3 id="81-技術限制">8.1 技術限制</h3>
+<p><strong>硬性限制（來自 BRD §8.1/§8.3，不得違反）：</strong></p>
+<ul><li>核心理念：算力留本地、只上雲信任層——不得把 LLM 推論 / 遊戲模擬上雲（成本護城河）。</li><li>框架：Spring Boot 3 + Spring Modulith（7 BC 於單一應用落地，HC-1~HC-5 強制）。</li><li>基礎設施：Kubernetes（Rancher Desktop k3s，local-first），全程本機可跑完。</li><li>資料庫：PostgreSQL 16（既有 8 表 schema，交易 + <code>SELECT FOR UPDATE</code> 保一致）。</li><li>工程守則：Clean Architecture 4 層 + SOLID、HA ≥ 2 replicas、SECS、SSOT。</li><li>金流分期：Phase A 假付費、Phase B 真金流（接口預留）。</li></ul>
+<p><strong>軟性限制：</strong></p>
+<ul><li>程式語言：Java（Spring 生態）為上界；EDD 可於 ADR 說明覆蓋。</li><li>OSS 授權：商業友善（Apache/MIT/PostgreSQL License）優先，禁用限制商用之強 copyleft。</li></ul>
+<h3 id="82-技術依賴">8.2 技術依賴</h3>
+<table>
+<tr><th>技術棧</th><th>版本要求</th><th>用途</th></tr>
+<tr><td>Spring Boot</td><td>3.x</td><td>應用框架</td></tr>
+<tr><td>Spring Modulith</td><td>最新穩定版（Apache-2.0）</td><td>7 BC 邊界、Event Publication Registry（Outbox）</td></tr>
+<tr><td>PostgreSQL</td><td>16</td><td>權威資料庫（8 表 + Outbox 表）</td></tr>
+<tr><td>Redis</td><td>7.2</td><td>session cache、rate-limit 計數、leaderboard Top-N 快取（EDD ADR-003/004）；cache miss 回源 DB，非硬 SPOF</td></tr>
+<tr><td>HikariCP</td><td>隨 Spring Boot</td><td>連線池（依 Q4 容量設定）</td></tr>
+<tr><td>Kubernetes</td><td>k3s（Rancher Desktop）</td><td>local-first 部署</td></tr>
+</table>
+<h3 id="83-外部依賴">8.3 外部依賴</h3>
+<table>
+<tr><th>依賴項</th><th>類型</th><th>負責方</th><th>風險等級</th><th>備援方案</th></tr>
+<tr><td>PostgreSQL 16（權威 DB）</td><td>基礎設施</td><td>Engineering / SRE</td><td>HIGH</td><td>HA/備援（主從 + 備份還原 BCP）、PodDisruptionBudget、連線重試</td></tr>
+<tr><td>Redis 7.2（快取/限流）</td><td>基礎設施</td><td>Engineering / SRE</td><td>MEDIUM</td><td>Sentinel HA；降級策略：cache miss 回源 PostgreSQL，限流改保守預設，不影響資料正確性（EDD ADR-003/004）</td></tr>
+<tr><td>Rancher Desktop k8s（k3s）</td><td>基礎設施</td><td>Engineering</td><td>HIGH</td><td>標準 k8s manifest，可移植至任一 CNCF 相容叢集</td></tr>
+<tr><td>Phase B 真金流 SDK</td><td>外部服務</td><td>PM + 金流商</td><td>MEDIUM</td><td>deposit BC 接口抽象、冪等/對帳先行；Phase A 假付費不受影響</td></tr>
+<tr><td>遊戲客戶端團隊</td><td>內部消費者</td><td>客戶端 Tech Lead</td><td>MEDIUM</td><td>OpenAPI 契約先行、向後相容承諾</td></tr>
+</table>
+<h3 id="84-關鍵假設assumptions">8.4 關鍵假設（Assumptions）</h3>
+<table>
+<tr><th>#</th><th>假設內容</th><th>若假設錯誤的風險等級</th><th>驗證方式</th><th>驗證截止日</th><th>負責人</th></tr>
+<tr><td>A-1</td><td>薄信任層足以防竄改且無需上雲遊戲算力（Leap of Faith）</td><td>HIGH</td><td>滲透測試 + 歸戶/對帳驗證</td><td>MVP 驗收（開發週 3，2026 開發期內）</td><td>Engineering Lead</td></tr>
+<tr><td>A-2</td><td>錢包一致性可用「交易 + SELECT FOR UPDATE + 冪等鍵 + outbox」在 HA/failover 下達成</td><td>HIGH</td><td>併發 / failover 壓測</td><td>MVP 驗收（開發週 2–3）</td><td>Engineering Lead</td></tr>
+<tr><td>A-3</td><td>啟動期 5,000 DAU / 500 PCU 下單體 HA（≥2 replicas）足以承載</td><td>MEDIUM</td><td>容量 / 壓力測試</td><td>EDD 審查前</td><td>Engineering</td></tr>
+<tr><td>A-4</td><td>7 BC 可以 Spring Modulith 單體 Day1 落地並不改邊界下逐一拆微服務</td><td>MEDIUM</td><td>ModularityTests + 依賴 DAG（PoC）</td><td>EDD 完成前</td><td>Engineering</td></tr>
+<tr><td>A-5</td><td>既有 8 表 schema 與 API 契約可作重構基礎而不需大改</td><td>LOW</td><td>契約比對 + 回歸測試</td><td>BRD → PRD 交接前</td><td>PM + Engineering</td></tr>
+</table>
+<blockquote><p><strong>風險等級定義：</strong> HIGH＝錯誤將導致交付延遲 &gt; 2 週或需重大架構調整；MEDIUM＝需調整實作細節但不影響核心架構；LOW＝僅需微幅調整。</p></blockquote>
+<blockquote><p>A-1 風險為 HIGH，驗證截止日排在 MVP 驗收（開發啟動後 3 週內），若不成立觸發根本性 Pivot（BRD §10.2 Kill Criteria）。</p></blockquote>
+<h3 id="85-向後相容性宣告backward-compatibility">8.5 向後相容性宣告（Backward Compatibility）</h3>
+<table>
+<tr><th>欄位</th><th>內容</th></tr>
+<tr><td><strong>本版本是否有 Breaking Change</strong></td><td>否</td></tr>
+<tr><td><strong>受影響的 API 版本</strong></td><td>N/A（本版本為信任層首次正式化，既有原型 API 契約沿用）</td></tr>
+<tr><td><strong>Breaking Change 清單</strong></td><td>N/A</td></tr>
+<tr><td><strong>Deprecation Timeline</strong></td><td>N/A</td></tr>
+<tr><td><strong>Migration Guide 責任歸屬</strong></td><td>N/A（原型 → 正式化，客戶端契約不變；假付費接口在 Phase B 前保持不變）</td></tr>
+<tr><td><strong>向下相容保障期</strong></td><td>N/A（全新產品正式化）；假付費→真金流升級時承諾向後相容，接口不破壞</td></tr>
+</table>
+<hr>
+<h2 id="9-success-metrics--launch-criteria">9. Success Metrics &amp; Launch Criteria</h2>
+<h3 id="91-成功指標kpis">9.1 成功指標（KPIs）</h3>
+<table>
+<tr><th>指標</th><th>Baseline（現在）</th><th>目標</th><th>量測工具</th></tr>
+<tr><td>可信付費動作完成率（北極星）</td><td>N/A（localStorage 100% 可竄改）</td><td>100%（MVP 驗收）</td><td>ledger 稽核 + 滲透測試</td></tr>
+<tr><td>可竄改路徑數（O1）</td><td>100%（F12 可改）</td><td>0 條（MVP 驗收，開發週 3）</td><td>滲透測試報告</td></tr>
+<tr><td>HA 滾動更新錯誤率（O2）</td><td>原型無 HA</td><td>&lt; 0.1%（MVP 驗收）</td><td>混沌測試 + APM</td></tr>
+<tr><td>錢包不一致筆數（O3）</td><td>無權威 ledger</td><td>0 筆、ledger 100% 相符（壓測）</td><td>併發壓測 + 對帳稽核</td></tr>
+<tr><td>付費轉化率（O4，DAU→付費）</td><td>0%</td><td>≥ 2%（GA + 3 個月）</td><td>Analytics / ledger</td></tr>
+<tr><td>跨裝置還原成功率</td><td>無跨裝置</td><td>≥ 99%（GA + 6 個月）</td><td>存檔還原成功率</td></tr>
+<tr><td>ModularityTests 通過率（O5）</td><td>原型無邊界</td><td>100% 綠、0 循環依賴（每次建置）</td><td>ModularityTests</td></tr>
+</table>
+<h3 id="92-護欄指標guardrail-metrics">9.2 護欄指標（Guardrail Metrics）</h3>
+<table>
+<tr><th>指標</th><th>當前值</th><th>可接受下限</th><th>若跌破的處置</th></tr>
+<tr><td>API 錯誤率（5xx）</td><td>N/A</td><td>&lt; 1%</td><td>立即 Rollback（Feature Flag Kill Switch）</td></tr>
+<tr><td>API P99 延遲</td><td>N/A</td><td>&lt; 1000ms @ 500 PCU</td><td>降級模式 / 限流</td></tr>
+<tr><td>錢包對帳一致性</td><td>N/A</td><td>0 筆不一致（任一不一致即觸發）</td><td>立即凍結金流、On-Call 介入</td></tr>
+<tr><td>Outbox 積壓</td><td>N/A</td><td>&lt; 100 筆</td><td>加速消費 / 擴容</td></tr>
+</table>
+<h3 id="93-上線-go--no-go-清單">9.3 上線 Go / No-Go 清單</h3>
+<p><strong>Go 條件（全部必須通過）：</strong></p>
+<ul><li style="list-style:none"><input type="checkbox" disabled> 所有 P0 AC 通過 QA 驗收</li><li style="list-style:none"><input type="checkbox" disabled> 測試覆蓋率 ≥ 80%（核心交易邏輯 100%）</li><li style="list-style:none"><input type="checkbox" disabled> 滲透測試：0 條可竄改伺服器餘額路徑</li><li style="list-style:none"><input type="checkbox" disabled> 併發/failover 壓測：0 筆錢包不一致</li><li style="list-style:none"><input type="checkbox" disabled> HA：殺 1 pod / 滾動更新錯誤率 &lt; 0.1%</li><li style="list-style:none"><input type="checkbox" disabled> ModularityTests 100% 綠、0 循環依賴</li><li style="list-style:none"><input type="checkbox" disabled> 安全掃描無 CRITICAL / HIGH 漏洞</li><li style="list-style:none"><input type="checkbox" disabled> local-first：全流程於 Rancher Desktop k8s 跑完</li><li style="list-style:none"><input type="checkbox" disabled> Rollback 方案（Feature Flag Kill Switch）已驗證</li></ul>
+<p><strong>No-Go 條件（任一存在就不上線）：</strong></p>
+<ul><li style="list-style:none"><input type="checkbox" disabled> 任一路徑可由客戶端竄改伺服器餘額</li><li style="list-style:none"><input type="checkbox" disabled> 併發/failover 出現負餘額或 ledger 對不上帳</li><li style="list-style:none"><input type="checkbox" disabled> PostgreSQL 仍為無備援 SPOF</li><li style="list-style:none"><input type="checkbox" disabled> 法務 / 合規初審未通過（Phase A 範圍）</li></ul>
+<hr>
+<h2 id="94-experiment--ab-test-plan實驗與-ab-測試計畫">9.4 Experiment &amp; A/B Test Plan（實驗與 A/B 測試計畫）</h2>
+<h4 id="實驗優先序矩陣">實驗優先序矩陣</h4>
+<table>
+<tr><th>實驗名稱</th><th>假說</th><th>主要指標</th><th>次要指標</th><th>流量分配</th><th>最短測試週期</th><th>衝突限制</th></tr>
+<tr><td>儲值包定價優化</td><td>若提供「中包 +10%」加量，則 topup ARPPU 提升 ≥ 10%</td><td>付費轉化率</td><td>平均客單價</td><td>50/50</td><td>2 週（需 N ≥ 2,000 付費樣本）</td><td>不可與「首購優惠」同時測試</td></tr>
+<tr><td>轉化時刻提示</td><td>若在破產瀕臨時提示儲值救公司，則 rescue topup 轉化提升 ≥ 15%</td><td>rescue topup 率</td><td>Day1 留存</td><td>80/20（小流量）</td><td>1 週</td><td>—</td></tr>
+</table>
+<h4 id="ab-測試標準流程">A/B 測試標準流程</h4>
+<pre><code class="">1. 假說定義（本表格）
+2. 統計顯著性計算：α=0.05, 檢定力 1-β=0.80，最小偵測效應量 MDE=10%
+3. 樣本量計算：N = f(conversion_rate, MDE, α, β)
+4. 實驗設計審查（避免 novelty effect、SRM 問題）
+5. 上線 + 監控（每日查看 guardrail metrics）
+6. 決策：達標 → Ship ｜ 不顯著 → 延長或關閉 ｜ 負向 → 立即關閉
+7. 結果記錄進 Decision Log</code></pre>
+<h4 id="guardrail-metrics實驗護欄指標">Guardrail Metrics（實驗護欄指標）</h4>
+<p>以下指標任一惡化 &gt; 5%，立即暫停實驗：</p>
+<ul><li>系統錯誤率（5xx）</li><li>API P99 延遲</li><li>錢包對帳一致性（任一不一致即暫停）</li></ul>
+<hr>
+<h2 id="95-definition-of-done完成定義">9.5 Definition of Done（完成定義）</h2>
+<h4 id="product-dod產品完成標準">Product DoD（產品完成標準）</h4>
+<table>
+<tr><th>項目</th><th>驗收標準</th><th>負責方</th></tr>
+<tr><td>✅ User Story 覆蓋</td><td>所有 P0 AC 均有對應 BDD scenario 並通過</td><td>PM</td></tr>
+<tr><td>✅ Analytics Events</td><td>§7.8 所有 Event 已確認觸發</td><td>PM</td></tr>
+<tr><td>✅ Edge Cases</td><td>所有已知 edge case 與 error state（400/401/402/409/500）已測試</td><td>QA</td></tr>
+<tr><td>✅ 合規</td><td>§9/§17 Phase A 合規項通過法務初審</td><td>Legal</td></tr>
+<tr><td>✅ i18n Ready</td><td>API 錯誤訊息已 key 化，無 hardcode</td><td>Engineering</td></tr>
+<tr><td>✅ Metrics Baseline</td><td>Launch 前已記錄基準值供效益評估</td><td>PM</td></tr>
+</table>
+<h4 id="engineering-dod工程完成標準">Engineering DoD（工程完成標準）</h4>
+<table>
+<tr><th>項目</th><th>驗收標準</th><th>負責方</th></tr>
+<tr><td>✅ 單元測試</td><td>Coverage ≥ 80%（核心錢包/權益交易 100%）</td><td>Engineering</td></tr>
+<tr><td>✅ 整合測試</td><td>所有 API endpoint 有 integration test</td><td>Engineering</td></tr>
+<tr><td>✅ 所有 P0 AC 自動化測試通過</td><td>E2E 覆蓋 Happy Path + Error Path</td><td>QA</td></tr>
+<tr><td>✅ 無 P0 Bug</td><td>無 CRITICAL / HIGH 開放缺陷</td><td>QA</td></tr>
+<tr><td>✅ ModularityTests</td><td>100% 綠、0 循環依賴、HC-1~HC-5 合規</td><td>Engineering</td></tr>
+<tr><td>✅ Security Review</td><td>SAST 無 HIGH/CRITICAL，dependencies 無 CVE &gt; 7.0</td><td>Security</td></tr>
+<tr><td>✅ Performance Gate</td><td>P99 ≤ 1000ms @ 500 PCU、Error Rate ≤ 1%</td><td>Engineering</td></tr>
+<tr><td>✅ Feature Flag</td><td>P0 功能在 Kill Switch Flag 保護下上線</td><td>Engineering</td></tr>
+<tr><td>✅ Runbook</td><td>新功能 Runbook 已加入 docs/runbooks/</td><td>Engineering</td></tr>
+</table>
+<hr>
+<h2 id="10-rollout-plan">10. Rollout Plan</h2>
+<table>
+<tr><th>階段</th><th>名稱</th><th>目標用戶</th><th>流量比例</th><th>持續時間</th><th>成功指標</th><th>退出條件</th></tr>
+<tr><td>Alpha</td><td>內測</td><td>內部員工 + 客戶端整合團隊</td><td>100% 內部</td><td>1 週</td><td>無 CRITICAL bug、ModularityTests 綠</td><td>出現無法繞過的 CRITICAL</td></tr>
+<tr><td>Beta</td><td>封閉測試</td><td>5% 真實玩家（itch/Steam 封測）</td><td>5%</td><td>1 週</td><td>Error rate &lt; 1%、0 筆錢包不一致</td><td>錯誤率 &gt; 1% 或出現不一致</td></tr>
+<tr><td>GA</td><td>全面上線</td><td>所有玩家</td><td>100%</td><td>—</td><td>付費轉化 ≥ 2%（+3M）、跨裝置還原 ≥ 99%（+6M）</td><td>—</td></tr>
+</table>
+<h3 id="102-feature-flag-規格">10.2 Feature Flag 規格</h3>
+<table>
+<tr><th>Flag 名稱</th><th>預設值</th><th>目標群組</th><th>啟用條件</th><th>Kill Switch</th><th>管理工具</th><th>預計移除日</th></tr>
+<tr><td><code>trust_wallet_enabled</code></td><td>OFF</td><td>Beta 玩家</td><td>account 屬封測名單</td><td>是（立即關閉，5 分鐘內生效）</td><td>待 Engineering 確認（如 Unleash / 組態中心）</td><td>GA + 2 週</td></tr>
+<tr><td><code>trust_entitlement_enabled</code></td><td>OFF</td><td>Beta 玩家</td><td>account 屬封測名單</td><td>是（立即關閉，5 分鐘內生效）</td><td>待 Engineering 確認</td><td>GA + 2 週</td></tr>
+<tr><td><code>trust_game_save_enabled</code></td><td>OFF</td><td>Beta 玩家</td><td>account 屬封測名單</td><td>是（立即關閉，5 分鐘內生效）</td><td>待 Engineering 確認</td><td>GA + 2 週</td></tr>
+<tr><td><code>deposit_realmoney_enabled</code></td><td>OFF</td><td>全體</td><td>Phase B 真金流就緒</td><td>是（立即關閉，5 分鐘內生效）</td><td>待 Engineering 確認</td><td>Phase B GA + 2 週</td></tr>
+</table>
+<blockquote><p><strong>Flag 管理原則：</strong></p></blockquote>
+<blockquote><p>1. 所有 P0 功能必須有 Kill Switch Feature Flag（名稱採 snake_case）。</p></blockquote>
+<blockquote><p>2. Flag 啟用/關閉操作紀錄必須寫入 Audit Log / Decision Log。</p></blockquote>
+<blockquote><p>3. Flag 變更需通知相關 On-Call 工程師。</p></blockquote>
+<blockquote><p>4. GA 完成後 2 週內清除相關 Flag 程式碼（避免 Flag debt）。</p></blockquote>
+<hr>
+<h2 id="11-data-requirements">11. Data Requirements</h2>
+<h3 id="111-新增資料欄位--資料表">11.1 新增資料欄位 / 資料表</h3>
+<table>
+<tr><th>資料表名稱</th><th>操作類型</th><th>說明</th><th>關聯 PRD 功能</th></tr>
+<tr><td><code>accounts</code></td><td>沿用（既有）</td><td>帳號（email/display_name/pass_hash）</td><td>§5.1 member</td></tr>
+<tr><td><code>sessions</code></td><td>沿用（既有）</td><td>session token + expires_at</td><td>§5.1 member</td></tr>
+<tr><td><code>wallets</code></td><td>沿用（既有）</td><td>伺服器權威餘額（cash/gems）</td><td>§5.2 wallet</td></tr>
+<tr><td><code>wallet_ledger</code></td><td>沿用（既有）</td><td>append-only 異動帳本</td><td>§5.2 wallet</td></tr>
+<tr><td><code>entitlements</code></td><td>沿用（既有）</td><td>已購權益（UNIQUE account,kind,item）</td><td>§5.3 entitlement</td></tr>
+<tr><td><code>saves</code></td><td>沿用（既有）</td><td>跨裝置存檔（JSONB）</td><td>§5.4 game-save</td></tr>
+<tr><td><code>records</code></td><td>沿用（既有）</td><td>經營史（破產/成就/傳承）</td><td>§5.6 record（P1）</td></tr>
+<tr><td><code>leaderboard</code></td><td>沿用（既有）</td><td>全域排行</td><td>§5.7 leaderboard（P1）</td></tr>
+<tr><td><code>deposit_pack</code></td><td><strong>新增</strong></td><td>儲值包目錄（pack_id/幣別/入帳數量/顯示名稱，詳細 schema 見 SCHEMA.md）</td><td>§5.8 deposit（P1）</td></tr>
+<tr><td><code>deposit_order</code></td><td><strong>新增</strong></td><td>儲值訂單（order_id/pack_id/帳號/狀態/冪等鍵，詳細 schema 見 SCHEMA.md）</td><td>§5.8 deposit（P1）</td></tr>
+<tr><td><code>event_publication</code>（Outbox）</td><td><strong>新增</strong></td><td>Spring Modulith Event Publication Registry（跨 BC 可靠事件）</td><td>§5.5 平台底座</td></tr>
+<tr><td><code>idempotency_keys</code></td><td><strong>新增（Phase B 預留）</strong></td><td>deposit 真金流冪等鍵，防重複入帳</td><td>§5.8 deposit（P1）</td></tr>
+</table>
+<h3 id="112-data-dictionary">11.2 Data Dictionary</h3>
+<table>
+<tr><th>欄位名稱</th><th>型別</th><th>長度/精度</th><th>必填</th><th>預設值</th><th>說明</th><th>範例值</th><th>PII</th></tr>
+<tr><td><code>accounts.email</code></td><td>TEXT</td><td>-</td><td>是</td><td>-</td><td>登入識別（UNIQUE）</td><td>&quot;player@example.com&quot;</td><td>是（需遮罩/加密）</td></tr>
+<tr><td><code>accounts.display_name</code></td><td>TEXT</td><td>1–24</td><td>是</td><td>-</td><td>公司/老闆名（亦用於排行榜顯示）</td><td>&quot;喵喵企業&quot;</td><td>是（準 PII，公開於排行）</td></tr>
+<tr><td><code>accounts.pass_hash</code></td><td>TEXT</td><td>-</td><td>是</td><td>-</td><td>scrypt(salt$hash) 單向雜湊</td><td>&quot;a1b2…$c3d4…&quot;</td><td>認證資料（禁明文/禁 Log）</td></tr>
+<tr><td><code>sessions.token</code></td><td>TEXT</td><td>-</td><td>是</td><td>-</td><td>Bearer session token（32-byte hex）</td><td>&quot;f3a9…&quot;</td><td>認證憑證（禁 Log 明文）</td></tr>
+<tr><td><code>wallets.cash</code> / <code>gems</code></td><td>BIGINT</td><td>-</td><td>是</td><td>0</td><td>伺服器權威餘額（恆 ≥ 0）</td><td>1000</td><td>否</td></tr>
+<tr><td><code>wallet_ledger.delta</code></td><td>BIGINT</td><td>-</td><td>是</td><td>-</td><td>異動量（+儲值 / −花費）</td><td>-200</td><td>否</td></tr>
+<tr><td><code>wallet_ledger.reason</code></td><td>TEXT</td><td>-</td><td>是</td><td>-</td><td>異動原因（topup/buy_*/rescue/init）</td><td>&quot;buy_cosmetic&quot;</td><td>否</td></tr>
+<tr><td><code>wallet_ledger.balance</code></td><td>BIGINT</td><td>-</td><td>是</td><td>-</td><td>異動後餘額（對帳用）</td><td>800</td><td>否</td></tr>
+<tr><td><code>entitlements.kind</code></td><td>TEXT</td><td>-</td><td>是</td><td>-</td><td>cosmetic/dream/scenario</td><td>&quot;dream&quot;</td><td>否</td></tr>
+<tr><td><code>saves.data</code></td><td>JSONB</td><td>-</td><td>是</td><td>-</td><td>辦公室存檔遊戲狀態</td><td>{...}</td><td>否（可能含暱稱）</td></tr>
+<tr><td><code>records.type</code></td><td>TEXT</td><td>-</td><td>是</td><td>-</td><td>bankruptcy/achievement/legacy</td><td>&quot;bankruptcy&quot;</td><td>否</td></tr>
+<tr><td><code>leaderboard.score</code></td><td>BIGINT</td><td>-</td><td>是</td><td>-</td><td>排行分數</td><td>99999</td><td>否</td></tr>
+</table>
+<h3 id="113-資料來源">11.3 資料來源</h3>
+<table>
+<tr><th>資料欄位 / 資料表</th><th>來源系統</th><th>同步方式</th><th>同步頻率</th><th>負責方</th></tr>
+<tr><td>accounts/wallets/entitlements/saves/records/leaderboard</td><td>遊戲客戶端（代表玩家）</td><td>API 寫入（信任層權威）</td><td>即時</td><td>遊戲客戶端團隊</td></tr>
+<tr><td>wallet_ledger</td><td>信任層內部</td><td>交易內寫入</td><td>即時（每筆異動）</td><td>信任層</td></tr>
+<tr><td>event_publication（Outbox）</td><td>信任層內部</td><td>交易內寫入 + 非同步投遞</td><td>即時</td><td>信任層</td></tr>
+</table>
+<h3 id="114-資料品質要求">11.4 資料品質要求</h3>
+<table>
+<tr><th>要求項目</th><th>規格</th></tr>
+<tr><td>完整性</td><td>必填欄位（email/pass_hash/balance/reason）空值率 = 0%</td></tr>
+<tr><td>準確性</td><td>wallet 餘額與 ledger 累積一致性 = 100%（每筆 balance = 前筆 + delta）</td></tr>
+<tr><td>時效性</td><td>權威狀態即時，寫入延遲 P99 &lt; 1000ms</td></tr>
+<tr><td>唯一性</td><td><code>accounts.email</code> UNIQUE；<code>entitlements(account_id,kind,item_id)</code> UNIQUE；<code>leaderboard.run_id</code> PK</td></tr>
+<tr><td>格式驗證</td><td>email 符合 <code>^[^\s@]+@[^\s@]+\.[^\s@]+$</code>；timestamp 為 ISO 8601（TIMESTAMPTZ）</td></tr>
+</table>
+<h3 id="115-pii-欄位清單">11.5 PII 欄位清單</h3>
+<table>
+<tr><th>欄位名稱</th><th>PII 類型</th><th>處理方式</th><th>法規依據</th></tr>
+<tr><td><code>accounts.email</code></td><td>Email（聯絡資料）</td><td>靜態加密（AES-256）+ Log 遮罩 + 最小化收集</td><td>個資法 / GDPR Art.6.1b（合約必要）</td></tr>
+<tr><td><code>accounts.display_name</code></td><td>準 PII（公司/老闆名，公開於排行榜）</td><td>最小化；排行僅顯示名稱不含 email</td><td>個資法（同意告知）</td></tr>
+<tr><td><code>accounts.pass_hash</code></td><td>認證資料</td><td>scrypt 單向雜湊，禁明文、禁 Log</td><td>個資法（安全維護義務）</td></tr>
+<tr><td><code>sessions.token</code></td><td>認證憑證</td><td>禁 Log 明文、TTL 到期失效、登出即刪</td><td>個資法</td></tr>
+<tr><td><code>wallet_ledger.*</code></td><td>交易資料（非直接 PII，掛 account_id）</td><td>依金流/稅務法規保留，Finance 唯讀</td><td>金流監管（Phase B ~7 年）</td></tr>
+</table>
+<blockquote><p><strong>注意：</strong> PII 欄位異動必須知會法務 / 隱私長（DPO），並更新隱私政策。Phase A 假付費合規暴露面低；Phase B 真金流前需 Legal 正式介入。</p></blockquote>
+<hr>
+<h2 id="12-open-questions">12. Open Questions</h2>
+<table>
+<tr><th>#</th><th>問題</th><th>影響範圍</th><th>影響層級</th><th>負責人</th><th>解決截止日</th><th>狀態</th></tr>
+<tr><td>Q1</td><td>PostgreSQL 的 HA/BCP 具體形態（主從？備份還原 RPO/RTO？）</td><td>架構（O2 無單點）</td><td>高</td><td>Engineering</td><td>EDD 階段</td><td>OPEN</td></tr>
+<tr><td>Q2</td><td>Phase B 真金流 SDK 選型與冪等/對帳契約</td><td>範圍（deposit BC）</td><td>高</td><td>PM + Engineering</td><td>Phase B 前</td><td>OPEN</td></tr>
+<tr><td>Q3</td><td>deposit 與 wallet 的邊界劃分（儲值 vs 錢包異動職責切割）</td><td>模組邊界 / Outbox 事件設計</td><td>中</td><td>Engineering</td><td>EDD 階段</td><td>OPEN</td></tr>
+<tr><td>Q4</td><td>個資/金流合規範圍（真金流接入前的法務要求）</td><td>合規（上市時程）</td><td>高</td><td>Legal</td><td>Phase B 前</td><td>OPEN</td></tr>
+<tr><td>Q5</td><td>Feature Flag 管理工具選型（local-first 相容）</td><td>Rollout（§10.2）</td><td>中</td><td>Engineering</td><td>開發啟動前</td><td>OPEN</td></tr>
+</table>
+<hr>
+<h2 id="13-glossary">13. Glossary</h2>
+<table>
+<tr><th>術語</th><th>定義</th></tr>
+<tr><td>信任層（Trust Layer）</td><td>需由伺服器當權威的薄薄一層：身分/錢包/權益/記錄/排行/存檔，與遊戲算力解耦</td></tr>
+<tr><td>伺服器權威（Server-authoritative）</td><td>狀態唯一真實來源在伺服器，客戶端只讀顯示，無法自行竄改</td></tr>
+<tr><td>Bounded Context（有界上下文，BC）</td><td>Spring Modulith 模組邊界；本專案 7 個：member/wallet/deposit/entitlement/record/leaderboard/game-save</td></tr>
+<tr><td>append-only ledger</td><td>只增不改的錢包異動帳本（wallet_ledger），每筆含 reason/delta/balance/meta，供對帳與防作弊</td></tr>
+<tr><td>Transactional Outbox</td><td>同一交易寫入事件待投遞表，保證跨 BC 事件可靠投遞（Spring Modulith Event Publication Registry）</td></tr>
+<tr><td>HC-1~HC-5</td><td>Spring Modulith 模組邊界硬約束：禁跨 BC DB FK、只走 Public API/Event、優先 Async、無共享可變狀態、依賴為 DAG</td></tr>
+<tr><td>假付費（Phase A）</td><td>不接真金流，儲值走 ledger 記錄以驗證信任底座；真金流為 Phase B</td></tr>
+<tr><td>recycle（破產重經營）</td><td>公司破產只重置當前現金與營運，保留人才庫/已購權益/成就/排行（不作惡底線）</td></tr>
+<tr><td>HA / SPOF / BCP</td><td>高可用 / 單點故障 / 營運持續計畫；Day1 即 ≥2 replicas、無單點、有備援</td></tr>
+<tr><td>local-first</td><td>全程可在本機 Rancher Desktop k8s（k3s）開發與驗收，不依賴外部雲端</td></tr>
+<tr><td>可信付費動作完成率</td><td>北極星指標：經伺服器權威成功記錄且不可竄改的金流/權益動作數 ÷ 全部金流/權益動作數</td></tr>
+<tr><td>DAU / PCU / ARPPU</td><td>日活用戶 / 同時在線峰值 / 每付費用戶平均收入</td></tr>
+</table>
+<hr>
+<h2 id="14-references">14. References</h2>
+<ul><li>上游 BRD：<a href="brd.html" target="_blank" rel="noopener">BRD.md</a>（DOC-ID：BRD-YOCAT-OFFICE-BACKEND-20261030）</li><li>上游 IDEA：<a href="idea.html" target="_blank" rel="noopener">IDEA.md</a>（DOC-ID：IDEA-YOCAT-OFFICE-BACKEND-20261030）</li><li>docs/req/ 素材：</li><li style="margin-left:1.0rem">docs/req/企画.md（交接聖經，§15 商業化 / §16 獲利 / §17 會員系統與雲端架構）</li><li style="margin-left:1.0rem">docs/req/schema.sql（8 表伺服器權威 schema）</li><li style="margin-left:1.0rem">docs/req/postgres.yaml（Rancher Desktop k8s PostgreSQL manifest）</li><li style="margin-left:1.0rem">docs/req/server-src/accounts.ts（信任層 API 原型：帳號/錢包/權益/存檔/記錄/排行）</li><li style="margin-left:1.0rem">docs/req/server-src/index.ts、db.ts（HTTP server + 連線池）</li><li style="margin-left:1.0rem">docs/req/codebase-tree.txt（專案目錄樹）</li><li>外部標準 / 法規：Spring Modulith（Apache-2.0）、PostgreSQL 16、Kubernetes（CNCF）、台灣個資法、GDPR（Phase B）、PCI-DSS（Phase B）</li></ul>
+<hr>
+<h2 id="15-requirement-traceability-matrix-rtm">15. Requirement Traceability Matrix (RTM)</h2>
+<table>
+<tr><th>REQ-ID</th><th>BRD 目標</th><th>User Story 章節</th><th>AC#</th><th>設計章節（PDD）</th><th>技術方案（EDD）</th><th>測試案例 ID</th><th>狀態</th></tr>
+<tr><td>US-MEM-001</td><td>O1（BRD §3）</td><td>§5.1</td><td>AC-1~AC-6</td><td>待 PDD 生成後補填</td><td>待 EDD 生成後補填</td><td>TC-MEM-001~006</td><td>DRAFT</td></tr>
+<tr><td>US-WAL-001</td><td>O1, O3（BRD §3）</td><td>§5.2</td><td>AC-1~AC-5</td><td>待 PDD 生成後補填</td><td>待 EDD 生成後補填</td><td>TC-WAL-001~005</td><td>DRAFT</td></tr>
+<tr><td>US-ENT-001</td><td>O1, O4（BRD §3）</td><td>§5.3</td><td>AC-1~AC-5</td><td>待 PDD 生成後補填</td><td>待 EDD 生成後補填</td><td>TC-ENT-001~005</td><td>DRAFT</td></tr>
+<tr><td>US-SAVE-001</td><td>O4（BRD §3）</td><td>§5.4</td><td>AC-1~AC-5</td><td>待 PDD 生成後補填</td><td>待 EDD 生成後補填</td><td>TC-SAVE-001~005</td><td>DRAFT</td></tr>
+<tr><td>US-PLAT-001</td><td>O2, O5（BRD §3）</td><td>§5.5</td><td>AC-1~AC-5</td><td>待 PDD 生成後補填</td><td>待 EDD 生成後補填</td><td>TC-PLAT-001~005</td><td>DRAFT</td></tr>
+<tr><td>US-REC-001</td><td>O4（BRD §3）</td><td>§5.6（record，P1）</td><td>AC-1</td><td>待 PDD 生成後補填</td><td>待 EDD 生成後補填</td><td>TC-INT-REC-001~005</td><td>DRAFT</td></tr>
+<tr><td>US-LB-001</td><td>O4（BRD §3）</td><td>§5.7（leaderboard，P1）</td><td>AC-1</td><td>待 PDD 生成後補填</td><td>待 EDD 生成後補填</td><td>TC-INT-LB-001~006</td><td>DRAFT</td></tr>
+<tr><td>US-DEP-001</td><td>O3, O4（BRD §3）</td><td>§5.8（deposit，P1）</td><td>AC-1~AC-2</td><td>待 PDD 生成後補填</td><td>待 EDD 生成後補填</td><td>TC-E2E-DEP-001~002、TC-INT-DEP-003~007</td><td>DRAFT</td></tr>
+</table>
+<blockquote><p><strong>狀態說明：</strong> DRAFT（需求已識別，尚未設計）/ IN_REVIEW / APPROVED / VERIFIED。PRD 生成階段 PDD/EDD 章節欄填「待補填」，狀態預設 DRAFT。</p></blockquote>
+<blockquote><p><strong>P1 補充說明：</strong> record / leaderboard / deposit 為 Should Have（P1），User Story 與完整 AC 見 §5.6（US-REC-001 / AC-1）、§5.7（US-LB-001 / AC-1）、§5.8（US-DEP-001 / AC-1~AC-2），並與 features/ BDD @tag 及 RTM 雙向對齊。</p></blockquote>
+<hr>
+<h2 id="16-approval-sign-off">16. Approval Sign-off</h2>
+<table>
+<tr><th>角色</th><th>姓名</th><th>簽核狀態</th><th>簽核日期</th><th>備注</th></tr>
+<tr><td>PM</td><td>待指派</td><td>🔲 待簽核</td><td>—</td><td></td></tr>
+<tr><td>Engineering Lead</td><td>待指派</td><td>🔲 待簽核</td><td>—</td><td></td></tr>
+<tr><td>Design Lead</td><td>併入 Engineering Lead（後端信任層，無 UI）</td><td>🔲 待簽核</td><td>—</td><td></td></tr>
+<tr><td>QA Lead</td><td>待指派</td><td>🔲 待簽核</td><td>—</td><td></td></tr>
+<tr><td>Legal / Compliance</td><td>待指派</td><td>🔲 待簽核</td><td>—</td><td>Phase A 範圍初審</td></tr>
+</table>
+<hr>
+<h2 id="17-privacy-by-design--data-protection">17. Privacy by Design &amp; Data Protection</h2>
+<h3 id="171-privacy-by-design-七大原則合規檢查">17.1 Privacy by Design 七大原則合規檢查</h3>
+<table>
+<tr><th>#</th><th>原則</th><th>本產品實作方式</th><th>合規狀態</th></tr>
+<tr><td>1</td><td>Proactive not Reactive</td><td>設計階段即最小化 PII（僅 email/display_name）；威脅建模於 EDD 完成</td><td>🔲 待確認</td></tr>
+<tr><td>2</td><td>Privacy as Default</td><td>僅收集登入與歸戶必要資料；無行銷追蹤；排行僅顯示名稱不含 email</td><td>🔲 待確認</td></tr>
+<tr><td>3</td><td>Privacy Embedded into Design</td><td>email 靜態加密、pass_hash 單向雜湊、Log 遮罩於資料模型層</td><td>🔲 待確認</td></tr>
+<tr><td>4</td><td>Full Functionality</td><td>隱私保護不降低信任層功能（加密/遮罩不影響對帳與歸戶）</td><td>🔲 待確認</td></tr>
+<tr><td>5</td><td>End-to-End Security</td><td>傳輸 TLS 1.3 + 靜態 AES-256 + scrypt + session TTL</td><td>🔲 待確認</td></tr>
+<tr><td>6</td><td>Visibility and Transparency</td><td>隱私政策公開、資料使用目的明確告知（Phase B 前完成）</td><td>🔲 待確認</td></tr>
+<tr><td>7</td><td>Respect for User Privacy</td><td>提供資料匯出（存檔/權益）與帳號刪除（ON DELETE CASCADE + ledger 匿名化）</td><td>🔲 待確認</td></tr>
+</table>
+<h3 id="172-個人資料盤點pii-inventory">17.2 個人資料盤點（PII Inventory）</h3>
+<table>
+<tr><th>欄位名稱</th><th>資料表</th><th>PII 類別</th><th>蒐集目的</th><th>法律依據（GDPR / 個資法）</th><th>保留期限</th><th>加密方式</th></tr>
+<tr><td><code>email</code></td><td><code>accounts</code></td><td>聯絡資料</td><td>帳號識別、登入</td><td>合約必要（Art.6.1b）/ 個資法告知同意</td><td>帳號存續期 + 依法必要稽核期</td><td>AES-256（靜態）</td></tr>
+<tr><td><code>display_name</code></td><td><code>accounts</code></td><td>準識別資料</td><td>公司/老闆名、排行顯示</td><td>同意（Art.6.1a）</td><td>帳號存續期</td><td>不加密（公開於排行）</td></tr>
+<tr><td><code>pass_hash</code></td><td><code>accounts</code></td><td>認證資料</td><td>身份驗證</td><td>合約必要（Art.6.1b）</td><td>帳號存續期</td><td>scrypt（salt$hash，單向）</td></tr>
+<tr><td><code>token</code></td><td><code>sessions</code></td><td>認證憑證</td><td>會話維持</td><td>合約必要（Art.6.1b）</td><td>TTL 30 天 / 登出即刪</td><td>隨機 32-byte，不可逆</td></tr>
+</table>
+<h3 id="173-使用者隱私權實作矩陣">17.3 使用者隱私權實作矩陣</h3>
+<table>
+<tr><th>GDPR 權利</th><th>條文</th><th>功能需求</th><th>對應 API Endpoint</th><th>實作狀態</th></tr>
+<tr><td>存取權</td><td>Art.15</td><td>查看個人資料（帳號+錢包+權益+存檔）</td><td>GET /auth/me、GET /save、GET /entitlements、GET /records（彙整匯出，Phase B 擴充）</td><td>🔲 待規劃</td></tr>
+<tr><td>更正權</td><td>Art.16</td><td>修改 display_name（帳號設定）</td><td>待新增 PATCH /auth/me（Phase B）</td><td>🔲 待規劃</td></tr>
+<tr><td>刪除權</td><td>Art.17</td><td>帳號刪除（ON DELETE CASCADE + ledger 匿名化）</td><td>待新增 DELETE /auth/me（Phase B）</td><td>🔲 待規劃</td></tr>
+<tr><td>限制處理權</td><td>Art.18</td><td>帳號暫停（停用不刪除）</td><td>待新增（Phase B）</td><td>🔲 待規劃</td></tr>
+<tr><td>資料可攜權</td><td>Art.20</td><td>存檔/權益 JSON 匯出</td><td>GET /save、GET /entitlements（JSON）</td><td>🔲 待規劃</td></tr>
+<tr><td>反對權</td><td>Art.21</td><td>非必要處理反對（Phase B 行銷）</td><td>待新增（Phase B）</td><td>🔲 待規劃</td></tr>
+<tr><td>撤回同意</td><td>Art.7(3)</td><td>撤回非必要同意</td><td>待新增（Phase B）</td><td>🔲 待規劃</td></tr>
+</table>
+<h3 id="174-同意管理consent-management">17.4 同意管理（Consent Management）</h3>
+<p><strong>同意收集規範：</strong> 同意須自願、具體、知情且明確（GDPR Art.4(11)）；不得預先勾選；記錄同意時間戳、IP、隱私政策版本。</p>
+<p><strong>同意記錄 Schema（Phase B 前建立）：</strong></p>
+<pre><code class="language-sql">CREATE TABLE user_consents (
+    id              BIGSERIAL    PRIMARY KEY,
+    account_id      BIGINT       NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    consent_type    VARCHAR(100) NOT NULL,  -- &#x27;marketing&#x27;, &#x27;analytics&#x27;, &#x27;third_party_payment&#x27;
+    granted         BOOLEAN      NOT NULL,
+    granted_at      TIMESTAMPTZ,
+    revoked_at      TIMESTAMPTZ,
+    policy_version  VARCHAR(20)  NOT NULL,
+    ip_address      INET,
+    user_agent      TEXT,
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT now()
+);</code></pre>
+<h3 id="175-dpia資料保護影響評估觸發條件">17.5 DPIA（資料保護影響評估）觸發條件</h3>
+<table>
+<tr><th>情況</th><th>說明</th><th>本產品是否適用</th></tr>
+<tr><td>大規模 PII 處理</td><td>處理超過 10 萬名使用者個人資料</td><td>🔲 評估中（成長期 50,000 DAU，接近門檻）</td></tr>
+<tr><td>敏感資料處理</td><td>健康/種族/生物識別</td><td>否（不處理敏感類別）</td></tr>
+<tr><td>系統性評估/分析</td><td>AI/ML 對個人評分畫像</td><td>否（信任層不做畫像）</td></tr>
+<tr><td>新技術大規模應用</td><td>新型識別技術</td><td>否</td></tr>
+<tr><td>跨境傳輸 EU 個人資料</td><td>傳輸至 EU 以外</td><td>🔲 評估中（Phase B 真金流若涉境外支付商）</td></tr>
+</table>
+<hr>
+<h2 id="18-accessibility-requirements無障礙需求">18. Accessibility Requirements（無障礙需求）</h2>
+<blockquote><p><strong>適用性說明</strong>：本產品為 <strong>api-only 信任層</strong>，無直接 C 端 UI，無障礙責任主要落在<strong>客戶端 UI 與未來營運對帳 Console</strong>。本章定義目標與清單作為客戶端團隊與未來 Console 的合規依據；信任層本身負責提供無障礙友善的基礎（結構化錯誤訊息、語意化錯誤碼、i18n key）。</p></blockquote>
+<h3 id="181-wcag-21-合規目標">18.1 WCAG 2.1 合規目標</h3>
+<table>
+<tr><th>等級</th><th>目標</th><th>時程</th></tr>
+<tr><td>WCAG 2.1 Level A</td><td>客戶端 UI / Console 發佈即達標</td><td>MVP（客戶端）</td></tr>
+<tr><td>WCAG 2.1 Level AA</td><td>上線後 3 個月</td><td>Phase 2</td></tr>
+<tr><td>WCAG 2.1 Level AAA（核心功能）</td><td>12 個月內（視情況）</td><td>Phase 3</td></tr>
+</table>
+<h3 id="182-無障礙需求清單">18.2 無障礙需求清單</h3>
+<table>
+<tr><th>編號</th><th>需求</th><th>WCAG 準則</th><th>優先度</th><th>責任方</th></tr>
+<tr><td>A11y-01</td><td>所有圖片提供替代文字（alt text）</td><td>1.1.1</td><td>P0</td><td>客戶端</td></tr>
+<tr><td>A11y-02</td><td>色彩對比度 ≥ 4.5:1（正文）/ 3:1（大文字）</td><td>1.4.3</td><td>P0</td><td>客戶端</td></tr>
+<tr><td>A11y-03</td><td>鍵盤完整可操作（無需滑鼠）</td><td>2.1.1</td><td>P0</td><td>客戶端 / Console</td></tr>
+<tr><td>A11y-04</td><td>焦點狀態視覺可見</td><td>2.4.7</td><td>P0</td><td>客戶端 / Console</td></tr>
+<tr><td>A11y-05</td><td>所有表單欄位有明確 Label</td><td>1.3.1</td><td>P0</td><td>客戶端 / Console</td></tr>
+<tr><td>A11y-06</td><td>錯誤訊息有文字描述（非僅顏色）；信任層回傳結構化 JSON 錯誤供呈現</td><td>1.4.1 / 3.3.1</td><td>P0</td><td>信任層 + 客戶端</td></tr>
+<tr><td>A11y-07</td><td>頁面語意化標題結構（H1-H6）</td><td>1.3.1</td><td>P0</td><td>客戶端 / Console</td></tr>
+<tr><td>A11y-08</td><td>影片有字幕（如教學）</td><td>1.2.2</td><td>P1</td><td>客戶端</td></tr>
+<tr><td>A11y-09</td><td>動畫可暫停/停止（prefers-reduced-motion）</td><td>2.3.3</td><td>P1</td><td>客戶端</td></tr>
+<tr><td>A11y-10</td><td>螢幕閱讀器測試通過（NVDA / VoiceOver）</td><td>4.1.3</td><td>P1</td><td>客戶端 / Console</td></tr>
+</table>
+<hr>
+<h2 id="19-admin-backend-requirements管理後台需求">19. Admin Backend Requirements（管理後台需求）</h2>
+<blockquote><p>本專案無 Admin 後台需求（<code>has_admin_backend=false</code>，見 state file），略過此章節。</p></blockquote>
+<p>&gt;</p>
+<blockquote><p><strong>說明</strong>：本版本營運對帳需求以「逐筆 ledger 查詢 API」滿足（§5 wallet / record 的查詢端點，由營運/客服經授權使用），風控/對帳儀表板列為 Could Have（P2，§4.4），未來若啟用獨立 Admin Portal 再補此章節並對齊 EDD §5.5 RBAC 模型。</p></blockquote>
+<hr>
+<p><em>本 PRD 由 gendoc gen-prd 依 docs/IDEA.md、docs/BRD.md 與 docs/req/（企画.md §17、schema.sql、server-src/accounts.ts）生成，全文 zh-TW。核心理念：算力留本地（零邊際成本護城河）、信任上雲端（收真錢的伺服器權威），7 有界上下文 Spring Modulith + Clean Architecture + Day1 HA，全程 local-first 可在 Rancher Desktop k8s 跑完。執行 <code>/reviewdoc PRD</code> 進行品質審查。</em></p></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "yocat-office-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "yoCat Office 角色大腦後端：路由 client 到本地 vLLM",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.ts",
+    "dev": "node --watch src/index.ts"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

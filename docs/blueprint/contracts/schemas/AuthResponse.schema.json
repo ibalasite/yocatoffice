@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/AuthResponse",
+  "title": "AuthResponse",
+  "description": "POST /auth/register|login 回應",
+  "type": "object",
+  "properties": {
+    "token": {
+      "type": "string",
+      "description": "opaque session token（32B hex）"
+    },
+    "account": {
+      "$ref": "AccountView.schema.json"
+    },
+    "wallet": {
+      "$ref": "WalletView.schema.json"
+    }
+  },
+  "required": [
+    "token",
+    "account",
+    "wallet"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ResponseDTO>>"
+}

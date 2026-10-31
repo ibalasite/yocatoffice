@@ -1,0 +1,62 @@
+{
+  "consumer": { "name": "entitlement-bc" },
+  "provider": { "name": "wallet-bc" },
+  "interactions": [
+    {
+      "description": "WalletService.debit() atomic debit within buy transaction (happy path)",
+      "providerState": "account 1024 exists with wallet gems >= 120",
+      "request": {
+        "method": "POST",
+        "path": "/internal/wallet/debit",
+        "headers": { "Content-Type": "application/json" },
+        "body": {
+          "accountId": "1024",
+          "currency": "gems",
+          "amount": 120,
+          "reason": "buy_cosmetic",
+          "meta": { "itemId": "suit_gold" }
+        },
+        "matchingRules": {
+          "$.body.accountId": { "match": "type" },
+          "$.body.currency": { "match": "regex", "regex": "cash|gems" },
+          "$.body.amount": { "match": "integer" }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "ok": true, "currency": "gems", "balance": 210, "wallet": { "cash": 18750, "gems": 210 } },
+        "matchingRules": {
+          "$.body.balance": { "match": "integer" },
+          "$.body.wallet.cash": { "match": "integer" },
+          "$.body.wallet.gems": { "match": "integer" }
+        }
+      }
+    },
+    {
+      "description": "WalletService.debit() rejects when balance < amount (402, transaction rolls back)",
+      "providerState": "account 2048 exists with wallet gems = 50",
+      "request": {
+        "method": "POST",
+        "path": "/internal/wallet/debit",
+        "headers": { "Content-Type": "application/json" },
+        "body": { "accountId": "2048", "currency": "gems", "amount": 120, "reason": "buy_cosmetic" }
+      },
+      "response": {
+        "status": 402,
+        "headers": { "Content-Type": "application/json" },
+        "body": { "error": "餘額不足", "wallet": { "cash": 0, "gems": 50 } },
+        "matchingRules": {
+          "$.body.error": { "match": "type" },
+          "$.body.wallet.gems": { "match": "integer" }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": { "version": "2.0.0" },
+    "x-source": "docs/EDD.md §3.4 (entitlement → wallet, Customer/Supplier Sync Public API) + docs/API.md POST /entitlements/buy",
+    "x-integration": "synchronous public API, same transaction (atomic debit+grant)",
+    "x-generated-by": "gendoc-gen-contracts"
+  }
+}

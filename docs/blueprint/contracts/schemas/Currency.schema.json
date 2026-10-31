@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/Currency",
+  "title": "Currency",
+  "description": "幣別（wallet BC 權威）",
+  "type": "string",
+  "enum": [
+    "cash",
+    "gems"
+  ],
+  "x-source": "docs/SCHEMA.md §0 Shared ENUM / docs/CONSTANTS.md §9",
+  "x-stereotype": "<<Enum>>"
+}

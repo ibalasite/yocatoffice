@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://yocat-office-backend.contracts/EntitlementView",
+  "title": "EntitlementView",
+  "description": "權益視圖",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "$ref": "EntitlementKind.schema.json"
+    },
+    "itemId": {
+      "type": "string"
+    },
+    "acquiredAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "kind",
+    "itemId",
+    "acquiredAt"
+  ],
+  "additionalProperties": false,
+  "x-source": "docs/API.md §3 + docs/EDD.md §3.4",
+  "x-stereotype": "<<ValueObject>>"
+}

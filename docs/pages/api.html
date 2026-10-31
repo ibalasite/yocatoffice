@@ -1,0 +1,1815 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 文件 — YoCatOffice</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    /* ─── Sidebar collapsible folder groups ─── */
+    .sidebar__section details { border: none; }
+    .sidebar__section details > summary {
+      cursor: pointer; list-style: none; display: flex; align-items: center;
+      gap: 0.375rem; padding: 0 1rem; margin-bottom: 0.375rem;
+      font-size: 0.6875rem; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.08em; user-select: none;
+    }
+    .sidebar__section details > summary::-webkit-details-marker { display: none; }
+    .sidebar__section details > summary::before {
+      content: '▶'; font-size: 0.5rem; flex-shrink: 0;
+      transition: transform 150ms; color: var(--text-muted);
+    }
+    .sidebar__section details[open] > summary::before { transform: rotate(90deg); }
+    .sidebar__section details .sidebar__link { padding-left: 1.75rem; font-size: 0.8125rem; }
+    .sidebar__section details details > summary { padding-left: 1.75rem; }
+    .sidebar__section details details .sidebar__link { padding-left: 2.5rem; }
+    /* B5/B8: labels inside details are sub-labels — indent past their parent <summary>. */
+    .sidebar__section details > .sidebar__label {
+      padding-left: 2.25rem;
+    }
+    .sidebar__section details details > .sidebar__label {
+      padding-left: 3rem;
+    }
+    /* B5: sub-label inside diagrams folding for prefix groups (Activity / Class / ...) */
+    .sidebar__label--sub {
+      padding: 0.25rem 1rem 0.125rem 3rem;
+      font-size: 0.6875rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    /* B5: links following a sub-label indent further still */
+    .sidebar__section details .sidebar__label--sub ~ .sidebar__link {
+      padding-left: 3.5rem;
+    }
+    /* ─── Q-group: header 兩層等高 56px + 白條消除 ─── */
+    .top-nav { height: 56px; padding: 0 1.5rem; border-bottom: none; }
+    .nav-breadcrumb { display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.95rem; color: #cbd5e1; }
+    .nav-breadcrumb a { color: #fff; text-decoration: none; font-weight: 600; }
+    .nav-breadcrumb a:hover { color: #60a5fa; }
+    /* U-group: current page anchor — clickable to scroll back to top */
+    .nav-breadcrumb__current { color: #fff; cursor: pointer; }
+    .nav-breadcrumb__current:hover { color: #60a5fa; }
+    .doc-page-banner { height: 56px; padding: 0 2rem;
+      display: flex; align-items: center; border-top: none; }
+    .banner-title { font-size: 1.25rem; font-weight: 700;
+      line-height: 1; margin: 0; }
+    /* R-group: main 上方留白縮減（從 style.css 預設 2.5rem 改 1rem，
+       讓 main content 緊接 banner，跟 sidebar 視覺對齊）*/
+    .doc-content { padding-top: 1rem; }
+    /* V-group: anchor jump（TOC / sidebar / URL hash）必須避開 sticky top-nav，
+       否則被點到的 heading / table / cell 永遠卡在 nav 底下看不到。
+       64px = top-nav 高 56px + 8px 視覺呼吸；scope 限 .doc-content 內 [id]
+       元素，避免影響 sidebar / nav 內部結構。 */
+    .doc-content [id] { scroll-margin-top: 64px; }
+
+    /* ─── N1 + Q + R + T: sidebar tab switcher (📁 文件 / 📑 本頁目錄) ─── */
+    /* T-group: sidebar 永遠 sticky 在左邊（top-nav 下方），tabs 釘 sidebar 頂端
+       不卷，panel 自己內部捲。`align-self: start` 讓 grid item 不被 row 拉長。
+       `overflow: visible` — wrapper 自己不卷（避免 tabs 被 panel scroll 帶走）。
+       Q-group 原意：top: 0 蓋過 style.css `top: var(--nav-h)`，但 T 後改成
+       top: 56px（top-nav 高度）讓 sticky 在 nav 下方啟動。 */
+    .sidebar { position: sticky; top: 56px;
+      height: calc(100vh - 56px); align-self: start;
+      display: flex; flex-direction: column;
+      overflow: visible; padding: 0; }
+    .sidebar__toggle { position: absolute; top: 6px; right: 6px;
+      background: #f1f5f9; border: 1px solid #cbd5e1;
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer; font-size: 11px; line-height: 1;
+      color: #475569; z-index: 3; }
+    .sidebar__toggle:hover { background: #e2e8f0; }
+    .sidebar__tabs { display: flex; gap: 2px; padding: 4px 32px 0 4px;
+      border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+      flex: 0 0 auto; }
+    .sidebar__tab { flex: 1; padding: 6px 8px; font-size: 12px;
+      border: 1px solid transparent; border-bottom: none;
+      border-radius: 4px 4px 0 0; cursor: pointer; background: transparent;
+      color: #64748b; font-family: inherit; text-align: center;
+      transition: background-color 150ms, color 150ms; }
+    .sidebar__tab:hover { color: #1e293b; background: #f1f5f9; }
+    .sidebar__tab.active { background: #fff; color: #1e3a8a;
+      border-color: #e2e8f0; font-weight: 600; margin-bottom: -1px; }
+    /* T-group: panel 自己內部捲（sidebar wrapper 不卷，tabs 不會被擠走）。
+       scrollbar-width: thin + ::-webkit-scrollbar 6px = 細到幾乎不擾眼。 */
+    .sidebar__panel { display: none; flex: 1 1 auto; overflow-y: auto;
+      overflow-x: hidden; padding: 0.5rem 0; font-size: 0.875rem;
+      scrollbar-width: thin; }
+    .sidebar__panel.active { display: block; }
+    .sidebar__panel::-webkit-scrollbar { width: 6px; }
+    .sidebar__panel::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.18); border-radius: 3px; }
+    .sidebar__panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(0,0,0,0.32); }
+    .sidebar__panel::-webkit-scrollbar-track { background: transparent; }
+    /* TOC list rendering inside the toc panel */
+    .sidebar__panel .toc-list { list-style: none; padding: 0; margin: 0; }
+    .sidebar__panel .toc-list li { margin: 0; }
+    .toc__link { display: block; padding: 0.25rem 0.75rem;
+      color: #475569; text-decoration: none; font-size: 0.8125rem;
+      border-left: 2px solid transparent; margin: 1px 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .toc__link:hover { background: #f1f5f9; color: #1e293b; }
+    .toc__link.active { background: #eff6ff; color: #1e3a8a;
+      border-left-color: #3b82f6; font-weight: 500; }
+    .toc__link--h3 { padding-left: 1.5rem; font-size: 0.78rem; color: #64748b; }
+    /* Sidebar collapsed state — keep a 32px rail visible so the toggle
+       button stays clickable; hide tabs + panels. Overrides style.css's
+       .page-wrapper.sidebar-collapsed { grid-template-columns: 0 4px 1fr; }
+       to keep the rail. */
+    .page-wrapper.sidebar-collapsed { grid-template-columns: 32px 4px 1fr; }
+    .page-wrapper.sidebar-collapsed .sidebar {
+      width: 32px; min-width: 32px;
+      visibility: visible; padding: 0; overflow: visible;
+    }
+    .page-wrapper.sidebar-collapsed .sidebar__tabs,
+    .page-wrapper.sidebar-collapsed .sidebar__panel { display: none; }
+    .page-wrapper.sidebar-collapsed .sidebar__toggle { left: 4px; right: 4px; }
+    /* RWD — auto-collapse on phones (<768px). Only kicks in when no
+       explicit `.sidebar-expanded` flag is set; tap the toggle to expand. */
+    @media (max-width: 768px) {
+      .page-wrapper:not(.sidebar-expanded) {
+        grid-template-columns: 32px 4px 1fr;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar {
+        width: 32px; min-width: 32px;
+      }
+      .page-wrapper:not(.sidebar-expanded) .sidebar__tabs,
+      .page-wrapper:not(.sidebar-expanded) .sidebar__panel { display: none; }
+    }
+    /* G-Q2 + LB1: lightbox cloned-diagram visibility under zoom container.
+       The canonical style.css sets `.lightbox__zoom-content > * { position:
+       absolute }` which collapses the cloned .diagram-container to 0×0;
+       its child SVG with `width:100%` then renders empty. Force a sensible
+       explicit width so the cloned content is actually visible. */
+    .lightbox__zoom-content .diagram-container {
+      width: 80vw;
+      max-width: 1400px;
+      min-width: 60vw;
+    }
+    .lightbox__zoom-content .diagram-container svg {
+      width: 100%;
+      height: auto;
+      max-height: 80vh;
+      display: block;
+    }
+    .lightbox__zoom-content .diagram-container .mermaid {
+      width: 100%;
+      max-width: none;
+    }
+    .lightbox__zoom-content svg {
+      height: auto;
+    }
+    /* G-Q5: prevent flex/grid child main.doc-content from expanding to its
+       content's intrinsic size when a PUML SVG / pre.mermaid has wide
+       content. Without min-width:0, the flex item's default min-width is
+       its min-content (i.e. SVG natural width), which pushes <main> to
+       3000px+ on PUML pages and breaks layout.
+
+       Pair with `<pre> { max-width: 100% }` so wide source content scrolls
+       inside the <pre> block instead of expanding the page. */
+    main.doc-content {
+      min-width: 0;
+    }
+    .doc-content pre {
+      max-width: 100%;
+    }
+    .doc-content .diagram-container {
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    /* ─── UI Mock DSL (stage 9) ─── */
+    .umock { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+    .umock__page, .umock__modal, .umock__card {
+      border: 1.5px solid #94a3b8; border-radius: 8px; background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin: 1rem 0;
+      overflow: hidden;
+    }
+    .umock__card-title { padding: 0.625rem 1rem; font-weight: 600; font-size: 0.95rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; color: #1e293b; }
+    .umock__page-title { padding: 0.75rem 1rem; font-weight: 600; font-size: 1.05rem;
+      background: #f8fafc; border-bottom: 1.5px solid #94a3b8; }
+    /* `.diagram-container` (assets/style.css) defaults to text-align: center
+       which is right for SVG/mermaid but wrong for umock body text. Reset
+       to start so individual umock elements decide their own alignment.
+       Also constrain width to content so umock card mirrors ASCII source
+       proportions (rather than stretching to full doc-content width). */
+    .diagram-container--umock {
+      text-align: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+    .diagram-container--umock .umock__card,
+    .diagram-container--umock .umock__page,
+    .diagram-container--umock .umock__modal {
+      width: fit-content;
+      max-width: 100%;
+    }
+    /* Outer-alignment modifiers — applied via attrs.align detected from
+       the source ASCII's leading/trailing whitespace within `│ ... │`. */
+    .umock__card-title--center, .umock__page-title--center,
+    .umock__text--center, .umock__info--center, .umock__hint--center,
+    .umock__actions--center { text-align: center; }
+    .umock__card-title--right, .umock__page-title--right,
+    .umock__text--right, .umock__info--right, .umock__hint--right,
+    .umock__actions--right { text-align: right; }
+    .umock__modal { max-width: 540px; }
+    .umock__modal-titlebar { display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; background: #f1f5f9; border-bottom: 1.5px solid #94a3b8; }
+    .umock__modal-title { font-weight: 600; font-size: 1rem; }
+    .umock__modal-close { color: #94a3b8; font-size: 1.1rem; cursor: default; }
+    .umock__modal-body, .umock__page > .umock__section,
+    .umock__card { padding: 0.75rem 1rem; }
+    .umock__navbar { display: flex; gap: 1rem; align-items: center;
+      padding: 0.625rem 1rem; background: #1e293b; color: #f1f5f9;
+      border-radius: 8px 8px 0 0; }
+    .umock__sidenav { float: left; width: 12rem; padding: 0.75rem;
+      background: #f8fafc; border-right: 1px solid #e2e8f0; min-height: 200px; }
+    .umock__sidenav .umock__item { padding: 0.375rem 0.5rem; border-radius: 4px;
+      color: #475569; font-size: 0.875rem; }
+    .umock__sidenav .umock__item:hover { background: #e2e8f0; }
+    .umock__page > *:not(.umock__navbar):not(.umock__sidenav) { margin-left: 12.5rem;
+      padding: 0.75rem 1rem; }
+    .umock__page::after { content: ""; display: block; clear: both; }
+    .umock__section { padding: 0.75rem 0; }
+    .umock__section-title { margin: 0 0 0.5rem 0; font-size: 1rem; font-weight: 600; }
+    .umock__section-subtitle { color: #64748b; font-size: 0.875rem; margin-bottom: 0.5rem; }
+    .umock__field { margin: 0.5rem 0; }
+    .umock__field-label { display: block; font-size: 0.85rem; color: #334155;
+      margin-bottom: 0.25rem; font-weight: 500; }
+    .umock__field-required { color: #dc2626; margin-left: 0.125rem; }
+    .umock__input, .umock__search {
+      display: block; width: 100%; padding: 0.5rem 0.625rem; font-size: 0.9rem;
+      border: 1px solid #94a3b8; border-radius: 4px; background: #fff;
+      color: #475569; box-sizing: border-box;
+    }
+    .umock__btn { display: inline-block; padding: 0.4rem 0.9rem; margin: 0.125rem;
+      font-size: 0.875rem; font-weight: 500; border: 1px solid transparent;
+      border-radius: 4px; cursor: default; background: #e2e8f0; color: #334155; }
+    .umock__btn--primary { background: #2563eb; color: #fff; }
+    .umock__btn--secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+    .umock__btn--danger { background: #dc2626; color: #fff; }
+    .umock__actions { padding: 0.5rem 0;
+      border-top: 1px solid #f1f5f9; }
+    .umock__badge { display: inline-block; padding: 0.125rem 0.5rem;
+      border-radius: 999px; font-size: 0.75rem; font-weight: 500;
+      background: #e2e8f0; color: #475569; }
+    .umock__badge--active { background: #dcfce7; color: #166534; }
+    .umock__badge--inactive { background: #fee2e2; color: #991b1b; }
+    .umock__badge--warning { background: #fef3c7; color: #92400e; }
+    .umock__hint { color: #64748b; font-size: 0.8rem; margin: 0.25rem 0 0.5rem 0; }
+    .umock__info { background: #eff6ff; border-left: 3px solid #3b82f6;
+      padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: #1e3a8a; font-size: 0.875rem; }
+    /* Plain body text row in UI mock: monospace, preserve whitespace,
+       left-aligned, no background. Maps to ASCII content rows that aren't
+       semantic markers (ⓘ / helper:). */
+    .umock__text { padding: 0.125rem 1rem; margin: 0; color: #1e293b;
+      font-family: 'Menlo','Consolas','Courier New',monospace;
+      font-size: 0.85rem; white-space: pre; }
+    /* Higher specificity than `.doc-content pre` (assets/style.css) so the
+       umock dark-canvas background isn't overridden by the generic `pre`
+       rule when umock is rendered inside `.doc-content`. */
+    .doc-content pre.umock__code, pre.umock__code { background: #1e293b; color: #f1f5f9; padding: 0.75rem;
+      border-radius: 4px; overflow-x: auto; font-size: 0.8rem;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+    .umock__code code { background: none; color: inherit; padding: 0; }
+    .umock__table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; }
+    .umock__table th, .umock__table td { padding: 0.75rem 0.875rem; text-align: left;
+      border-bottom: 1px solid #cbd5e1; }
+    .umock__table th { background: #f8fafc; font-weight: 600; color: #334155;
+      border-bottom: 2px solid #94a3b8; }
+    .umock__table tbody tr:hover { background: #f8fafc; }
+    .umock__pagination { padding: 0.5rem 0; color: #64748b; font-size: 0.8rem; text-align: right; }
+    .umock__tabs { display: flex; gap: 0.5rem; padding: 0.25rem 0; border-bottom: 1px solid #e2e8f0; }
+    .umock__tab { padding: 0.375rem 0.75rem; color: #475569; font-size: 0.875rem;
+      border-bottom: 2px solid transparent; }
+    .umock__tab:first-child { border-bottom-color: #2563eb; color: #1e40af; font-weight: 500; }
+    .umock__filter-bar { display: flex; gap: 0.5rem; align-items: center;
+      padding: 0.5rem 0; }
+    .umock__divider { border: 0; border-top: 1px solid #e2e8f0; margin: 0.5rem 0; }
+    .umock__meta-line { color: #64748b; font-size: 0.8rem; margin: 0.125rem 0; }
+    .umock__row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .umock__row-cell { font-size: 0.875rem; color: #334155; }
+    .umock__avatar { width: 1.75rem; height: 1.75rem; border-radius: 50%;
+      background: #94a3b8; display: inline-block; }
+    .umock__logo { font-weight: 700; letter-spacing: 0.02em; }
+    .umock__spacer { flex: 1; }
+    .umock__pyramid { display: block; max-width: 100%; height: auto; }
+    /* generic fallback for unknown types */
+    .umock__x { padding: 0.5rem; border: 1px dashed #cbd5e1; border-radius: 4px;
+      color: #64748b; font-size: 0.875rem; margin: 0.25rem 0; }
+  </style>
+</head>
+<body>
+  <header class="top-nav">
+    <nav class="nav-breadcrumb"><a href="index.html">YoCatOffice</a> › <a href="#top" class="nav-breadcrumb__current" onclick="event.preventDefault(); window.scrollTo({top:0, behavior:'smooth'});">API 文件</a></nav>
+    <div class="nav-controls">
+      <div class="search-wrap">
+        <input class="search-input" type="search" placeholder="搜尋文件...">
+        <div class="search-results"></div>
+      </div>
+      <a class="nav-gh-link" href="https://github.com/ibalasite/yocatoffice" target="_blank" rel="noopener">⌥ GitHub</a>
+      <button class="sidebar-toggle" id="sidebarToggle" title="收合/展開側欄">☰</button>
+    </div>
+  </header>
+  <div class="doc-page-banner">
+    <h1 class="banner-title">API 文件</h1>
+  </div>
+  <div class="page-wrapper">
+    <aside class="sidebar" aria-label="文件導覽">
+      <button class="sidebar__toggle" id="sidebarCollapseBtn" type="button" aria-label="收合 / 展開側欄" title="收合 / 展開">⇤</button><div class="sidebar__tabs" role="tablist"><button class="sidebar__tab active" data-tab="docs" type="button" role="tab" aria-selected="true">📁 文件</button><button class="sidebar__tab" data-tab="toc" type="button" role="tab" aria-selected="false">📑 本頁目錄</button></div><div class="sidebar__panel active" data-panel="docs" role="tabpanel"><div class="sidebar__section">
+<a class="sidebar__link" href="index.html">🏠 首頁</a>
+<a class="sidebar__link" href="idea.html">💡 構想文件 (IDEA)</a>
+<a class="sidebar__link" href="brd.html">📋 商業需求文件 (BRD)</a>
+<a class="sidebar__link" href="prd.html">📝 產品需求文件 (PRD)</a>
+<a class="sidebar__link" href="edd.html">🏗️ 工程設計文件 (EDD)</a>
+<a class="sidebar__link" href="arch.html">🧩 架構設計</a>
+<a class="sidebar__link active" href="api.html">🔌 API 文件</a>
+<a class="sidebar__link" href="schema.html">🗄️ Schema 文件</a>
+<a class="sidebar__link" href="constants.html">🔢 業務常數文件</a>
+<a class="sidebar__link" href="test-plan.html">✅ 測試計畫 (Test Plan)</a>
+<a class="sidebar__link" href="runbook.html">📖 Runbook</a>
+<a class="sidebar__link" href="local_deploy.html">🚀 本地部署指南</a>
+<a class="sidebar__link" href="rtm.html">🗂️ 需求追蹤矩陣 (RTM)</a>
+<a class="sidebar__link" href="align_report.html">🔍 對齊報告</a>
+<a class="sidebar__link" href="cicd.html">📄 Cicd</a>
+<a class="sidebar__link" href="contracts.html">📦 機器可讀合約</a>
+<a class="sidebar__link" href="developer_guide.html">📄 Developer Guide</a>
+<a class="sidebar__link" href="dryrun.html">📄 Dryrun</a>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📎 req/</summary>
+<a class="sidebar__link" href="req/企画.html">企画</a>
+</details>
+</div>
+<div class="sidebar__section">
+<details>
+<summary>📁 diagrams/</summary>
+<div class="sidebar__label">Server UML</div>
+<div class="sidebar__label sidebar__label--sub">Activity</div>
+<a class="sidebar__link" href="diagrams/activity-bankruptcy-rescue.html">📐 Activity Bankruptcy Rescue</a>
+<a class="sidebar__link" href="diagrams/activity-entitlements-buy.html">📐 Activity Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/activity-member-register.html">📐 Activity Member Register</a>
+<a class="sidebar__link" href="diagrams/activity-wallet-spend.html">📐 Activity Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">Class</div>
+<a class="sidebar__link" href="diagrams/class-application.html">📐 Class Application</a>
+<a class="sidebar__link" href="diagrams/class-domain.html">🗂️ 類別圖：領域模型</a>
+<a class="sidebar__link" href="diagrams/class-infra-presentation.html">📐 Class Infra Presentation</a>
+<div class="sidebar__label sidebar__label--sub">Sequence</div>
+<a class="sidebar__link" href="diagrams/sequence-auth-register.html">📐 Sequence Auth Register</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy-error.html">📐 Sequence Entitlements Buy Error</a>
+<a class="sidebar__link" href="diagrams/sequence-entitlements-buy.html">📐 Sequence Entitlements Buy</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend-error.html">📐 Sequence Wallet Spend Error</a>
+<a class="sidebar__link" href="diagrams/sequence-wallet-spend.html">📐 Sequence Wallet Spend</a>
+<div class="sidebar__label sidebar__label--sub">State</div>
+<a class="sidebar__link" href="diagrams/state-machine-deposit-order.html">📐 State Machine Deposit Order</a>
+<a class="sidebar__link" href="diagrams/state-machine-entitlement.html">📐 State Machine Entitlement</a>
+<a class="sidebar__link" href="diagrams/state-machine-office-save.html">📐 State Machine Office Save</a>
+<a class="sidebar__link" href="diagrams/state-machine-session.html">📐 State Machine Session</a>
+<a class="sidebar__link" href="diagrams/state-machine-wallet.html">📐 State Machine Wallet</a>
+<div class="sidebar__label sidebar__label--sub">CI/CD</div>
+<a class="sidebar__link" href="diagrams/cicd-pipeline-sequence.html">📐 Cicd Pipeline Sequence</a>
+<a class="sidebar__link" href="diagrams/cicd-pr-gate-activity.html">📐 Cicd Pr Gate Activity</a>
+<a class="sidebar__link" href="diagrams/cicd-secret-flow.html">📐 Cicd Secret Flow</a>
+<a class="sidebar__link" href="diagrams/developer-workflow-activity.html">📐 Developer Workflow Activity</a>
+<a class="sidebar__link" href="diagrams/infra-local-topology.html">📐 Infra Local Topology</a>
+<div class="sidebar__label sidebar__label--sub">其他</div>
+<a class="sidebar__link" href="diagrams/communication.html">🤝 協作圖</a>
+<a class="sidebar__link" href="diagrams/component.html">🧩 元件圖</a>
+<a class="sidebar__link" href="diagrams/deployment.html">☁️ 部署圖</a>
+<a class="sidebar__link" href="diagrams/er-diagram.html">🗃️ ER 關聯圖</a>
+<a class="sidebar__link" href="diagrams/object-snapshot.html">📸 物件圖：快照</a>
+<a class="sidebar__link" href="diagrams/use-case.html">👤 用例圖 (Use Case)</a>
+</details>
+</div></div><div class="sidebar__panel" data-panel="toc" role="tabpanel"><ul class="toc-list"><li><a class="toc__link" href="#document-control">Document Control</a></li><li><a class="toc__link" href="#change-log">Change Log</a></li><li><a class="toc__link" href="#0-快速概覽">0. 快速概覽</a></li><li><a class="toc__link" href="#1-概述">1. 概述</a></li><li><a class="toc__link toc__link--h3" href="#11-設計原則">1.1 設計原則</a></li><li><a class="toc__link toc__link--h3" href="#12-bounded-context-歸屬hc-2">1.2 Bounded Context 歸屬（HC-2）</a></li><li><a class="toc__link toc__link--h3" href="#13-api-序列圖client-視角">1.3 API 序列圖（Client 視角）</a></li><li><a class="toc__link" href="#2-通用規範">2. 通用規範</a></li><li><a class="toc__link toc__link--h3" href="#21-standard-request-headers">2.1 Standard Request Headers</a></li><li><a class="toc__link toc__link--h3" href="#22-standard-response-headers">2.2 Standard Response Headers</a></li><li><a class="toc__link toc__link--h3" href="#23-standard-response-body">2.3 Standard Response Body</a></li><li><a class="toc__link toc__link--h3" href="#24-http-status-code本系統實際使用集合constants-10">2.4 HTTP Status Code（本系統實際使用集合，CONSTANTS §10）</a></li><li><a class="toc__link toc__link--h3" href="#25-pagination--列表查詢策略">2.5 Pagination — 列表查詢策略</a></li><li><a class="toc__link toc__link--h3" href="#26-null-vs-absent-field-語意強制">2.6 Null vs Absent Field 語意（強制）</a></li><li><a class="toc__link toc__link--h3" href="#27-validation-error-priority-matrix強制">2.7 Validation Error Priority Matrix（強制）</a></li><li><a class="toc__link toc__link--h3" href="#271-request-body-驗證規則bean-validation-schemagencode-友善">2.7.1 Request Body 驗證規則（Bean Validation Schema，gencode 友善）</a></li><li><a class="toc__link toc__link--h3" href="#28-ha--resilience-通用規範所有端點適用詳見-edd-36">2.8 HA / Resilience 通用規範（所有端點適用，詳見 EDD §3.6）</a></li><li><a class="toc__link toc__link--h3" href="#29-curl-快速範例可執行">2.9 curl 快速範例（可執行）</a></li><li><a class="toc__link" href="#3-endpoints">3. Endpoints</a></li><li><a class="toc__link toc__link--h3" href="#bc-平台底座healthendpoints">BC: 平台底座（Health）Endpoints</a></li><li><a class="toc__link toc__link--h3" href="#bc-member-endpoints">BC: member Endpoints</a></li><li><a class="toc__link toc__link--h3" href="#bc-wallet-endpoints">BC: wallet Endpoints</a></li><li><a class="toc__link toc__link--h3" href="#bc-deposit-endpoints">BC: deposit Endpoints</a></li><li><a class="toc__link toc__link--h3" href="#bc-entitlement-endpoints">BC: entitlement Endpoints</a></li><li><a class="toc__link toc__link--h3" href="#bc-record-endpoints">BC: record Endpoints</a></li><li><a class="toc__link toc__link--h3" href="#bc-leaderboard-endpoints">BC: leaderboard Endpoints</a></li><li><a class="toc__link toc__link--h3" href="#bc-game-save-endpoints">BC: game-save Endpoints</a></li><li><a class="toc__link" href="#4-authentication--authorization">4. Authentication &amp;amp; Authorization</a></li><li><a class="toc__link toc__link--h3" href="#41-認證機制opaque-session-token--edd-adr-003">4.1 認證機制（Opaque Session Token — EDD ADR-003）</a></li><li><a class="toc__link toc__link--h3" href="#42-token-生命週期">4.2 Token 生命週期</a></li><li><a class="toc__link toc__link--h3" href="#43-密碼安全">4.3 密碼安全</a></li><li><a class="toc__link toc__link--h3" href="#44-授權模型rbac">4.4 授權模型（RBAC）</a></li><li><a class="toc__link toc__link--h3" href="#45-公開端點清單">4.5 公開端點清單</a></li><li><a class="toc__link" href="#5-error-handling">5. Error Handling</a></li><li><a class="toc__link toc__link--h3" href="#51-error-response-schema">5.1 Error Response Schema</a></li><li><a class="toc__link toc__link--h3" href="#52-error-code-registry全域constants-10--edd-54">5.2 Error Code Registry（全域，CONSTANTS §10 / EDD §5.4）</a></li><li><a class="toc__link" href="#6-rate-limiting">6. Rate Limiting</a></li><li><a class="toc__link toc__link--h3" href="#61-限制層級三層">6.1 限制層級（三層）</a></li><li><a class="toc__link toc__link--h3" href="#62-burst-容許機制">6.2 Burst 容許機制</a></li><li><a class="toc__link toc__link--h3" href="#63-429-response-格式">6.3 429 Response 格式</a></li><li><a class="toc__link" href="#7-idempotency">7. Idempotency</a></li><li><a class="toc__link toc__link--h3" href="#71-設計原則">7.1 設計原則</a></li><li><a class="toc__link toc__link--h3" href="#72-冪等端點清單edd-51--456">7.2 冪等端點清單（EDD §5.1 / §4.5.6）</a></li><li><a class="toc__link toc__link--h3" href="#73-伺服器行為idempotency-key">7.3 伺服器行為（Idempotency-Key）</a></li><li><a class="toc__link toc__link--h3" href="#74-key-規範">7.4 Key 規範</a></li><li><a class="toc__link" href="#8-webhooks">8. Webhooks</a></li><li><a class="toc__link toc__link--h3" href="#81-phase-b--金流-inbound-webhook預留">8.1 Phase B — 金流 Inbound Webhook（預留）</a></li><li><a class="toc__link toc__link--h3" href="#82-簽名驗證hmac-sha256phase-b">8.2 簽名驗證（HMAC-SHA256，Phase B）</a></li><li><a class="toc__link toc__link--h3" href="#83-重試策略phase-b">8.3 重試策略（Phase B）</a></li><li><a class="toc__link" href="#9-batch-operations">9. Batch Operations</a></li><li><a class="toc__link toc__link--h3" href="#91-phase-b-批次設計預留">9.1 Phase B 批次設計（預留）</a></li><li><a class="toc__link" href="#10-file-upload">10. File Upload</a></li><li><a class="toc__link toc__link--h3" href="#101-phase-b-大型存檔預留">10.1 Phase B 大型存檔（預留）</a></li><li><a class="toc__link" href="#11-api-paradigm-decisionapi-範式決策">11. API Paradigm Decision（API 範式決策）</a></li><li><a class="toc__link" href="#12-openapi-31-specification-example規格範本">12. OpenAPI 3.1 Specification Example（規格範本）</a></li><li><a class="toc__link" href="#13-api-changelog">13. API Changelog</a></li><li><a class="toc__link" href="#14-api-review-checklist">14. API Review Checklist</a></li><li><a class="toc__link toc__link--h3" href="#命名與結構">命名與結構</a></li><li><a class="toc__link toc__link--h3" href="#response-一致性">Response 一致性</a></li><li><a class="toc__link toc__link--h3" href="#安全性">安全性</a></li><li><a class="toc__link toc__link--h3" href="#版本與相容性">版本與相容性</a></li><li><a class="toc__link toc__link--h3" href="#文件完整性">文件完整性</a></li><li><a class="toc__link toc__link--h3" href="#ha--resilience必查所有端點">HA / Resilience（必查，所有端點）</a></li><li><a class="toc__link toc__link--h3" href="#bounded-context-封裝spring-modulith-hc-2必查">Bounded Context 封裝（Spring Modulith HC-2，必查）</a></li><li><a class="toc__link" href="#15-api-versioning--deprecation-policy">15. API Versioning &amp;amp; Deprecation Policy</a></li><li><a class="toc__link toc__link--h3" href="#151-版本策略">15.1 版本策略</a></li><li><a class="toc__link toc__link--h3" href="#152-deprecation-流程">15.2 Deprecation 流程</a></li><li><a class="toc__link toc__link--h3" href="#153-版本遷移指南格式">15.3 版本遷移指南格式</a></li><li><a class="toc__link toc__link--h3" href="#154-語義化版本">15.4 語義化版本</a></li><li><a class="toc__link" href="#16-client-sdk--code-generation">16. Client SDK &amp;amp; Code Generation</a></li><li><a class="toc__link toc__link--h3" href="#161-sdk-生成策略">16.1 SDK 生成策略</a></li><li><a class="toc__link toc__link--h3" href="#162-sdk-生成指令">16.2 SDK 生成指令</a></li><li><a class="toc__link toc__link--h3" href="#163-sdk-使用範例typescript">16.3 SDK 使用範例（TypeScript）</a></li><li><a class="toc__link" href="#17-api-observability--slo">17. API Observability &amp;amp; SLO</a></li><li><a class="toc__link toc__link--h3" href="#171-標準-observability-headers">17.1 標準 Observability Headers</a></li><li><a class="toc__link toc__link--h3" href="#172-slo-定義constants-4">17.2 SLO 定義（CONSTANTS §4）</a></li><li><a class="toc__link toc__link--h3" href="#173-error-budget-計算">17.3 Error Budget 計算</a></li><li><a class="toc__link toc__link--h3" href="#174-監測工具">17.4 監測工具</a></li><li><a class="toc__link" href="#18-admin-api條件章節">18. Admin API（條件章節）</a></li></ul></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebarResizer"></div>
+    <main class="doc-content"><h1 id="api--yocat-office-後端信任層-api-設計文件">API — yoCat Office 後端信任層 API 設計文件</h1>
+<h2 id="document-control">Document Control</h2>
+<table>
+<tr><th>欄位</th><th>值</th></tr>
+<tr><td>Document ID</td><td><code>API-YOCAT-OFFICE-BACKEND-20261030</code></td></tr>
+<tr><td>Version</td><td><code>1.0</code></td></tr>
+<tr><td>Status</td><td>Draft</td></tr>
+<tr><td>Classification</td><td>Internal</td></tr>
+<tr><td>Owner</td><td>Backend Lead / API Guild（聖祐遊戲）</td></tr>
+<tr><td><strong>Owning Bounded Context / Service</strong></td><td><strong>yocat-office-backend</strong>（Spring Modulith 模組化單體，單一對外發布服務；內含 7 個有界上下文：member / wallet / deposit / entitlement / record / leaderboard / game-save，對應 ARCH §4 / EDD §3.4）</td></tr>
+<tr><td>Created</td><td>20261030</td></tr>
+<tr><td>Last Updated</td><td>20261030</td></tr>
+<tr><td>Upstream EDD</td><td><a href="edd.html" target="_blank" rel="noopener">docs/EDD.md</a></td></tr>
+<tr><td>Upstream PRD</td><td><a href="prd.html" target="_blank" rel="noopener">docs/PRD.md</a></td></tr>
+<tr><td>Upstream CONSTANTS（SSOT）</td><td><a href="constants.html" target="_blank" rel="noopener">docs/CONSTANTS.md</a></td></tr>
+<tr><td>OpenAPI Spec</td><td><a href="openapi.yaml" target="_blank" rel="noopener">docs/openapi.yaml</a>（見 §12）</td></tr>
+<tr><td>Changelog</td><td><a href="#13-api-changelog">見 §13 Changelog</a></td></tr>
+</table>
+<h2 id="change-log">Change Log</h2>
+<table>
+<tr><th>Version</th><th>Date</th><th>Author</th><th>Summary</th></tr>
+<tr><td>1.0</td><td>20261030</td><td>gendoc gen API</td><td>初稿：依 EDD §5.2 Endpoint Inventory + CONSTANTS SSOT 生成 16 個業務端點（+2 健康檢查），涵蓋 7 有界上下文；Java 21 / Spring Boot 3.3 / Spring Modulith DTO</td></tr>
+</table>
+<hr>
+<h2 id="0-快速概覽">0. 快速概覽</h2>
+<table>
+<tr><th>項目</th><th>值</th></tr>
+<tr><td>Base URL（Production）</td><td><code>https://api.yocat.sayyogames.com</code></td></tr>
+<tr><td>Base URL（Staging）</td><td><code>https://api-staging.yocat.sayyogames.com</code></td></tr>
+<tr><td>Base URL（Development）</td><td><code>http://localhost:8080</code></td></tr>
+<tr><td>協議</td><td>HTTPS 強制（Production / Staging；本地 HTTP）</td></tr>
+<tr><td>API 版本</td><td>v1（隱含，路徑即 <code>/auth/<em></code>、<code>/wallet/</em></code> 等，與原型一致；破壞性變更時引入 <code>/v2</code> 前綴）</td></tr>
+<tr><td>認證方式</td><td><code>Authorization: Bearer &lt;session_token&gt;</code>（opaque session token，32 bytes hex）；公開端點除外</td></tr>
+<tr><td>資料格式</td><td><code>application/json; charset=utf-8</code></td></tr>
+<tr><td>時區</td><td>所有時間欄位為 UTC，ISO 8601 格式（<code>2026-10-30T00:00:00Z</code>）</td></tr>
+<tr><td>分頁策略</td><td>列表端點採 Cursor-based；<code>GET /records</code>、<code>GET /leaderboard</code> 以時間/分數排序 + <code>limit</code> 夾擠（詳見 §2.5）</td></tr>
+<tr><td>技術棧</td><td>Java 21 + Spring Boot 3.3 + Spring Modulith 1.3（Clean Architecture 4 層 + SOLID）</td></tr>
+</table>
+<p><strong>公開端點（不需 token）：</strong> <code>POST /auth/register</code>、<code>POST /auth/login</code>、<code>GET /leaderboard</code>、<code>GET /deposit/packs</code>、<code>GET /health/live</code>、<code>GET /health/ready</code>。其餘端點一律需 Bearer session token。</p>
+<p><strong>設計基準來源：</strong> 本文件端點、路徑、Request/Response、錯誤碼均以 <a href="edd.html" target="_blank" rel="noopener">EDD §5.2 Endpoint Inventory</a> 與 <a href="constants.html" target="_blank" rel="noopener">CONSTANTS（SSOT）</a> 為準，不自行新增未登記之常數、列舉或錯誤碼。</p>
+<hr>
+<h2 id="1-概述">1. 概述</h2>
+<p><strong>上下游一致性聲明：</strong></p>
+<pre><code class="">本文件的 API 序列圖描述 Client ↔ API 層的 HTTP 請求-回應視角。
+同一業務操作的服務內部詳細流程，見 docs/EDD.md §4.5.4。
+若兩份文件描述同一操作，以下優先級解決矛盾：
+  1. 若 Client 操作無效（400/401），以本文件回應規格為準
+  2. 若 Server 內部流程有異，以 EDD 為準
+  3. 若兩者皆不明確，標記 [UPSTREAM_CONFLICT] 並提交 ADR</code></pre>
+<h3 id="11-設計原則">1.1 設計原則</h3>
+<ul><li><strong>RESTful 資源導向</strong>：URL 使用名詞（<code>/entitlements</code>、<code>/records</code>、<code>/leaderboard</code>）；動作語意以 HTTP method 表達。</li><li><strong>伺服器權威（Server-Authoritative）</strong>：錢包餘額（cash / gems）、權益、記錄、排行分數一律由伺服器當權威來源，client 只讀顯示；任何餘額變動必寫 append-only <code>wallet_ledger</code>（CONSTANTS §9 reason 列舉）。</li><li><strong>冪等性</strong>：<code>POST /auth/logout</code>（by token）、<code>PUT /save</code>（by <code>account_id,slot</code>）、<code>POST /leaderboard</code>（by <code>run_id</code> upsert）、<code>POST /entitlements/buy</code>（by <code>UNIQUE(account_id,kind,item_id)</code>）、<code>POST /deposit/checkout</code>（by <code>orderId</code> / <code>Idempotency-Key</code>）皆為冪等。</li><li><strong>Service Encapsulation（Spring Modulith HC-2）</strong>：本服務為 7 個 BC 的唯一對外介面；BC 之間不得直接存取彼此 DB Schema，跨 BC 僅透過 Public API（如 <code>WalletService.debit()</code>）或 Domain Event（Transactional Outbox）互動（EDD §3.4 / §4.6）。API Response 欄位名稱經 DTO/View Model 層與 DB 欄位解耦（DB 欄位重命名不影響 API Contract）。</li><li><strong>向後相容</strong>：新欄位以 additive 方式加入，不移除或重命名現有欄位（破壞性變更升主版本）。</li></ul>
+<h3 id="12-bounded-context-歸屬hc-2">1.2 Bounded Context 歸屬（HC-2）</h3>
+<blockquote><p>本 API 文件覆蓋 yocat-office-backend 單一 Spring Modulith 服務內的 7 個有界上下文。每個 Endpoint 只屬於一個 BC；BC 邊界與 §3 的 BC 分組標題一致；Owned Tables 與 ARCH §4.0 / EDD §3.4 Schema 擁有權表一致。跨 BC 呼叫走 Public API 或 Domain Event。</p></blockquote>
+<table>
+<tr><th>Bounded Context</th><th>Path Prefix</th><th>Owning Team</th><th>Owned DB Schema（對應 SCHEMA / EDD §3.4）</th></tr>
+<tr><td>member</td><td><code>/auth/</code></td><td>Backend Core</td><td><code>member</code>: <code>accounts</code>, <code>sessions</code></td></tr>
+<tr><td>wallet</td><td><code>/wallet/</code></td><td>Backend Core</td><td><code>wallet</code>: <code>wallets</code>, <code>wallet_ledger</code></td></tr>
+<tr><td>deposit</td><td><code>/deposit/</code>、<code>POST /wallet/topup</code>（pack 解析）</td><td>Backend Core</td><td><code>deposit</code>: <code>deposit_pack</code>（目錄）、<code>deposit_order</code>（Phase B）</td></tr>
+<tr><td>entitlement</td><td><code>/entitlements</code></td><td>Backend Core</td><td><code>entitlement</code>: <code>entitlements</code></td></tr>
+<tr><td>record</td><td><code>/records</code></td><td>Backend Core</td><td><code>record</code>: <code>records</code></td></tr>
+<tr><td>leaderboard</td><td><code>/leaderboard</code></td><td>Backend Core</td><td><code>leaderboard</code>: <code>leaderboard</code></td></tr>
+<tr><td>game-save</td><td><code>/save</code></td><td>Backend Core</td><td><code>game_save</code>: <code>saves</code></td></tr>
+<tr><td>平台底座（非 BC，橫切）</td><td><code>/health/</code></td><td>Platform</td><td>—（無擁有表；承載 7 BC + Outbox）</td></tr>
+</table>
+<h3 id="13-api-序列圖client-視角">1.3 API 序列圖（Client 視角）</h3>
+<blockquote><p>覆蓋規則：每個 Mutation Endpoint（POST/PUT）至少一張，含 Happy Path + ≥2 Error Path。本系統 Mutation 共 10 個，依業務域合併呈現關鍵流程；其餘同模式者於圖下對照表標注。</p></blockquote>
+<p><strong>§1.3.1 — <code>POST /auth/register</code>（含跨 BC 事件 MemberRegistered）</strong></p>
+<div class="diagram-container"><pre class="mermaid">sequenceDiagram
+    participant C as Client
+    participant GW as API (Spring Security Filter)
+    participant M as MemberService
+    participant R as MemberRepository
+    participant DB as PostgreSQL
+    participant OB as Outbox (event_publication)
+    participant W as WalletService
+
+    C-&gt;&gt;GW: POST /auth/register {email, displayName, password}
+    GW-&gt;&gt;M: register(cmd)
+    alt email 格式/名稱/密碼不合法 (fail-fast)
+        M--&gt;&gt;C: 400 {error:&quot;email 格式不正確&quot;}
+    else email 已存在
+        M-&gt;&gt;R: SELECT 1 FROM accounts WHERE email=?
+        R--&gt;&gt;M: 命中
+        M--&gt;&gt;C: 409 {error:&quot;這個 email 已經註冊過了&quot;}
+    else Happy Path
+        M-&gt;&gt;DB: BEGIN TX
+        M-&gt;&gt;DB: INSERT accounts(email,display_name,pass_hash)
+        M-&gt;&gt;OB: INSERT event_publication(MemberRegistered)（同交易）
+        M-&gt;&gt;DB: COMMIT
+        M-&gt;&gt;M: newSession() → 簽發 session (TTL 30 天)
+        M--&gt;&gt;C: 200 {token, account, wallet:{cash:0,gems:0}}
+        par [async] Outbox 投遞
+            OB--&gt;&gt;W: deliver MemberRegistered {accountId,email}
+            W-&gt;&gt;DB: INSERT wallets(0,0) + wallet_ledger(reason=init,balance=0)
+        end
+    end</pre></div>
+<p><strong>§1.3.2 — <code>POST /wallet/spend</code>（行鎖扣款，Happy + 3 Error Path）</strong></p>
+<div class="diagram-container"><pre class="mermaid">sequenceDiagram
+    participant C as Client
+    participant GW as API (BearerTokenFilter)
+    participant WS as WalletService
+    participant DB as PostgreSQL
+    participant OB as Outbox
+
+    C-&gt;&gt;GW: POST /wallet/spend {currency, amount, reason} (Bearer)
+    alt 認證失敗（無/過期 token）
+        GW--&gt;&gt;C: 401 {error:&quot;請先登入&quot;}
+    else amount ≤ 0
+        GW-&gt;&gt;WS: debit(cmd)
+        WS--&gt;&gt;C: 400 {error:&quot;金額不正確&quot;}
+    else DB/連線不可用（Circuit Breaker Open）
+        WS--xDB: SELECT ... FOR UPDATE（逾時）
+        WS--&gt;&gt;C: 503 {error:&quot;服務暫時不可用&quot;} + Retry-After
+    else Happy Path
+        WS-&gt;&gt;DB: BEGIN TX
+        WS-&gt;&gt;DB: SELECT cash/gems FROM wallets WHERE account_id=? FOR UPDATE
+        alt 餘額 &lt; amount
+            WS-&gt;&gt;DB: ROLLBACK
+            WS--&gt;&gt;C: 402 {error:&quot;餘額不足&quot;, wallet}
+        else 餘額足夠
+            WS-&gt;&gt;DB: UPDATE wallets SET col = col - amount
+            WS-&gt;&gt;DB: INSERT wallet_ledger(delta=-amount, reason, balance)
+            WS-&gt;&gt;OB: INSERT event_publication(WalletBalanceChanged)
+            WS-&gt;&gt;DB: COMMIT
+            WS--&gt;&gt;C: 200 {ok:true, currency, balance, wallet}
+            par [async]
+                OB--&gt;&gt;OB: deliver WalletBalanceChanged
+            end
+        end
+    end</pre></div>
+<p><strong>§1.3.3 — <code>POST /entitlements/buy</code>（原子扣款 + 授予，Happy + Error）</strong></p>
+<div class="diagram-container"><pre class="mermaid">sequenceDiagram
+    participant C as Client
+    participant GW as API (BearerTokenFilter)
+    participant ES as EntitlementService
+    participant WS as WalletService
+    participant DB as PostgreSQL
+    participant OB as Outbox
+
+    C-&gt;&gt;GW: POST /entitlements/buy {kind,itemId,currency,amount} (Bearer)
+    alt kind 非法 / itemId 空
+        ES--&gt;&gt;C: 400 {error:&quot;項目不正確&quot;}
+    else 已擁有 (UNIQUE 命中)
+        ES-&gt;&gt;DB: SELECT 1 FROM entitlements WHERE account_id,kind,item_id
+        ES--&gt;&gt;C: 409 {error:&quot;已經擁有這個項目&quot;}
+    else Happy Path (amount&gt;0)
+        ES-&gt;&gt;DB: BEGIN TX
+        ES-&gt;&gt;WS: WalletService.debit(account,currency,amount) [同交易]
+        alt 餘額不足
+            WS-&gt;&gt;DB: ROLLBACK
+            WS--&gt;&gt;C: 402 {error:&quot;餘額不足&quot;, wallet}
+        else
+            WS-&gt;&gt;DB: UPDATE wallets - amount + INSERT ledger(reason=buy_&lt;kind&gt;)
+            ES-&gt;&gt;DB: INSERT entitlements(account,kind,item_id)
+            ES-&gt;&gt;OB: INSERT event_publication(EntitlementGranted)
+            ES-&gt;&gt;DB: COMMIT
+            ES--&gt;&gt;C: 200 {ok:true, wallet, entitlements}
+            par [async]
+                OB--&gt;&gt;OB: deliver EntitlementGranted
+            end
+        end
+    end</pre></div>
+<p><strong>§1.3.4 — <code>POST /deposit/checkout</code>（Phase A 假付費 / Phase B 金流，冪等 orderId）</strong></p>
+<div class="diagram-container"><pre class="mermaid">sequenceDiagram
+    participant C as Client
+    participant GW as API
+    participant DS as DepositService
+    participant DB as PostgreSQL
+    participant OB as Outbox
+    participant W as WalletService
+
+    C-&gt;&gt;GW: POST /deposit/checkout {packId} + Idempotency-Key (Bearer)
+    alt packId 不在目錄
+        DS--&gt;&gt;C: 400 {error:&quot;儲值包不正確&quot;}
+    else Idempotency-Key 重放（已確認）
+        DS-&gt;&gt;DB: SELECT deposit_order WHERE idempotency_key=?
+        DS--&gt;&gt;C: 200 {orderId, status:&quot;confirmed&quot;}（回放原結果）
+    else Happy Path（Phase A 假付費）
+        DS-&gt;&gt;DB: BEGIN TX
+        DS-&gt;&gt;DB: INSERT deposit_order(status=confirmed, idempotency_key)
+        DS-&gt;&gt;OB: INSERT event_publication(DepositConfirmed)
+        DS-&gt;&gt;DB: COMMIT
+        DS--&gt;&gt;C: 200 {orderId, packId, status:&quot;confirmed&quot;}
+        par [async] credit wallet
+            OB--&gt;&gt;W: deliver DepositConfirmed {accountId,orderId,currency,amount}
+            loop [retry 最多 5 次，指數退避]
+                W-&gt;&gt;DB: credit wallet + INSERT ledger(reason=topup) [event_id dedup]
+            end
+        end
+    end</pre></div>
+<p><strong>§1.3.5 — <code>PUT /save</code>（upsert，冪等）+ <code>POST /records</code> + <code>POST /leaderboard</code>（簡單寫入）</strong></p>
+<div class="diagram-container"><pre class="mermaid">sequenceDiagram
+    participant C as Client
+    participant GW as API (BearerTokenFilter)
+    participant S as SaveService / RecordService / LeaderboardService
+    participant DB as PostgreSQL
+
+    C-&gt;&gt;GW: PUT /save {slot?, data} (Bearer)
+    alt 未認證
+        GW--&gt;&gt;C: 401 {error:&quot;請先登入&quot;}
+    else data 缺失（PUT /save）
+        S--&gt;&gt;C: 400 {error:&quot;缺 data&quot;}
+    else Happy Path
+        S-&gt;&gt;DB: INSERT ... ON CONFLICT(account_id,slot|run_id) DO UPDATE（upsert，冪等）
+        S--&gt;&gt;C: 200 {ok:true}
+    end</pre></div>
+<blockquote><p><strong>Mutation 序列對照：</strong> <code>POST /auth/login</code>（同 §1.3.1 不含事件，錯誤 401 帳密錯）；<code>POST /auth/logout</code>（冪等刪 session，恆 200）；<code>POST /wallet/topup</code>（同 §1.3.2 credit 模式，無餘額檢查，400 金額不正確）；<code>POST /records</code>、<code>POST /leaderboard</code> 見 §1.3.5。</p></blockquote>
+<hr>
+<h2 id="2-通用規範">2. 通用規範</h2>
+<h3 id="21-standard-request-headers">2.1 Standard Request Headers</h3>
+<table>
+<tr><th>標頭</th><th>格式</th><th>必填</th><th>說明</th></tr>
+<tr><td><code>Authorization</code></td><td><code>Bearer &lt;session_token&gt;</code></td><td>是（公開端點除外）</td><td>opaque session token（32 bytes hex，TTL 30 天）</td></tr>
+<tr><td><code>Content-Type</code></td><td><code>application/json</code></td><td>POST/PUT</td><td>請求 body 格式</td></tr>
+<tr><td><code>Accept</code></td><td><code>application/json</code></td><td>建議</td><td>可接受的回應格式</td></tr>
+<tr><td><code>X-Request-Id</code></td><td>UUID v4 / traceparent</td><td>建議</td><td>追蹤用唯一請求 ID；未提供時伺服器自動產生</td></tr>
+<tr><td><code>Idempotency-Key</code></td><td>UUID v4</td><td><code>POST /deposit/checkout</code> 必填</td><td>冪等鍵；伺服器保存 24 小時（§7）</td></tr>
+</table>
+<p><strong>範例：</strong></p>
+<pre><code class="language-http">POST /wallet/spend HTTP/1.1
+Host: api.yocat.sayyogames.com
+Authorization: Bearer 3f8c1d2ae9b74c0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8
+Content-Type: application/json
+Accept: application/json
+X-Request-Id: 550e8400-e29b-41d4-a716-446655440000</code></pre>
+<h3 id="22-standard-response-headers">2.2 Standard Response Headers</h3>
+<table>
+<tr><th>標頭</th><th>格式</th><th>說明</th></tr>
+<tr><td><code>Content-Type</code></td><td><code>application/json; charset=utf-8</code></td><td>回應格式</td></tr>
+<tr><td><code>X-Request-Id</code></td><td>UUID v4</td><td>Echo 回請求的 Request ID（或伺服器產生）</td></tr>
+<tr><td><code>X-RateLimit-Limit</code></td><td>integer</td><td>當前時間窗口的請求上限</td></tr>
+<tr><td><code>X-RateLimit-Remaining</code></td><td>integer</td><td>當前時間窗口的剩餘請求次數</td></tr>
+<tr><td><code>X-RateLimit-Reset</code></td><td>Unix timestamp（秒）</td><td>速率限制重置時間點</td></tr>
+<tr><td><code>Retry-After</code></td><td>integer（秒）</td><td>僅 429 / 503 回應附帶</td></tr>
+</table>
+<p><strong>CORS（EDD §5.3）：</strong> <code>Access-Control-Allow-Origin</code>（Phase A <code>*</code>，正式收斂白名單）、<code>Access-Control-Allow-Methods: GET,POST,PUT,OPTIONS</code>、<code>Access-Control-Allow-Headers: Content-Type,Authorization</code>；<code>OPTIONS</code> 預檢回 <code>204 No Content</code>。</p>
+<h3 id="23-standard-response-body">2.3 Standard Response Body</h3>
+<blockquote><p>本 API 為 api-only 契約，沿用原型 wire 格式（EDD §5.1）：成功回傳業務物件本體（非 <code>data</code> 包裝），錯誤統一為 <code>{ &quot;error&quot;: &quot;&lt;zh-TW 訊息&gt;&quot; }</code>。錢包相關 402 另附 <code>wallet</code>。</p></blockquote>
+<p><strong>成功（範例，<code>POST /wallet/spend</code>）：</strong></p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: true,
+  &quot;currency&quot;: &quot;cash&quot;,
+  &quot;balance&quot;: 18750,
+  &quot;wallet&quot;: { &quot;cash&quot;: 18750, &quot;gems&quot;: 330 }
+}</code></pre>
+<p><strong>失敗（統一錯誤格式）：</strong></p>
+<pre><code class="language-json">{ &quot;error&quot;: &quot;餘額不足&quot;, &quot;wallet&quot;: { &quot;cash&quot;: 500, &quot;gems&quot;: 0 } }</code></pre>
+<h3 id="24-http-status-code本系統實際使用集合constants-10">2.4 HTTP Status Code（本系統實際使用集合，CONSTANTS §10）</h3>
+<table>
+<tr><th>情境</th><th>Status</th><th>說明</th></tr>
+<tr><td>查詢/操作成功</td><td>200 OK</td><td>回傳對應資源</td></tr>
+<tr><td>CORS 預檢</td><td>204 No Content</td><td><code>OPTIONS</code> 回應</td></tr>
+<tr><td>參數錯誤</td><td>400 Bad Request</td><td>email 格式、名稱越界、密碼過短、金額不正確、kind/type 非法、缺 data/runId</td></tr>
+<tr><td>未授權</td><td>401 Unauthorized</td><td>無/過期/無效 token；登入帳密錯</td></tr>
+<tr><td>需付費（餘額不足）</td><td>402 Payment Required</td><td>spend / buy 餘額 &lt; amount（附 <code>wallet</code>）</td></tr>
+<tr><td>找不到</td><td>404 Not Found</td><td>命中前綴但無對應路由</td></tr>
+<tr><td>衝突</td><td>409 Conflict</td><td>email 已註冊；已擁有 <code>(kind,item_id)</code></td></tr>
+<tr><td>速率超限</td><td>429 Too Many Requests</td><td>含 <code>Retry-After</code>（§6）</td></tr>
+<tr><td>伺服器錯誤</td><td>500 Internal Server Error</td><td>未預期例外（交易回滾，不產生半筆異動）</td></tr>
+<tr><td>服務不可用</td><td>503 Service Unavailable</td><td>依賴（DB/Redis）不可用；含 <code>Retry-After</code>（§14 HA）</td></tr>
+</table>
+<h3 id="25-pagination--列表查詢策略">2.5 Pagination — 列表查詢策略</h3>
+<p>本系統列表端點資料量受控（單帳號記錄、排行 Top N），採<strong>排序 + <code>limit</code> 夾擠</strong>策略，避免全表掃描；不回傳 <code>total_count</code>（大資料集避免 COUNT(*)）。</p>
+<table>
+<tr><th>端點</th><th>排序</th><th>limit 規則</th><th>游標欄位（Phase B 擴充）</th></tr>
+<tr><td><code>GET /records</code></td><td><code>created_at DESC</code></td><td>固定上限 100 筆（CONSTANTS §7）</td><td><code>created_at</code> + <code>id</code>（base64 cursor）</td></tr>
+<tr><td><code>GET /leaderboard</code></td><td><code>score DESC</code></td><td>預設 20，夾擠 <code>[1,100]</code>（CONSTANTS §3）</td><td><code>score</code> + <code>run_id</code></td></tr>
+</table>
+<blockquote><p>Phase B 若需無限捲動，<code>next_cursor</code> 為 base64 編碼（內含排序鍵 + tie-break id），<code>has_more</code> 布林；<code>total_count</code> 恆為 <code>null</code>。</p></blockquote>
+<h3 id="26-null-vs-absent-field-語意強制">2.6 Null vs Absent Field 語意（強制）</h3>
+<p>每個 Response DTO 區分三態：<code>required</code>（永遠存在且非 null）、<code>null</code>（欄位存在值為 null）、<code>absent</code>（欄位不出現）。各端點 Response 欄位表均含 <strong>Nullable</strong> 欄。代表性規則：</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>若為 null / absent 語意</th></tr>
+<tr><td><code>save</code></td><td>Object</td><td>required</td><td>yes（null = 該 slot 無存檔）</td><td><code>GET /save</code> 查無資料回 <code>{&quot;save&quot;: null}</code></td></tr>
+<tr><td><code>grade</code></td><td>String</td><td>optional</td><td>yes（null = 未評級）</td><td><code>leaderboard.grade</code> 未提供時為 null</td></tr>
+<tr><td><code>wallet</code>（錯誤回應中）</td><td>Object</td><td>absent if not 402</td><td>no</td><td>僅 402 餘額不足時附帶，其餘錯誤 absent</td></tr>
+</table>
+<h3 id="27-validation-error-priority-matrix強制">2.7 Validation Error Priority Matrix（強制）</h3>
+<p>本系統沿用原型驗證語意：所有寫入端點採 <strong>fail-fast</strong>（第一個欄位驗證失敗即回傳 400，回應 <code>{&quot;error&quot;:&quot;&lt;該欄位訊息&gt;&quot;}</code>），與 accounts.ts 逐項 <code>return</code> 一致。</p>
+<table>
+<tr><th>Endpoint</th><th>驗證策略</th><th>第一順位檢查</th></tr>
+<tr><td><code>POST /auth/register</code></td><td>fail-fast</td><td>email 格式 → displayName 長度 → password 長度</td></tr>
+<tr><td><code>POST /wallet/topup</code></td><td>fail-fast</td><td>pack 有效性 / amount 範圍</td></tr>
+<tr><td><code>POST /wallet/spend</code></td><td>fail-fast</td><td>amount &gt; 0</td></tr>
+<tr><td><code>POST /entitlements/buy</code></td><td>fail-fast</td><td>kind ∈ 集合 且 itemId 非空</td></tr>
+<tr><td><code>POST /deposit/checkout</code></td><td>fail-fast</td><td>packId ∈ 目錄</td></tr>
+<tr><td><code>PUT /save</code></td><td>fail-fast</td><td>data 非 null</td></tr>
+<tr><td><code>POST /records</code></td><td>fail-fast</td><td>type ∈ 集合</td></tr>
+<tr><td><code>POST /leaderboard</code></td><td>fail-fast</td><td>runId 非空</td></tr>
+</table>
+<h3 id="271-request-body-驗證規則bean-validation-schemagencode-友善">2.7.1 Request Body 驗證規則（Bean Validation Schema，gencode 友善）</h3>
+<blockquote><p>本節為 gencode / 自動化實作提供<strong>機器可讀的輸入驗證 schema</strong>。採 Jakarta Bean Validation（<code>jakarta.validation</code> 註解，Spring Boot <code>@Valid</code> 觸發）；數值 / 列舉 / 跨欄位條件以 constraint 欄說明。約束值對齊 CONSTANTS（SSOT），與各端點 §3 的 Request DTO 一致。違反任一約束 → fail-fast 回 400 <code>{&quot;error&quot;:&quot;&lt;該欄位訊息&gt;&quot;}</code>（§2.7）。</p></blockquote>
+<p><strong><code>POST /auth/register</code></strong> — <code>RegisterRequest</code></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Bean Validation</th><th>約束說明</th></tr>
+<tr><td><code>email</code></td><td>String</td><td>✔</td><td><code>@NotBlank @Email</code></td><td>RFC 5322；伺服器 trim + lowercase；全域唯一（違反唯一 → 409，非 400）</td></tr>
+<tr><td><code>displayName</code></td><td>String</td><td>✔</td><td><code>@NotBlank @Size(min=1, max=24)</code></td><td><code>DISPLAY_NAME_MIN</code>/<code>MAX</code></td></tr>
+<tr><td><code>password</code></td><td>String</td><td>✔</td><td><code>@NotBlank @Size(min=6)</code></td><td><code>PASSWORD_MIN</code>；scrypt 雜湊</td></tr>
+</table>
+<p><strong><code>POST /auth/login</code></strong> — <code>LoginRequest</code></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Bean Validation</th><th>約束說明</th></tr>
+<tr><td><code>email</code></td><td>String</td><td>✔</td><td><code>@NotBlank @Email</code></td><td>trim + lowercase</td></tr>
+<tr><td><code>password</code></td><td>String</td><td>✔</td><td><code>@NotBlank</code></td><td>明文（TLS 傳輸），不洩露帳號是否存在</td></tr>
+</table>
+<p><strong><code>POST /wallet/topup</code></strong> — <code>TopupRequest</code>（<code>pack</code> 與 <code>currency</code>+<code>amount</code> 二擇一）</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Bean Validation</th><th>約束說明</th></tr>
+<tr><td><code>pack</code></td><td>String</td><td>選填</td><td>—</td><td>∈ <code>{g_small,g_mid,g_big,cap_1000}</code>（deposit 目錄；程式碼層校驗）</td></tr>
+<tr><td><code>currency</code></td><td>enum</td><td>選填</td><td>—</td><td><code>cash</code>/<code>gems</code>；無 <code>pack</code> 時必填；非 <code>gems</code> 視為 <code>cash</code></td></tr>
+<tr><td><code>amount</code></td><td>Long</td><td>選填</td><td><code>@Min(1) @Max(10_000_000)</code></td><td><code>TOPUP_AMOUNT_MIN</code>/<code>MAX</code>；無 <code>pack</code> 時必填</td></tr>
+</table>
+<p><strong><code>POST /wallet/spend</code></strong> — <code>SpendRequest</code></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Bean Validation</th><th>約束說明</th></tr>
+<tr><td><code>currency</code></td><td>enum</td><td>✔</td><td><code>@NotNull</code></td><td><code>cash</code>/<code>gems</code>（非 <code>gems</code> 視為 <code>cash</code>）</td></tr>
+<tr><td><code>amount</code></td><td>long</td><td>✔</td><td><code>@Positive</code></td><td>&gt; 0；取整</td></tr>
+<tr><td><code>reason</code></td><td>String</td><td>選填</td><td><code>@Size(max=40)</code></td><td><code>SPEND_REASON_MAXLEN</code>；超過截斷；預設 <code>spend</code></td></tr>
+</table>
+<p><strong><code>POST /entitlements/buy</code></strong> — <code>BuyRequest</code></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Bean Validation</th><th>約束說明</th></tr>
+<tr><td><code>kind</code></td><td>enum</td><td>✔</td><td><code>@NotNull</code></td><td><code>cosmetic</code>/<code>dream</code>/<code>scenario</code></td></tr>
+<tr><td><code>itemId</code></td><td>String</td><td>✔</td><td><code>@NotBlank</code></td><td>非空</td></tr>
+<tr><td><code>currency</code></td><td>enum</td><td>選填</td><td>—</td><td><code>cash</code>/<code>gems</code>（預設 <code>cash</code>）</td></tr>
+<tr><td><code>amount</code></td><td>Long</td><td>選填</td><td><code>@PositiveOrZero</code></td><td>≥ 0（預設 0 = 免費授予，不寫 ledger）</td></tr>
+</table>
+<p><strong><code>POST /deposit/checkout</code></strong> — <code>CheckoutRequest</code>（+ header <code>Idempotency-Key</code>）</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Bean Validation</th><th>約束說明</th></tr>
+<tr><td><code>packId</code></td><td>String</td><td>✔</td><td><code>@NotBlank</code></td><td>須 ∈ <code>GET /deposit/packs</code> 目錄（程式碼層校驗）</td></tr>
+<tr><td><code>Idempotency-Key</code>（header）</td><td>String（UUID v4）</td><td>✔</td><td><code>@NotBlank</code>（header 必填）</td><td>缺失回 400；24h 保存；同 key 異 body 回 409</td></tr>
+</table>
+<p><strong><code>PUT /save</code></strong> — <code>SavePutRequest</code></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Bean Validation</th><th>約束說明</th></tr>
+<tr><td><code>slot</code></td><td>String</td><td>選填</td><td>—</td><td>存檔槽，預設 <code>main</code></td></tr>
+<tr><td><code>data</code></td><td>Map/Object</td><td>✔</td><td><code>@NotNull</code></td><td>null 回 400「缺 data」；body &gt; 4MB（<code>REQUEST_BODY_MAX</code>）回 413</td></tr>
+</table>
+<blockquote><p>列舉（<code>Currency</code>/<code>EntitlementKind</code>/<code>RecordType</code>）由 Jackson 反序列化校驗，非法值回 400；<code>pack</code>/<code>packId</code> 的目錄成員資格與 <code>email</code> 唯一性屬業務規則，於 service 層校驗（非註解），分別回 400 / 409。</p></blockquote>
+<h3 id="28-ha--resilience-通用規範所有端點適用詳見-edd-36">2.8 HA / Resilience 通用規範（所有端點適用，詳見 EDD §3.6）</h3>
+<p><strong>2.8.1 Timeout（強制，非無限）</strong></p>
+<table>
+<tr><th>Timeout 類型</th><th>值</th><th>說明</th></tr>
+<tr><td>連線建立 Timeout（client）</td><td>2s</td><td>TCP/TLS 連線建立上限</td></tr>
+<tr><td>讀取 Timeout（client read）</td><td>5s</td><td>client 等待回應上限</td></tr>
+<tr><td>Server 端最大響應時間</td><td>3s</td><td>超過回 503（防 thread pool 耗盡）</td></tr>
+<tr><td>DB 查詢 Timeout</td><td>2s</td><td>HikariCP + statement_timeout；超時回滾交易</td></tr>
+<tr><td>Redis 操作 Timeout</td><td>200ms</td><td>cache miss 降級回源 DB（非 500）</td></tr>
+</table>
+<blockquote><p>效能敏感端點（<code>POST /wallet/spend</code>、<code>POST /entitlements/buy</code> 含 <code>FOR UPDATE</code> 行鎖）鎖等待逾時 1s，超時回 503 並釋放鎖，避免 cascading failure。</p></blockquote>
+<p><strong>2.8.2 重試策略（client）</strong></p>
+<table>
+<tr><th>項目</th><th>規則</th></tr>
+<tr><td>可重試狀態碼</td><td>429、502、503、504（暫時性故障）</td></tr>
+<tr><td>不可重試狀態碼</td><td>400、401、402、404、409（語意性失敗，重試無效）</td></tr>
+<tr><td>最大重試次數</td><td>3 次</td></tr>
+<tr><td>退避算法</td><td>Exponential Backoff + Jitter：<code>delay = min(2^n × 200ms, 5s) × (0.5 + rand/2)</code></td></tr>
+<tr><td>非冪等端點重試</td><td><code>POST /deposit/checkout</code> 重試須帶相同 <code>Idempotency-Key</code>（§7）；<code>POST /wallet/spend</code> 不建議自動重試（非冪等）</td></tr>
+</table>
+<p><strong>2.8.3 Circuit Breaker</strong></p>
+<p>對外部依賴（PostgreSQL、Redis）呼叫採 Resilience4j Circuit Breaker：</p>
+<table>
+<tr><th>參數</th><th>值</th></tr>
+<tr><td>錯誤率門檻</td><td>5 秒滑動窗內錯誤率 &gt; 50% → Open</td></tr>
+<tr><td>Open 後 fallback</td><td>回 <code>503 {&quot;error&quot;:&quot;服務暫時不可用&quot;}</code> + <code>Retry-After: 30</code></td></tr>
+<tr><td>半開探測間隔</td><td>30s（半開放行少量請求探測）</td></tr>
+<tr><td>Redis 降級</td><td>Open 時 session/cache 查詢回源 DB（降級非中斷，EDD §3.6.4）</td></tr>
+</table>
+<p><strong>2.8.4 Graceful Shutdown（EDD §3.6.5）</strong></p>
+<p>Pod 收到 <code>SIGTERM</code> 後：(1) Readiness Probe 立即轉 <code>DOWN</code>，Load Balancer 停止導流；(2) 不再接受新請求；(3) in-flight 請求最多等待 <strong>30s</strong> 完成後才退出（Spring Boot <code>server.shutdown=graceful</code>、<code>spring.lifecycle.timeout-per-shutdown-phase=30s</code>）；(4) Outbox 事件投遞於關閉前完成當前批次。確保 rolling update / scale / 節點驅逐期間 SLO 維持 99.9%（CONSTANTS §4）。</p>
+<h3 id="29-curl-快速範例可執行">2.9 curl 快速範例（可執行）</h3>
+<blockquote><p>Base URL 以 Production 為例；token 為 <code>POST /auth/login</code> 回傳的 <code>token</code> 欄位（32B hex opaque session）。測試用帳號請向後端申請（Slack: #backend）。</p></blockquote>
+<pre><code class="language-bash"># 註冊
+curl -X POST https://api.yocat.sayyogames.com/auth/register \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{&quot;email&quot;:&quot;boss@yocat.example&quot;,&quot;displayName&quot;:&quot;喵喵科技&quot;,&quot;password&quot;:&quot;s3cret!&quot;}&#x27;
+
+# 登入（取得 token）
+curl -X POST https://api.yocat.sayyogames.com/auth/login \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{&quot;email&quot;:&quot;boss@yocat.example&quot;,&quot;password&quot;:&quot;s3cret!&quot;}&#x27;
+
+# 花費（帶 Bearer session token）
+curl -X POST https://api.yocat.sayyogames.com/wallet/spend \
+  -H &quot;Authorization: Bearer 3f8c1d2ae9b74c0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{&quot;currency&quot;:&quot;cash&quot;,&quot;amount&quot;:1250,&quot;reason&quot;:&quot;salary_day_42&quot;}&#x27;
+
+# 公開排行 Top 20
+curl &quot;https://api.yocat.sayyogames.com/leaderboard?mode=sandbox&amp;limit=20&quot;</code></pre>
+<hr>
+<h2 id="3-endpoints">3. Endpoints</h2>
+<blockquote><p><strong>組織原則（Spring Modulith HC-2）</strong>：依所屬 Bounded Context 分組；每個 Endpoint 只屬於一個 BC；Path Prefix 對應其 Owning BC。所有需認證端點回應碼含 401；錢包類含 402；建立/衝突類含 409（CONSTANTS §10）。lang_stack=Java，DTO 以 Java <code>record</code> + <code>@Schema</code> 表達。</p></blockquote>
+<h3 id="bc-平台底座healthendpoints">BC: 平台底座（Health）Endpoints</h3>
+<blockquote><p><strong>Owning BC</strong>：平台底座（非 BC，橫切） | <strong>Path Prefix</strong>：<code>/health/</code> | <strong>Owned Tables</strong>：無</p></blockquote>
+<h4 id="get-healthlive"><code>GET /health/live</code></h4>
+<p>存活探針（Liveness）。回應程序是否存活，供 K8s livenessProbe 使用。</p>
+<ul><li><strong>認證</strong>：公開（不需 token）</li><li><strong>權限</strong>：無</li></ul>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{ &quot;status&quot;: &quot;UP&quot; }</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>SERVICE_UNAVAILABLE</code></td><td>503</td><td>程序關閉中（Graceful Shutdown）</td><td><code>{&quot;status&quot;:&quot;DOWN&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="get-healthready"><code>GET /health/ready</code></h4>
+<p>就緒探針（Readiness）。檢查 DB / Redis 依賴是否可用，供 K8s readinessProbe 使用。</p>
+<ul><li><strong>認證</strong>：公開</li><li><strong>權限</strong>：無</li></ul>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{ &quot;status&quot;: &quot;UP&quot;, &quot;db&quot;: &quot;UP&quot;, &quot;redis&quot;: &quot;UP&quot; }</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>NOT_READY</code></td><td>503</td><td>DB 或 Redis 不可用（Pod 暫不接流量）</td><td><code>{&quot;status&quot;:&quot;DOWN&quot;,&quot;db&quot;:&quot;DOWN&quot;}</code></td></tr>
+</table>
+<hr>
+<h3 id="bc-member-endpoints">BC: member Endpoints</h3>
+<blockquote><p><strong>Owning BC</strong>：member | <strong>Path Prefix</strong>：<code>/auth/</code> | <strong>Owned Tables</strong>：<code>member</code>: <code>accounts</code>, <code>sessions</code></p></blockquote>
+<h4 id="post-authregister"><code>POST /auth/register</code></h4>
+<p>註冊新帳號。同交易建立 <code>accounts</code>，提交後經 <code>MemberRegistered</code> 事件由 wallet BC 建立錢包 + <code>init</code> 開帳 ledger（EDD §4.6.1）；簽發 session token（TTL 30 天）。</p>
+<ul><li><strong>認證</strong>：公開</li><li><strong>權限</strong>：無</li><li><strong>冪等</strong>：否（每次建立新帳號；email 唯一約束防重複）</li></ul>
+<p><strong>Request Body：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>email</code></td><td>String</td><td>required</td><td>no</td><td>登入識別，RFC 5322 e-mail；伺服器 trim + lowercase；全域唯一</td></tr>
+<tr><td><code>displayName</code></td><td>String</td><td>required</td><td>no</td><td>公司/老闆名，1–24 字（<code>DISPLAY_NAME_MIN</code>/<code>MAX</code>）</td></tr>
+<tr><td><code>password</code></td><td>String</td><td>required</td><td>no</td><td>密碼，≥ 6 碼（<code>PASSWORD_MIN</code>）；scrypt 雜湊儲存</td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public record RegisterRequest(
+    @NotBlank @Email String email,
+    @NotBlank @Size(min = 1, max = 24) String displayName,
+    @NotBlank @Size(min = 6) String password
+) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;email&quot;: &quot;boss@yocat.example&quot;, &quot;displayName&quot;: &quot;喵喵科技&quot;, &quot;password&quot;: &quot;s3cret!&quot; }</code></pre>
+<p><strong>Response 200：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>token</code></td><td>String</td><td>required</td><td>no</td><td>opaque session token（32B hex）</td></tr>
+<tr><td><code>account</code></td><td>Object</td><td>required</td><td>no</td><td><code>{id, email, display_name}</code></td></tr>
+<tr><td><code>wallet</code></td><td>Object</td><td>required</td><td>no</td><td>初始錢包 <code>{cash:0, gems:0}</code></td></tr>
+</table>
+<p><strong>Response DTO（Java）：</strong></p>
+<pre><code class="language-java">public record AccountView(String id, String email, String displayName) {}
+public record WalletView(long cash, long gems) {}
+public record AuthResponse(String token, AccountView account, WalletView wallet) {}</code></pre>
+<pre><code class="language-json">{
+  &quot;token&quot;: &quot;3f8c1d2ae9b74c0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8&quot;,
+  &quot;account&quot;: { &quot;id&quot;: &quot;1024&quot;, &quot;email&quot;: &quot;boss@yocat.example&quot;, &quot;display_name&quot;: &quot;喵喵科技&quot; },
+  &quot;wallet&quot;: { &quot;cash&quot;: 0, &quot;gems&quot;: 0 }
+}</code></pre>
+<p><strong>業務邏輯步驟：</strong></p>
+<ol><li>驗證 <code>email</code>（RFC regex）→ 不符回 400「email 格式不正確」</li><li>驗證 <code>displayName</code> 長度 ∈ [1,24] → 不符回 400「公司/老闆名需 1–24 字」</li><li>驗證 <code>password</code> 長度 ≥ 6 → 不符回 400「密碼至少 6 碼」</li><li>查詢 <code>accounts</code> WHERE <code>email</code> = :email → 命中回 409「這個 email 已經註冊過了」</li><li>BEGIN TRANSACTION</li><li>INSERT INTO <code>accounts</code> (<code>email</code>, <code>display_name</code>, <code>pass_hash</code>) VALUES (…)（<code>pass_hash</code> = scrypt(salt$hash)，<code>SCRYPT_KEYLEN=64</code>、<code>SCRYPT_SALT_BYTES=16</code>）</li><li>INSERT event_publication <code>MemberRegistered</code> {accountId, email}（同交易，Outbox）</li><li>COMMIT</li><li>簽發 session：INSERT INTO <code>sessions</code>(<code>token</code>, <code>account_id</code>, <code>expires_at</code>) VALUES (randomHex(32), :id, now()+30d)</li><li>回傳 200 + <code>AuthResponse</code>（wallet 由 <code>MemberRegistered</code> 事件異步建立，回應以 <code>{cash:0,gems:0}</code> 呈現）</li></ol>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>email 格式不符 / 名稱越界 / 密碼過短</td><td><code>{&quot;error&quot;:&quot;email 格式不正確&quot;}</code></td></tr>
+<tr><td><code>CONFLICT</code></td><td>409</td><td>該 email 已被註冊</td><td><code>{&quot;error&quot;:&quot;這個 email 已經註冊過了&quot;}</code></td></tr>
+<tr><td><code>RATE_LIMITED</code></td><td>429</td><td>同一 IP 每分鐘超過 5 次（CONSTANTS §6）</td><td><code>{&quot;error&quot;:&quot;請求過於頻繁&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外（交易回滾）</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="post-authlogin"><code>POST /auth/login</code></h4>
+<p>登入並簽發 session token。驗證 scrypt 密碼（<code>timingSafeEqual</code> 防時序攻擊）。</p>
+<ul><li><strong>認證</strong>：公開</li><li><strong>權限</strong>：無</li><li><strong>冪等</strong>：否（每次簽發新 session）</li></ul>
+<p><strong>Request Body：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>email</code></td><td>String</td><td>required</td><td>no</td><td>登入識別（trim + lowercase）</td></tr>
+<tr><td><code>password</code></td><td>String</td><td>required</td><td>no</td><td>明文密碼（TLS 傳輸）</td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public record LoginRequest(@NotBlank @Email String email, @NotBlank String password) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;email&quot;: &quot;boss@yocat.example&quot;, &quot;password&quot;: &quot;s3cret!&quot; }</code></pre>
+<p><strong>Response 200：</strong> 同 <code>AuthResponse</code>（<code>token</code> + <code>account</code> + 當前 <code>wallet</code>）。</p>
+<pre><code class="language-json">{
+  &quot;token&quot;: &quot;a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2&quot;,
+  &quot;account&quot;: { &quot;id&quot;: &quot;1024&quot;, &quot;email&quot;: &quot;boss@yocat.example&quot;, &quot;display_name&quot;: &quot;喵喵科技&quot; },
+  &quot;wallet&quot;: { &quot;cash&quot;: 18750, &quot;gems&quot;: 330 }
+}</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>帳號不存在或密碼錯誤（不區分，防帳號枚舉）</td><td><code>{&quot;error&quot;:&quot;email 或密碼錯誤&quot;}</code></td></tr>
+<tr><td><code>RATE_LIMITED</code></td><td>429</td><td>同一 IP 每分鐘超過 10 次（防暴力破解，CONSTANTS §6）</td><td><code>{&quot;error&quot;:&quot;請求過於頻繁&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="post-authlogout"><code>POST /auth/logout</code></h4>
+<p>登出，刪除當前 session token。<strong>冪等</strong>：重複呼叫或 token 已失效皆回 200。</p>
+<ul><li><strong>認證</strong>：需 Bearer token（但即使 token 無效亦回 200，冪等）</li><li><strong>權限</strong>：<code>member:self</code></li></ul>
+<p><strong>Request Body：</strong> 無（token 取自 <code>Authorization</code> header）</p>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true }</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外（刪 session 失敗）</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<blockquote><p>注意：logout 刻意不回 401（冪等語意），即使 token 不存在也刪除成功（no-op）並回 200。</p></blockquote>
+<hr>
+<h4 id="get-authme"><code>GET /auth/me</code></h4>
+<p>取得當前登入帳號資料，彙整 wallet 與 entitlements（跨 BC 經 Public API 彙整，非跨 BC JOIN）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>member:self</code></li><li><strong>Cross-BC Dependencies</strong>：讀 wallet BC（<code>WalletService.balanceOf(accountId)</code>）+ entitlement BC（<code>EntitlementService.listOf(accountId)</code>）；同步 Public API 呼叫，非跨 BC JOIN。降級策略：wallet/entitlement BC 不可用時，<code>wallet</code>/<code>entitlements</code> 欄位回最後已知值或空集合，<code>account</code> 仍回 200（member BC 自有資料）。</li></ul>
+<p><strong>Response 200：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>account</code></td><td>Object</td><td>required</td><td>no</td><td><code>{id, email, display_name}</code></td></tr>
+<tr><td><code>wallet</code></td><td>Object</td><td>required</td><td>no</td><td><code>{cash, gems}</code></td></tr>
+<tr><td><code>entitlements</code></td><td>Array</td><td>required</td><td>no（可為空陣列）</td><td>已購權益清單</td></tr>
+</table>
+<p><strong>Response DTO（Java）：</strong></p>
+<pre><code class="language-java">public record EntitlementView(String kind, String itemId, String acquiredAt) {}
+public record MeResponse(AccountView account, WalletView wallet, List&lt;EntitlementView&gt; entitlements) {}</code></pre>
+<pre><code class="language-json">{
+  &quot;account&quot;: { &quot;id&quot;: &quot;1024&quot;, &quot;email&quot;: &quot;boss@yocat.example&quot;, &quot;display_name&quot;: &quot;喵喵科技&quot; },
+  &quot;wallet&quot;: { &quot;cash&quot;: 18750, &quot;gems&quot;: 330 },
+  &quot;entitlements&quot;: [
+    { &quot;kind&quot;: &quot;cosmetic&quot;, &quot;itemId&quot;: &quot;suit_gold&quot;, &quot;acquiredAt&quot;: &quot;2026-10-30T02:11:00Z&quot; }
+  ]
+}</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 / 無效 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h3 id="bc-wallet-endpoints">BC: wallet Endpoints</h3>
+<blockquote><p><strong>Owning BC</strong>：wallet | <strong>Path Prefix</strong>：<code>/wallet/</code> | <strong>Owned Tables</strong>：<code>wallet</code>: <code>wallets</code>, <code>wallet_ledger</code></p></blockquote>
+<h4 id="post-wallettopup"><code>POST /wallet/topup</code></h4>
+<p>儲值（假付費）。支援預定義 <code>pack</code>（gem/cap 包，deposit BC 解析）或自訂 <code>currency</code> + <code>amount</code>。同交易加值並寫 <code>topup</code> ledger。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>wallet:write</code>（self）</li><li><strong>冪等</strong>：否（Phase A 直接加值；Phase B 真金流經 <code>POST /deposit/checkout</code> 以 orderId 冪等）</li></ul>
+<p><strong>Request Body：</strong>（<code>pack</code> 與 <code>currency+amount</code> 二擇一）</p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>pack</code></td><td>String</td><td>optional</td><td>yes</td><td>儲值包 ID：<code>g_small</code>/<code>g_mid</code>/<code>g_big</code>（gems）、<code>cap_1000</code>（cash），由 deposit BC 權威定義（CONSTANTS §7）</td></tr>
+<tr><td><code>currency</code></td><td>String（enum）</td><td>optional</td><td>yes</td><td><code>cash</code>/<code>gems</code>；無 <code>pack</code> 時必填；非 <code>gems</code> 一律視為 <code>cash</code></td></tr>
+<tr><td><code>amount</code></td><td>Integer</td><td>optional</td><td>yes</td><td>自訂金額，範圍 <code>[1, 10_000_000]</code>（<code>TOPUP_AMOUNT_MIN</code>/<code>MAX</code>）；取整</td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public enum Currency { cash, gems }
+public record TopupRequest(String pack, Currency currency, Long amount) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;pack&quot;: &quot;g_mid&quot; }</code></pre>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true, &quot;currency&quot;: &quot;gems&quot;, &quot;amount&quot;: 330, &quot;balance&quot;: 660, &quot;wallet&quot;: { &quot;cash&quot;: 18750, &quot;gems&quot;: 660 } }</code></pre>
+<p><strong>業務邏輯步驟：</strong></p>
+<ol><li>驗證 JWT → 解析 <code>account_id</code>（opaque session → <code>sessions.account_id</code>）</li><li>解析 <code>pack</code>：若 ∈ <code>GEM_PACKS</code> → currency=gems, amount=包面額；若 ∈ <code>CAP_PACKS</code> → currency=cash；否則採自訂 <code>currency</code>+<code>amount</code></li><li>驗證 <code>amount</code> ∈ <code>(0, 10_000_000]</code> → 否則回 400「金額不正確」</li><li>BEGIN TRANSACTION</li><li>UPDATE <code>wallets</code> SET <code>{cash|gems}</code> = <code>{cash|gems}</code> + :amount, <code>updated_at</code> = now() WHERE <code>account_id</code> = :id RETURNING balance</li><li>INSERT INTO <code>wallet_ledger</code> (<code>account_id</code>,<code>currency</code>,<code>delta</code>,<code>reason</code>,<code>balance</code>,<code>meta</code>) VALUES (:id, :currency, +:amount, <code>&#x27;topup&#x27;</code>, :newBal, <code>{label, fake:true}</code>)</li><li>PUBLISH Domain Event <code>WalletBalanceChanged</code> {accountId, currency, delta, balance, reason=topup}（Outbox）</li><li>COMMIT</li><li>回傳 200 + <code>{ok, currency, amount, balance, wallet}</code></li></ol>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>amount ≤ 0 或 &gt; 10,000,000</td><td><code>{&quot;error&quot;:&quot;金額不正確&quot;}</code></td></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>RATE_LIMITED</code></td><td>429</td><td>每帳號每分鐘超過 60 次（CONSTANTS §6）</td><td><code>{&quot;error&quot;:&quot;請求過於頻繁&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外（交易回滾）</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="post-walletspend"><code>POST /wallet/spend</code></h4>
+<p>花費（扣款）。以 <code>SELECT ... FOR UPDATE</code> 行鎖序列化，餘額不足回 402 並回傳現有 wallet（交易回滾，不產生半筆異動）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>wallet:write</code>（self）</li><li><strong>冪等</strong>：否（每次扣款為業務預期；併發以行鎖序列化，EDD §4.5.6）</li></ul>
+<p><strong>Request Body：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>currency</code></td><td>String（enum）</td><td>required</td><td>no</td><td><code>cash</code>/<code>gems</code>（非 <code>gems</code> 視為 <code>cash</code>）</td></tr>
+<tr><td><code>amount</code></td><td>Integer</td><td>required</td><td>no</td><td>扣款金額，&gt; 0（取整）</td></tr>
+<tr><td><code>reason</code></td><td>String</td><td>optional</td><td>yes</td><td>花費事由，超過 40 字截斷（<code>SPEND_REASON_MAXLEN</code>）；預設 <code>spend</code></td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public record SpendRequest(@NotNull Currency currency, @Positive long amount, String reason) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;currency&quot;: &quot;cash&quot;, &quot;amount&quot;: 1250, &quot;reason&quot;: &quot;salary_day_42&quot; }</code></pre>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true, &quot;currency&quot;: &quot;cash&quot;, &quot;balance&quot;: 17500, &quot;wallet&quot;: { &quot;cash&quot;: 17500, &quot;gems&quot;: 330 } }</code></pre>
+<p><strong>業務邏輯步驟：</strong></p>
+<ol><li>驗證 session → 解析 <code>account_id</code></li><li>驗證 <code>amount</code> &gt; 0 → 否則回 400「金額不正確」</li><li>截斷 <code>reason</code> 至 40 字（<code>SPEND_REASON_MAXLEN</code>）</li><li>BEGIN TRANSACTION</li><li>SELECT <code>{cash|gems}</code> FROM <code>wallets</code> WHERE <code>account_id</code> = :id <strong>FOR UPDATE</strong>（行鎖）</li><li>若當前餘額 &lt; :amount → ROLLBACK → 回 402「餘額不足」+ 現有 <code>wallet</code></li><li>UPDATE <code>wallets</code> SET <code>{cash|gems}</code> = <code>{cash|gems}</code> - :amount, <code>updated_at</code> = now() RETURNING balance</li><li>INSERT INTO <code>wallet_ledger</code> (<code>account_id</code>,<code>currency</code>,<code>delta</code>,<code>reason</code>,<code>balance</code>,<code>meta</code>) VALUES (:id, :currency, -:amount, :reason, :newBal, :meta)</li><li>PUBLISH <code>WalletBalanceChanged</code> {accountId, currency, delta=-amount, balance, reason}（Outbox）</li><li>COMMIT → 回傳 200 + <code>{ok, currency, balance, wallet}</code></li></ol>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>amount ≤ 0</td><td><code>{&quot;error&quot;:&quot;金額不正確&quot;}</code></td></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>PAYMENT_REQUIRED</code></td><td>402</td><td>餘額 &lt; amount（交易回滾）</td><td><code>{&quot;error&quot;:&quot;餘額不足&quot;,&quot;wallet&quot;:{&quot;cash&quot;:500,&quot;gems&quot;:0}}</code></td></tr>
+<tr><td><code>RATE_LIMITED</code></td><td>429</td><td>每帳號每分鐘超過 60 次</td><td><code>{&quot;error&quot;:&quot;請求過於頻繁&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外（交易回滾）</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h3 id="bc-deposit-endpoints">BC: deposit Endpoints</h3>
+<blockquote><p><strong>Owning BC</strong>：deposit | <strong>Path Prefix</strong>：<code>/deposit/</code>（另 <code>POST /wallet/topup</code> 的 pack 解析亦屬 deposit 權威） | <strong>Owned Tables</strong>：<code>deposit</code>: <code>deposit_pack</code>（目錄）、<code>deposit_order</code>（Phase B）</p></blockquote>
+<h4 id="get-depositpacks"><code>GET /deposit/packs</code></h4>
+<p>列出可購買的儲值包目錄（伺服器權威定義，含 gem 包與 cap 包）。供前端商店畫面渲染。</p>
+<ul><li><strong>認證</strong>：公開（商店目錄）</li><li><strong>權限</strong>：無</li></ul>
+<p><strong>Response 200：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>packs</code></td><td>Array</td><td>required</td><td>no</td><td>儲值包清單</td></tr>
+<tr><td><code>packs[].packId</code></td><td>String</td><td>required</td><td>no</td><td>包 ID（<code>g_small</code>/<code>g_mid</code>/<code>g_big</code>/<code>cap_1000</code>）</td></tr>
+<tr><td><code>packs[].currency</code></td><td>String（enum）</td><td>required</td><td>no</td><td><code>gems</code>/<code>cash</code></td></tr>
+<tr><td><code>packs[].amount</code></td><td>Integer</td><td>required</td><td>no</td><td>入帳數量（CONSTANTS §7）</td></tr>
+<tr><td><code>packs[].label</code></td><td>String</td><td>required</td><td>no</td><td>顯示名稱（zh-TW）</td></tr>
+<tr><td><code>packs[].bonusPct</code></td><td>Integer</td><td>optional</td><td>yes（null = 無加贈）</td><td>加量比例（g_mid=10、g_big=16，CONSTANTS §2）</td></tr>
+</table>
+<p><strong>Response DTO（Java）：</strong></p>
+<pre><code class="language-java">public record DepositPackView(String packId, Currency currency, long amount, String label, Integer bonusPct) {}
+public record DepositPackListResponse(List&lt;DepositPackView&gt; packs) {}</code></pre>
+<pre><code class="language-json">{
+  &quot;packs&quot;: [
+    { &quot;packId&quot;: &quot;g_small&quot;, &quot;currency&quot;: &quot;gems&quot;, &quot;amount&quot;: 60,  &quot;label&quot;: &quot;小寶石包&quot;,        &quot;bonusPct&quot;: null },
+    { &quot;packId&quot;: &quot;g_mid&quot;,   &quot;currency&quot;: &quot;gems&quot;, &quot;amount&quot;: 330, &quot;label&quot;: &quot;中寶石包（+10%）&quot;, &quot;bonusPct&quot;: 10 },
+    { &quot;packId&quot;: &quot;g_big&quot;,   &quot;currency&quot;: &quot;gems&quot;, &quot;amount&quot;: 700, &quot;label&quot;: &quot;大寶石包（+16%）&quot;, &quot;bonusPct&quot;: 16 },
+    { &quot;packId&quot;: &quot;cap_1000&quot;,&quot;currency&quot;: &quot;cash&quot;, &quot;amount&quot;: 1000,&quot;label&quot;: &quot;儲值 1000 資本（測試）&quot;, &quot;bonusPct&quot;: null }
+  ]
+}</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>目錄載入失敗</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="post-depositcheckout"><code>POST /deposit/checkout</code></h4>
+<p>建立儲值訂單（Phase A 假付費直接確認 → 由 <code>DepositConfirmed</code> 事件 credit 錢包；Phase B 對接真金流 SDK）。<strong>冪等</strong>：以 <code>Idempotency-Key</code>（= orderId）去重，重放回放原結果（EDD §4.6.1 orderId dedup）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>deposit:write</code>（self）</li><li><strong>冪等</strong>：是（<code>Idempotency-Key</code> 必填，24h 保存；同 key 重放只入帳一次）</li><li><strong>Cross-BC Dependencies</strong>：異步發布 <code>DepositConfirmed</code> 事件 → wallet BC 消費並 credit（Outbox，EDD §4.6.1）。降級策略：wallet BC 暫不可用時事件留存 Outbox（<code>event_publication</code>），wallet 恢復後補投（最多 5 次重試，event_id 冪等），不丟帳。</li></ul>
+<p><strong>Request Headers（額外必填）：</strong></p>
+<pre><code class="language-http">Idempotency-Key: 7d793037-a076-4c05-9a70-b7e8b2e3c4f5</code></pre>
+<p><strong>Request Body：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>packId</code></td><td>String</td><td>required</td><td>no</td><td>儲值包 ID，須 ∈ <code>GET /deposit/packs</code> 目錄</td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public record CheckoutRequest(@NotBlank String packId) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;packId&quot;: &quot;g_big&quot; }</code></pre>
+<p><strong>Response 200：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>orderId</code></td><td>String</td><td>required</td><td>no</td><td>訂單 ID（= Idempotency-Key 或伺服器產生 UUID）</td></tr>
+<tr><td><code>packId</code></td><td>String</td><td>required</td><td>no</td><td>儲值包 ID</td></tr>
+<tr><td><code>currency</code></td><td>String（enum）</td><td>required</td><td>no</td><td><code>gems</code>/<code>cash</code></td></tr>
+<tr><td><code>amount</code></td><td>Integer</td><td>required</td><td>no</td><td>入帳數量</td></tr>
+<tr><td><code>status</code></td><td>String（enum）</td><td>required</td><td>no</td><td><code>confirmed</code>（Phase A 假付費恆 confirmed；Phase B 可為 <code>pending</code>）</td></tr>
+</table>
+<p><strong>Response DTO（Java）：</strong></p>
+<pre><code class="language-java">public enum OrderStatus { pending, confirmed, failed }
+public record CheckoutResponse(String orderId, String packId, Currency currency, long amount, OrderStatus status) {}</code></pre>
+<pre><code class="language-json">{ &quot;orderId&quot;: &quot;7d793037-a076-4c05-9a70-b7e8b2e3c4f5&quot;, &quot;packId&quot;: &quot;g_big&quot;, &quot;currency&quot;: &quot;gems&quot;, &quot;amount&quot;: 700, &quot;status&quot;: &quot;confirmed&quot; }</code></pre>
+<p><strong>業務邏輯步驟：</strong></p>
+<ol><li>驗證 session → 解析 <code>account_id</code></li><li>讀取 <code>Idempotency-Key</code>（缺失回 400）；查詢 <code>deposit_order</code> WHERE <code>idempotency_key</code> = :key → 命中則回放原結果（200）</li><li>驗證 <code>packId</code> ∈ deposit 目錄 → 否則回 400「儲值包不正確」</li><li>BEGIN TRANSACTION</li><li>INSERT INTO <code>deposit_order</code> (<code>account_id</code>,<code>pack_id</code>,<code>currency</code>,<code>amount</code>,<code>status</code>,<code>idempotency_key</code>) VALUES (…, <code>&#x27;confirmed&#x27;</code>, :key)</li><li>PUBLISH <code>DepositConfirmed</code> {accountId, orderId, currency, amount}（Outbox，orderId dedup）</li><li>COMMIT</li><li>wallet BC 異步消費 <code>DepositConfirmed</code> → credit <code>wallets</code> + INSERT <code>wallet_ledger</code>(reason=<code>topup</code>)（event_id 冪等，最多 5 次重試指數退避）</li><li>回傳 200 + <code>CheckoutResponse</code></li></ol>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>packId 不在目錄 / 缺 Idempotency-Key</td><td><code>{&quot;error&quot;:&quot;儲值包不正確&quot;}</code></td></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>IDEMPOTENCY_CONFLICT</code></td><td>409</td><td>同 Idempotency-Key 但 body 不同</td><td><code>{&quot;error&quot;:&quot;idempotency key 衝突&quot;}</code></td></tr>
+<tr><td><code>RATE_LIMITED</code></td><td>429</td><td>每帳號每分鐘超過 60 次</td><td><code>{&quot;error&quot;:&quot;請求過於頻繁&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外（交易回滾）</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h3 id="bc-entitlement-endpoints">BC: entitlement Endpoints</h3>
+<blockquote><p><strong>Owning BC</strong>：entitlement | <strong>Path Prefix</strong>：<code>/entitlements</code> | <strong>Owned Tables</strong>：<code>entitlement</code>: <code>entitlements</code></p></blockquote>
+<h4 id="get-entitlements"><code>GET /entitlements</code></h4>
+<p>列出當前帳號已購權益（破產不消失，PRD §5.3）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>entitlement:read</code>（self）</li></ul>
+<p><strong>Response 200：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>entitlements</code></td><td>Array</td><td>required</td><td>no（可空陣列）</td><td>權益清單，依 <code>acquired_at</code> 升序</td></tr>
+<tr><td><code>entitlements[].kind</code></td><td>String（enum）</td><td>required</td><td>no</td><td><code>cosmetic</code>/<code>dream</code>/<code>scenario</code>（CONSTANTS §9）</td></tr>
+<tr><td><code>entitlements[].itemId</code></td><td>String</td><td>required</td><td>no</td><td>項目 ID</td></tr>
+<tr><td><code>entitlements[].acquiredAt</code></td><td>String（ISO 8601）</td><td>required</td><td>no</td><td>取得時間</td></tr>
+</table>
+<p><strong>Response DTO（Java）：</strong> <code>record EntitlementListResponse(List&lt;EntitlementView&gt; entitlements) {}</code></p>
+<pre><code class="language-json">{
+  &quot;entitlements&quot;: [
+    { &quot;kind&quot;: &quot;cosmetic&quot;, &quot;itemId&quot;: &quot;suit_gold&quot;, &quot;acquiredAt&quot;: &quot;2026-10-30T02:11:00Z&quot; },
+    { &quot;kind&quot;: &quot;dream&quot;, &quot;itemId&quot;: &quot;soul_einstein&quot;, &quot;acquiredAt&quot;: &quot;2026-10-30T05:40:00Z&quot; }
+  ]
+}</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="post-entitlementsbuy"><code>POST /entitlements/buy</code></h4>
+<p>購買權益（原子：扣款 + 授予）。同交易呼叫 <code>WalletService.debit()</code>（跨 BC Public API，EDD §3.4）；<code>amount=0</code> 為活動免費授予（僅插權益、不寫 ledger，CONSTANTS §7）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>entitlement:write</code>（self）</li><li><strong>冪等</strong>：是（<code>UNIQUE(account_id, kind, item_id)</code>；已擁有回 409）</li><li><strong>Cross-BC Dependencies</strong>：同步呼叫 wallet BC <code>WalletService.debit(accountId, currency, amount)</code>（同交易原子扣款，EDD §3.4 Customer/Supplier）。降級策略：wallet BC 不可用時整筆交易回滾（不授予權益），回 503，client 可重試（授予未發生，安全）。</li></ul>
+<p><strong>Request Body：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>kind</code></td><td>String（enum）</td><td>required</td><td>no</td><td><code>cosmetic</code>/<code>dream</code>/<code>scenario</code>；不在集合回 400</td></tr>
+<tr><td><code>itemId</code></td><td>String</td><td>required</td><td>no</td><td>項目 ID，非空</td></tr>
+<tr><td><code>currency</code></td><td>String（enum）</td><td>optional</td><td>yes</td><td><code>cash</code>/<code>gems</code>（預設 <code>cash</code>）</td></tr>
+<tr><td><code>amount</code></td><td>Integer</td><td>optional</td><td>yes</td><td>價格，≥ 0（預設 0 = 免費授予）</td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public enum EntitlementKind { cosmetic, dream, scenario }
+public record BuyRequest(@NotNull EntitlementKind kind, @NotBlank String itemId, Currency currency, Long amount) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;kind&quot;: &quot;cosmetic&quot;, &quot;itemId&quot;: &quot;suit_gold&quot;, &quot;currency&quot;: &quot;gems&quot;, &quot;amount&quot;: 120 }</code></pre>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{
+  &quot;ok&quot;: true,
+  &quot;wallet&quot;: { &quot;cash&quot;: 18750, &quot;gems&quot;: 210 },
+  &quot;entitlements&quot;: [
+    { &quot;kind&quot;: &quot;cosmetic&quot;, &quot;itemId&quot;: &quot;suit_gold&quot;, &quot;acquiredAt&quot;: &quot;2026-10-30T02:11:00Z&quot; }
+  ]
+}</code></pre>
+<p><strong>業務邏輯步驟：</strong></p>
+<ol><li>驗證 session → 解析 <code>account_id</code></li><li>驗證 <code>kind</code> ∈ {cosmetic,dream,scenario} 且 <code>itemId</code> 非空 → 否則回 400「項目不正確」</li><li>BEGIN TRANSACTION</li><li>SELECT 1 FROM <code>entitlements</code> WHERE <code>account_id</code>,<code>kind</code>,<code>item_id</code> → 命中則 ROLLBACK → 回 409「已經擁有這個項目」</li><li>若 <code>amount</code> &gt; 0：SELECT <code>{cash|gems}</code> FROM <code>wallets</code> WHERE <code>account_id</code> <strong>FOR UPDATE</strong> → 餘額 &lt; amount → ROLLBACK → 回 402「餘額不足」+ wallet</li><li>UPDATE <code>wallets</code> SET <code>{cash|gems}</code> = <code>{cash|gems}</code> - :amount；INSERT <code>wallet_ledger</code>(delta=-amount, reason=<code>&#x27;buy_&#x27;+kind</code>, balance, meta={itemId})</li><li>INSERT INTO <code>entitlements</code> (<code>account_id</code>,<code>kind</code>,<code>item_id</code>)</li><li>PUBLISH <code>EntitlementGranted</code> {accountId, kind, itemId}（Outbox）</li><li>COMMIT → 回傳 200 + <code>{ok, wallet, entitlements}</code></li></ol>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>kind 不在集合 / itemId 空</td><td><code>{&quot;error&quot;:&quot;項目不正確&quot;}</code></td></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>PAYMENT_REQUIRED</code></td><td>402</td><td>餘額 &lt; amount（交易回滾）</td><td><code>{&quot;error&quot;:&quot;餘額不足&quot;,&quot;wallet&quot;:{&quot;cash&quot;:50,&quot;gems&quot;:0}}</code></td></tr>
+<tr><td><code>CONFLICT</code></td><td>409</td><td>已擁有 <code>(kind,item_id)</code></td><td><code>{&quot;error&quot;:&quot;已經擁有這個項目&quot;}</code></td></tr>
+<tr><td><code>RATE_LIMITED</code></td><td>429</td><td>每帳號每分鐘超過 30 次（CONSTANTS §6）</td><td><code>{&quot;error&quot;:&quot;請求過於頻繁&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外（交易回滾）</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h3 id="bc-record-endpoints">BC: record Endpoints</h3>
+<blockquote><p><strong>Owning BC</strong>：record | <strong>Path Prefix</strong>：<code>/records</code> | <strong>Owned Tables</strong>：<code>record</code>: <code>records</code></p></blockquote>
+<h4 id="post-records"><code>POST /records</code></h4>
+<p>記錄經營史（破產 / 成就 / 傳承），append-only（PRD §4.1）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>record:write</code>（self）</li><li><strong>冪等</strong>：否（append-only，每次新增一筆）</li></ul>
+<p><strong>Request Body：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>type</code></td><td>String（enum）</td><td>required</td><td>no</td><td><code>bankruptcy</code>/<code>achievement</code>/<code>legacy</code>（CONSTANTS §9）；不在集合回 400</td></tr>
+<tr><td><code>payload</code></td><td>Object（JSON）</td><td>optional</td><td>yes</td><td>記錄內容（任意結構，預設 <code>{}</code>）</td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public enum RecordType { bankruptcy, achievement, legacy }
+public record RecordRequest(@NotNull RecordType type, Map&lt;String, Object&gt; payload) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;type&quot;: &quot;bankruptcy&quot;, &quot;payload&quot;: { &quot;day&quot;: 42, &quot;finalCash&quot;: -15200, &quot;reason&quot;: &quot;資金鏈斷裂&quot; } }</code></pre>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true }</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>type 不在集合</td><td><code>{&quot;error&quot;:&quot;type 不正確&quot;}</code></td></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="get-records"><code>GET /records</code></h4>
+<p>查詢經營史（可依 <code>type</code> 篩選），依 <code>created_at DESC</code> 排序，單次最多 100 筆（CONSTANTS §7）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>record:read</code>（self）</li></ul>
+<p><strong>Query Parameters：</strong></p>
+<table>
+<tr><th>參數</th><th>型別</th><th>必填</th><th>說明</th><th>預設</th></tr>
+<tr><td><code>type</code></td><td>String（enum）</td><td>否</td><td><code>bankruptcy</code>/<code>achievement</code>/<code>legacy</code>；省略則回全部類型</td><td>—</td></tr>
+</table>
+<p><strong>Response 200：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>records</code></td><td>Array</td><td>required</td><td>no（可空陣列）</td><td>記錄清單（≤ 100）</td></tr>
+<tr><td><code>records[].type</code></td><td>String（enum）</td><td>required</td><td>no</td><td>記錄類型</td></tr>
+<tr><td><code>records[].payload</code></td><td>Object</td><td>required</td><td>no</td><td>記錄內容</td></tr>
+<tr><td><code>records[].createdAt</code></td><td>String（ISO 8601）</td><td>required</td><td>no</td><td>建立時間</td></tr>
+</table>
+<p><strong>Response DTO（Java）：</strong></p>
+<pre><code class="language-java">public record BusinessRecordView(RecordType type, Map&lt;String, Object&gt; payload, String createdAt) {}
+public record RecordListResponse(List&lt;BusinessRecordView&gt; records) {}</code></pre>
+<pre><code class="language-json">{
+  &quot;records&quot;: [
+    { &quot;type&quot;: &quot;bankruptcy&quot;, &quot;payload&quot;: { &quot;day&quot;: 42, &quot;finalCash&quot;: -15200 }, &quot;createdAt&quot;: &quot;2026-10-30T06:00:00Z&quot; }
+  ]
+}</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h3 id="bc-leaderboard-endpoints">BC: leaderboard Endpoints</h3>
+<blockquote><p><strong>Owning BC</strong>：leaderboard | <strong>Path Prefix</strong>：<code>/leaderboard</code> | <strong>Owned Tables</strong>：<code>leaderboard</code>: <code>leaderboard</code></p></blockquote>
+<h4 id="get-leaderboard"><code>GET /leaderboard</code></h4>
+<p>公開查詢全域排行 Top N（不需登入），依 <code>score DESC</code>（索引 <code>idx_lb_mode_score</code>）。</p>
+<ul><li><strong>認證</strong>：公開</li><li><strong>權限</strong>：無</li></ul>
+<p><strong>Query Parameters：</strong></p>
+<table>
+<tr><th>參數</th><th>型別</th><th>必填</th><th>說明</th><th>預設</th></tr>
+<tr><td><code>mode</code></td><td>String</td><td>否</td><td>排行模式；空字串 = 全模式（CONSTANTS §9）</td><td><code>&#x27;&#x27;</code>（全模式）</td></tr>
+<tr><td><code>limit</code></td><td>Integer</td><td>否</td><td>回傳筆數，夾擠 <code>[1,100]</code>（<code>LEADERBOARD_LIMIT_MAX</code>）</td><td>20（<code>LEADERBOARD_LIMIT_DEFAULT</code>）</td></tr>
+</table>
+<p><strong>Response 200：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>leaderboard</code></td><td>Array</td><td>required</td><td>no（可空陣列）</td><td>Top N 清單</td></tr>
+<tr><td><code>leaderboard[].runId</code></td><td>String</td><td>required</td><td>no</td><td>場次 ID</td></tr>
+<tr><td><code>leaderboard[].name</code></td><td>String</td><td>required</td><td>no</td><td>上榜顯示名（display_name 歸戶）</td></tr>
+<tr><td><code>leaderboard[].mode</code></td><td>String</td><td>required</td><td>no</td><td>模式</td></tr>
+<tr><td><code>leaderboard[].score</code></td><td>Integer</td><td>required</td><td>no</td><td>分數</td></tr>
+<tr><td><code>leaderboard[].grade</code></td><td>String</td><td>optional</td><td>yes（null = 未評級）</td><td>評級</td></tr>
+<tr><td><code>leaderboard[].updatedAt</code></td><td>String（ISO 8601）</td><td>required</td><td>no</td><td>更新時間</td></tr>
+</table>
+<p><strong>Response DTO（Java）：</strong></p>
+<pre><code class="language-java">public record LeaderboardEntryView(String runId, String name, String mode, long score, String grade, String updatedAt) {}
+public record LeaderboardResponse(List&lt;LeaderboardEntryView&gt; leaderboard) {}</code></pre>
+<pre><code class="language-json">{
+  &quot;leaderboard&quot;: [
+    { &quot;runId&quot;: &quot;run-7781&quot;, &quot;name&quot;: &quot;喵喵科技&quot;, &quot;mode&quot;: &quot;sandbox&quot;, &quot;score&quot;: 982300, &quot;grade&quot;: &quot;S&quot;, &quot;updatedAt&quot;: &quot;2026-10-30T07:20:00Z&quot; },
+    { &quot;runId&quot;: &quot;run-5520&quot;, &quot;name&quot;: &quot;汪汪企業&quot;, &quot;mode&quot;: &quot;sandbox&quot;, &quot;score&quot;: 870100, &quot;grade&quot;: null, &quot;updatedAt&quot;: &quot;2026-10-30T07:10:00Z&quot; }
+  ]
+}</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>RATE_LIMITED</code></td><td>429</td><td>同一 IP 每分鐘超過 120 次（防爬取，CONSTANTS §6）</td><td><code>{&quot;error&quot;:&quot;請求過於頻繁&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="post-leaderboard"><code>POST /leaderboard</code></h4>
+<p>上榜（歸戶寫入），以 <code>run_id</code> upsert。<strong>冪等</strong>：同 <code>run_id</code> 重放只更新一筆（EDD §5.1）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>leaderboard:write</code>（self）</li><li><strong>冪等</strong>：是（by <code>run_id</code>，<code>ON CONFLICT (run_id) DO UPDATE</code>）</li></ul>
+<p><strong>Request Body：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>runId</code></td><td>String</td><td>required</td><td>no</td><td>場次 ID（upsert 鍵）；空字串回 400</td></tr>
+<tr><td><code>mode</code></td><td>String</td><td>optional</td><td>yes</td><td>排行模式，預設 <code>sandbox</code></td></tr>
+<tr><td><code>score</code></td><td>Integer</td><td>optional</td><td>yes</td><td>分數，取整，預設 0</td></tr>
+<tr><td><code>grade</code></td><td>String</td><td>optional</td><td>yes</td><td>評級</td></tr>
+<tr><td><code>detail</code></td><td>Object（JSON）</td><td>optional</td><td>yes</td><td>明細，預設 <code>{}</code></td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public record LeaderboardSubmitRequest(@NotBlank String runId, String mode, Long score, String grade, Map&lt;String, Object&gt; detail) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;runId&quot;: &quot;run-7781&quot;, &quot;mode&quot;: &quot;sandbox&quot;, &quot;score&quot;: 982300, &quot;grade&quot;: &quot;S&quot;, &quot;detail&quot;: { &quot;days&quot;: 120, &quot;peakWorkers&quot;: 8 } }</code></pre>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true }</code></pre>
+<p><strong>業務邏輯步驟：</strong></p>
+<ol><li>驗證 session → 解析 <code>account_id</code> + <code>display_name</code>（歸戶）</li><li>驗證 <code>runId</code> 非空 → 否則回 400「缺 runId」</li><li><code>mode</code> 預設 <code>sandbox</code>；<code>score</code> 取整</li><li>INSERT INTO <code>leaderboard</code>(<code>run_id</code>,<code>account_id</code>,<code>display_name</code>,<code>mode</code>,<code>score</code>,<code>grade</code>,<code>detail</code>,<code>updated_at</code>) VALUES (…) <strong>ON CONFLICT (<code>run_id</code>) DO UPDATE</strong> SET <code>score</code>,<code>grade</code>,<code>detail</code>,<code>mode</code>,<code>updated_at</code>=now()（冪等 upsert）</li><li>PUBLISH <code>RunScoreSubmitted</code> {accountId, runId, mode, score}（Outbox，EDD §3.4）</li><li>回傳 200 + <code>{ok:true}</code></li></ol>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>runId 空</td><td><code>{&quot;error&quot;:&quot;缺 runId&quot;}</code></td></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h3 id="bc-game-save-endpoints">BC: game-save Endpoints</h3>
+<blockquote><p><strong>Owning BC</strong>：game-save | <strong>Path Prefix</strong>：<code>/save</code> | <strong>Owned Tables</strong>：<code>game_save</code>: <code>saves</code></p></blockquote>
+<h4 id="get-save"><code>GET /save</code></h4>
+<p>取得辦公室存檔（跨裝置還原），指定 <code>slot</code>（預設 <code>main</code>）。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>game-save:read</code>（self）</li></ul>
+<p><strong>Query Parameters：</strong></p>
+<table>
+<tr><th>參數</th><th>型別</th><th>必填</th><th>說明</th><th>預設</th></tr>
+<tr><td><code>slot</code></td><td>String</td><td>否</td><td>存檔槽（CONSTANTS §7）</td><td><code>main</code></td></tr>
+</table>
+<p><strong>Response 200：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>save</code></td><td>Object</td><td>required</td><td>yes（<strong>null = 該 slot 無存檔</strong>）</td><td>存檔內容</td></tr>
+<tr><td><code>save.data</code></td><td>Object（JSON）</td><td>required（若 save≠null）</td><td>no</td><td>存檔資料</td></tr>
+<tr><td><code>save.updatedAt</code></td><td>String（ISO 8601）</td><td>required（若 save≠null）</td><td>no</td><td>最後更新時間</td></tr>
+</table>
+<p><strong>Response DTO（Java）：</strong></p>
+<pre><code class="language-java">public record SaveView(Map&lt;String, Object&gt; data, String updatedAt) {}
+public record SaveResponse(SaveView save) {} // save 可為 null</code></pre>
+<pre><code class="language-json">{ &quot;save&quot;: { &quot;data&quot;: { &quot;day&quot;: 42, &quot;cash&quot;: 18750, &quot;morale&quot;: 70 }, &quot;updatedAt&quot;: &quot;2026-10-30T08:00:00Z&quot; } }</code></pre>
+<p>查無存檔：</p>
+<pre><code class="language-json">{ &quot;save&quot;: null }</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h4 id="put-save"><code>PUT /save</code></h4>
+<p>上傳/覆寫辦公室存檔（upsert by <code>(account_id, slot)</code>）。<strong>冪等</strong>：相同請求重複執行結果相同。請求 body &gt; 4MB（<code>REQUEST_BODY_MAX</code>）中斷連線。</p>
+<ul><li><strong>認證</strong>：需 Bearer token</li><li><strong>權限</strong>：<code>game-save:write</code>（self）</li><li><strong>冪等</strong>：是（<code>ON CONFLICT (account_id, slot) DO UPDATE</code>）</li></ul>
+<p><strong>Request Body：</strong></p>
+<table>
+<tr><th>欄位</th><th>型別</th><th>必填</th><th>Nullable</th><th>說明</th></tr>
+<tr><td><code>slot</code></td><td>String</td><td>optional</td><td>yes</td><td>存檔槽，預設 <code>main</code></td></tr>
+<tr><td><code>data</code></td><td>Object（JSON）</td><td>required</td><td>no</td><td>存檔資料；null 回 400「缺 data」</td></tr>
+</table>
+<p><strong>Request DTO（Java）：</strong></p>
+<pre><code class="language-java">public record SavePutRequest(String slot, @NotNull Map&lt;String, Object&gt; data) {}</code></pre>
+<p><strong>Request 範例：</strong></p>
+<pre><code class="language-json">{ &quot;slot&quot;: &quot;main&quot;, &quot;data&quot;: { &quot;day&quot;: 42, &quot;cash&quot;: 18750, &quot;morale&quot;: 70, &quot;roster&quot;: [&quot;m1&quot;,&quot;m2&quot;,&quot;m3&quot;] } }</code></pre>
+<p><strong>Response 200：</strong></p>
+<pre><code class="language-json">{ &quot;ok&quot;: true }</code></pre>
+<p><strong>Possible Errors：</strong></p>
+<table>
+<tr><th>Error Code</th><th>HTTP Status</th><th>觸發條件</th><th>Response Body 範例</th></tr>
+<tr><td><code>VALIDATION_ERROR</code></td><td>400</td><td>data 為 null / 缺失</td><td><code>{&quot;error&quot;:&quot;缺 data&quot;}</code></td></tr>
+<tr><td><code>UNAUTHORIZED</code></td><td>401</td><td>無 / 過期 token</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code></td></tr>
+<tr><td><code>PAYLOAD_TOO_LARGE</code></td><td>413</td><td>body &gt; 4,000,000 bytes（<code>REQUEST_BODY_MAX</code>，連線中斷）</td><td>（連線中斷，無 body）</td></tr>
+<tr><td><code>INTERNAL_ERROR</code></td><td>500</td><td>未預期例外</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+</table>
+<hr>
+<h2 id="4-authentication--authorization">4. Authentication &amp; Authorization</h2>
+<h3 id="41-認證機制opaque-session-token--edd-adr-003">4.1 認證機制（Opaque Session Token — EDD ADR-003）</h3>
+<p>本系統採 <strong>opaque session token</strong>（非 JWT）。登入/註冊簽發 32 bytes hex token，存 <code>sessions</code> 表 + Redis 快取（miss 回源 DB），TTL 30 天（<code>SESSION_TTL_DAYS</code>）。選此方案以支援即時撤銷（客服強制登出 / logout）。</p>
+<p><strong>取得 token：</strong></p>
+<ul><li><code>POST /auth/register</code>（新帳號）或 <code>POST /auth/login</code>（既有帳號）→ Response 含 <code>token</code>。</li></ul>
+<p><strong>使用 token：</strong></p>
+<pre><code class="language-http">Authorization: Bearer 3f8c1d2ae9b74c0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8</code></pre>
+<p><strong>撤銷 token：</strong></p>
+<ul><li><code>POST /auth/logout</code>（刪除 session，冪等）。</li><li>token 過期（&gt; 30 天）自動失效（<code>expires_at</code> &lt; now()）。</li></ul>
+<blockquote><p><strong>無 Refresh Token</strong>：本系統不使用 JWT access/refresh 雙 token 模式；session TTL 30 天，過期後需重新 <code>POST /auth/login</code>。此與原型及 EDD ADR-003 一致。</p></blockquote>
+<h3 id="42-token-生命週期">4.2 Token 生命週期</h3>
+<table>
+<tr><th>Token 類型</th><th>有效期</th><th>儲存位置</th><th>撤銷方式</th></tr>
+<tr><td><code>session_token</code>（opaque）</td><td>30 天（<code>SESSION_TTL_DAYS</code>，可環境變數覆寫）</td><td><code>sessions</code> 表 + Redis 快取</td><td><code>POST /auth/logout</code> 或過期</td></tr>
+</table>
+<h3 id="43-密碼安全">4.3 密碼安全</h3>
+<ul><li>雜湊：scrypt（<code>SCRYPT_KEYLEN=64</code> bytes、<code>SCRYPT_SALT_BYTES=16</code> bytes），儲存格式 <code>salt$hash</code>（hex）。</li><li>驗證：<code>crypto.timingSafeEqual</code>（Java 以 <code>MessageDigest.isEqual</code> 等時比較）防時序攻擊。</li><li>登入失敗不區分「帳號不存在」與「密碼錯誤」（統一 401「email 或密碼錯誤」），防帳號枚舉。</li></ul>
+<h3 id="44-授權模型rbac">4.4 授權模型（RBAC）</h3>
+<p>本系統為 C 端信任層，權限以「資源擁有者（self）」為主；EDD §3.3 定義 <code>USER</code>（終端）與 <code>OPS</code>（營運/客服）兩角色。</p>
+<table>
+<tr><th>Role</th><th>說明</th><th>可操作範圍</th></tr>
+<tr><td><code>USER</code></td><td>遊戲客戶端代表的終端玩家</td><td>僅能存取自己帳號的 wallet / entitlement / record / leaderboard / save</td></tr>
+<tr><td><code>OPS</code></td><td>營運 / 客服</td><td>對帳稽核唯讀 + 強制登出（Phase B Admin，本文件 §18 不含 Admin 端點）</td></tr>
+</table>
+<blockquote><p>所有需認證端點強制「資源歸屬檢查」：<code>account_id</code> 一律取自 session，<strong>不信任 client 傳入的 account_id</strong>（防越權存取他人錢包/存檔）。</p></blockquote>
+<h3 id="45-公開端點清單">4.5 公開端點清單</h3>
+<p><code>POST /auth/register</code>、<code>POST /auth/login</code>、<code>GET /leaderboard</code>、<code>GET /deposit/packs</code>、<code>GET /health/live</code>、<code>GET /health/ready</code>。其餘端點無 / 過期 token 一律回 401（logout 除外，冪等回 200）。</p>
+<hr>
+<h2 id="5-error-handling">5. Error Handling</h2>
+<h3 id="51-error-response-schema">5.1 Error Response Schema</h3>
+<p>本系統 api-only 契約沿用原型統一錯誤格式（EDD §5.1）：</p>
+<pre><code class="language-json">{ &quot;error&quot;: &quot;&lt;zh-TW 人類可讀訊息&gt;&quot; }</code></pre>
+<ul><li>錢包相關 402 另附當前 <code>wallet</code>：<code>{ &quot;error&quot;: &quot;餘額不足&quot;, &quot;wallet&quot;: { &quot;cash&quot;: 0, &quot;gems&quot;: 0 } }</code>。</li><li>500 不洩露內部堆疊 / SQL（僅回安全訊息字串 + 以 <code>X-Request-Id</code> 供追蹤）。</li><li>訊息可 i18n key 化（<code>Accept-Language</code> 預設 zh-TW）。</li></ul>
+<h3 id="52-error-code-registry全域constants-10--edd-54">5.2 Error Code Registry（全域，CONSTANTS §10 / EDD §5.4）</h3>
+<table>
+<tr><th>HTTP Status</th><th>語意代號（client 處理用）</th><th>觸發情境</th><th>回應範例</th></tr>
+<tr><td>400</td><td><code>VALIDATION_ERROR</code></td><td>email 格式、名稱越界、密碼過短、金額不正確、kind/type 非法、缺 data/runId、packId 不正確</td><td><code>{&quot;error&quot;:&quot;金額不正確&quot;}</code></td></tr>
+<tr><td>401</td><td><code>UNAUTHORIZED</code></td><td>無 / 過期 / 無效 token；登入帳密錯</td><td><code>{&quot;error&quot;:&quot;請先登入&quot;}</code> / <code>{&quot;error&quot;:&quot;email 或密碼錯誤&quot;}</code></td></tr>
+<tr><td>402</td><td><code>PAYMENT_REQUIRED</code></td><td>spend / buy 餘額 &lt; amount</td><td><code>{&quot;error&quot;:&quot;餘額不足&quot;,&quot;wallet&quot;:{...}}</code></td></tr>
+<tr><td>404</td><td><code>NOT_FOUND</code></td><td>命中前綴但無對應路由</td><td><code>{&quot;error&quot;:&quot;api not found&quot;}</code></td></tr>
+<tr><td>409</td><td><code>CONFLICT</code></td><td>email 已註冊；已擁有 <code>(kind,item_id)</code>；Idempotency-Key 衝突</td><td><code>{&quot;error&quot;:&quot;這個 email 已經註冊過了&quot;}</code></td></tr>
+<tr><td>413</td><td><code>PAYLOAD_TOO_LARGE</code></td><td>請求 body &gt; 4MB（<code>REQUEST_BODY_MAX</code>）</td><td>（連線中斷）</td></tr>
+<tr><td>429</td><td><code>RATE_LIMITED</code></td><td>超過速率限制（§6）</td><td><code>{&quot;error&quot;:&quot;請求過於頻繁&quot;}</code> + <code>Retry-After</code></td></tr>
+<tr><td>500</td><td><code>INTERNAL_ERROR</code></td><td>未預期例外（交易回滾）</td><td><code>{&quot;error&quot;:&quot;internal error&quot;}</code></td></tr>
+<tr><td>503</td><td><code>SERVICE_UNAVAILABLE</code></td><td>依賴不可用 / Graceful Shutdown</td><td><code>{&quot;error&quot;:&quot;服務暫時不可用&quot;}</code> + <code>Retry-After</code></td></tr>
+</table>
+<blockquote><p>各 Endpoint 的 Possible Errors 表（§3）均引用本 Registry 語意；每個需認證端點含 401、錢包類含 402、建立/衝突類含 409。</p></blockquote>
+<blockquote><p><strong>關於 403 Forbidden（刻意不使用）：</strong> 本系統 C 端信任層所有資源均為「帳號自有（self-scoped）」，<code>account_id</code> 一律取自 session，client 無法指定他人資源，故不存在「已認證但無權限存取他人資源」的 403 情境。SSOT（CONSTANTS §10）亦未登記 403。未認證一律回 401；越權嘗試（偽造他人 token）等同無效 token → 401。OPS 角色的後台稽核屬 Phase B Admin（本契約不含），屆時於 Admin API 引入 403。</p></blockquote>
+<hr>
+<h2 id="6-rate-limiting">6. Rate Limiting</h2>
+<blockquote><p>現行原型尚未實作端點層 rate limit（CONSTANTS §6）；下列為 EDD §9 安全層須落地值（CONSTANTS §6 建議值，Spring Bucket4j + Redis 實作）。</p></blockquote>
+<h3 id="61-限制層級三層">6.1 限制層級（三層）</h3>
+<table>
+<tr><th>層級</th><th>限制對象</th><th>限制規則</th></tr>
+<tr><td>Per-IP（認證端點）</td><td>客戶端 IP</td><td><code>POST /auth/login</code> 10 req/min；<code>POST /auth/register</code> 5 req/min</td></tr>
+<tr><td>Per-IP（公開查詢）</td><td>客戶端 IP</td><td><code>GET /leaderboard</code> 120 req/min</td></tr>
+<tr><td>Per-User（金流/業務）</td><td>帳號 account_id</td><td><code>/wallet/topup</code>、<code>/wallet/spend</code>、<code>/deposit/checkout</code> 60 req/min；<code>/entitlements/buy</code> 30 req/min</td></tr>
+<tr><td>Global（全局保護）</td><td>全服務</td><td>依 HPA 容量（500 → 3000 PCU，CONSTANTS §8）動態上限，過載回 503</td></tr>
+</table>
+<h3 id="62-burst-容許機制">6.2 Burst 容許機制</h3>
+<p>採 Token Bucket；短暫突發容許至桶容量上限（例：login 平均 10/min，burst 桶容量 3/10s），超過即 429。</p>
+<h3 id="63-429-response-格式">6.3 429 Response 格式</h3>
+<pre><code class="language-http">HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1793664060
+Retry-After: 42
+Content-Type: application/json; charset=utf-8
+
+{ &quot;error&quot;: &quot;請求過於頻繁&quot; }</code></pre>
+<hr>
+<h2 id="7-idempotency">7. Idempotency</h2>
+<h3 id="71-設計原則">7.1 設計原則</h3>
+<p>冪等確保重試不產生重複副作用。本系統冪等來源有二：<strong>天然冪等</strong>（upsert / UNIQUE 約束）與 <strong>Idempotency-Key</strong>（金流）。</p>
+<h3 id="72-冪等端點清單edd-51--456">7.2 冪等端點清單（EDD §5.1 / §4.5.6）</h3>
+<table>
+<tr><th>端點</th><th>冪等依據</th><th>行為</th></tr>
+<tr><td><code>POST /auth/logout</code></td><td>by token</td><td>重複/無效 token 皆回 200（no-op）</td></tr>
+<tr><td><code>PUT /save</code></td><td>by <code>(account_id, slot)</code></td><td><code>ON CONFLICT DO UPDATE</code></td></tr>
+<tr><td><code>POST /leaderboard</code></td><td>by <code>run_id</code></td><td><code>ON CONFLICT (run_id) DO UPDATE</code></td></tr>
+<tr><td><code>POST /entitlements/buy</code></td><td>by <code>UNIQUE(account_id,kind,item_id)</code></td><td>已擁有回 409</td></tr>
+<tr><td><code>POST /deposit/checkout</code></td><td>by <code>Idempotency-Key</code>（= orderId）</td><td>重放回放原結果；Domain Event 以 <code>event_id</code>/<code>orderId</code> dedup</td></tr>
+</table>
+<blockquote><p><strong>非冪等</strong>：<code>POST /wallet/spend</code>（每次扣款為業務預期；併發以 <code>SELECT FOR UPDATE</code> 行鎖序列化）、<code>POST /wallet/topup</code>（Phase A）、<code>POST /records</code>（append-only）。</p></blockquote>
+<h3 id="73-伺服器行為idempotency-key">7.3 伺服器行為（Idempotency-Key）</h3>
+<ol><li>以 <code>Idempotency-Key</code> 為索引查詢 <code>deposit_order</code>。</li><li>命中且 body 相同 → 回放原始 Response（不重複執行）。</li><li>未命中 → 執行邏輯，保存結果（TTL 24 小時）。</li><li>命中但 body 不同 → 回 409「idempotency key 衝突」。</li></ol>
+<h3 id="74-key-規範">7.4 Key 規範</h3>
+<pre><code class="language-http">Idempotency-Key: 7d793037-a076-4c05-9a70-b7e8b2e3c4f5</code></pre>
+<ul><li>格式：UUID v4（client 產生）；生命週期 24 小時；每 key 對應單一帳號 + 端點。</li></ul>
+<hr>
+<h2 id="8-webhooks">8. Webhooks</h2>
+<blockquote><p><strong>Phase A：本系統不對外發送 Webhook。</strong> 跨 BC 通訊走內部 Domain Event（Transactional Outbox / <code>event_publication</code>），非 HTTP Webhook。</p></blockquote>
+<h3 id="81-phase-b--金流-inbound-webhook預留">8.1 Phase B — 金流 Inbound Webhook（預留）</h3>
+<p>Phase B 對接真金流時，由金流商 callback 本系統 <code>POST /deposit/webhook</code>（內部，非本契約公開端點），確認後發 <code>DepositConfirmed</code> 事件 credit 錢包（EDD §2.1 / §4.6.1）。</p>
+<h3 id="82-簽名驗證hmac-sha256phase-b">8.2 簽名驗證（HMAC-SHA256，Phase B）</h3>
+<pre><code class="language-http">X-Signature: sha256=&lt;HMAC-SHA256(secret, raw_body)&gt;
+X-Webhook-Timestamp: 1793664000</code></pre>
+<p><strong>驗證代碼（Python 範例）：</strong></p>
+<pre><code class="language-python">import hmac, hashlib, time
+
+def verify_webhook(raw_body: bytes, signature: str, timestamp: str, secret: str) -&gt; bool:
+    if abs(time.time() - int(timestamp)) &gt; 300:  # 5 分鐘容許誤差
+        return False
+    expected = &quot;sha256=&quot; + hmac.new(secret.encode(), f&quot;{timestamp}.&quot;.encode() + raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)</code></pre>
+<h3 id="83-重試策略phase-b">8.3 重試策略（Phase B）</h3>
+<p>指數退避：1m → 5m → 30m → 2h → 1d；超過 5 次失敗 → 停用並告警。重試保持相同 <code>event_id</code>（冪等消費）。</p>
+<hr>
+<h2 id="9-batch-operations">9. Batch Operations</h2>
+<blockquote><p><strong>Phase A：本系統無批次端點。</strong> 所有寫入為單筆操作（單帳號資料量小）。此章節保留 Phase B 擴充規格。</p></blockquote>
+<h3 id="91-phase-b-批次設計預留">9.1 Phase B 批次設計（預留）</h3>
+<p>若未來需批次上傳記錄 / 權益：<code>POST /records/batch</code>，回應 <code>207 Multi-Status</code>，單次最多 100 筆，採 Partial Success（部分失敗不影響其餘）。</p>
+<pre><code class="language-json">{
+  &quot;succeeded&quot;: 2,
+  &quot;failed&quot;: 1,
+  &quot;results&quot;: [
+    { &quot;index&quot;: 0, &quot;status&quot;: 200 },
+    { &quot;index&quot;: 1, &quot;status&quot;: 200 },
+    { &quot;index&quot;: 2, &quot;status&quot;: 400, &quot;error&quot;: &quot;type 不正確&quot; }
+  ]
+}</code></pre>
+<hr>
+<h2 id="10-file-upload">10. File Upload</h2>
+<blockquote><p><strong>本系統無檔案上傳端點。</strong> 存檔（<code>PUT /save</code>）以 JSON body 傳輸（上限 4MB，<code>REQUEST_BODY_MAX</code>），非 multipart 檔案。</p></blockquote>
+<h3 id="101-phase-b-大型存檔預留">10.1 Phase B 大型存檔（預留）</h3>
+<p>若存檔超過 4MB，Phase B 改採 S3 presigned URL 模式：<code>POST /save/upload-url</code> 取得 presigned PUT URL，client 直傳物件儲存；允許格式 <code>application/json</code>（gzip 壓縮），單檔上限 50MB。</p>
+<hr>
+<h2 id="11-api-paradigm-decisionapi-範式決策">11. API Paradigm Decision（API 範式決策）</h2>
+<table>
+<tr><th>評估維度</th><th>REST</th><th>GraphQL</th><th>gRPC</th></tr>
+<tr><td>瀏覽器 / 遊戲前端客戶端</td><td>✅ 最佳</td><td>✅ 良好</td><td>❌ 受限</td></tr>
+<tr><td>低頻信任層請求（登入/儲值/存檔/上榜）</td><td>✅ 最佳</td><td>⚠️ 過度設計</td><td>⚠️ 過度設計</td></tr>
+<tr><td>與現有 Node/TS 原型一致性</td><td>✅ 一對一對應</td><td>❌ 需重寫</td><td>❌ 需重寫</td></tr>
+<tr><td>HTTP 原生快取 / CDN（公開排行）</td><td>✅ 原生</td><td>⚠️ 需自訂</td><td>❌ 需自訂</td></tr>
+<tr><td>型別安全 + 程式碼生成</td><td>⚠️ OpenAPI</td><td>⚠️ SDL</td><td>✅ 最佳</td></tr>
+<tr><td>生態系成熟度（Spring Boot）</td><td>✅ 最成熟</td><td>✅ 成熟</td><td>✅ 成熟</td></tr>
+</table>
+<p><strong>本產品決策：REST + JSON（over HTTPS）。</strong></p>
+<p><strong>決策依據：</strong> yoCat Office 信任層請求頻率低（非每幀，以登入/儲值/存檔/上榜為主，CONSTANTS §8），資源邊界清晰（7 BC 對應明確資源），且需與現有 Node/TS 原型（accounts.ts 14 端點）一對一對應以降低遷移風險。REST 的 HTTP 原生快取利於公開排行查詢（<code>GET /leaderboard</code>），生態系與 Spring Boot 3.3 整合最成熟。GraphQL（靈活查詢）與 gRPC（服務間高效）對本低頻 C 端場景屬過度設計。</p>
+<p><strong>備選考量：</strong> 跨 BC 內部通訊已採 Domain Event（Outbox）而非同步 RPC；Phase B 若引入獨立微服務，內部可評估 gRPC。即時功能（本系統目前無）未來以 SSE 補充。</p>
+<hr>
+<h2 id="12-openapi-31-specification-example規格範本">12. OpenAPI 3.1 Specification Example（規格範本）</h2>
+<blockquote><p>完整規格維護於 <a href="openapi.yaml" target="_blank" rel="noopener"><code>docs/openapi.yaml</code></a>。以下為代表性端點（member / wallet）的標準規格，所有端點遵循此結構。</p></blockquote>
+<pre><code class="language-yaml">openapi: &quot;3.1.0&quot;
+info:
+  title: &quot;yoCat Office 後端信任層 API&quot;
+  version: &quot;1.0.0&quot;
+  description: &quot;yocat-office-backend：member/wallet/deposit/entitlement/record/leaderboard/game-save 七有界上下文信任層 API&quot;
+  contact:
+    name: &quot;Backend Core（聖祐遊戲）&quot;
+    email: &quot;boss@yocat.example&quot;
+  license:
+    name: &quot;Proprietary&quot;
+
+servers:
+  - url: &quot;https://api.yocat.sayyogames.com&quot;
+    description: &quot;Production&quot;
+  - url: &quot;https://api-staging.yocat.sayyogames.com&quot;
+    description: &quot;Staging&quot;
+  - url: &quot;http://localhost:8080&quot;
+    description: &quot;Development&quot;
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      summary: &quot;註冊新帳號&quot;
+      operationId: &quot;register&quot;
+      tags: [&quot;member&quot;]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: &quot;#/components/schemas/RegisterRequest&quot; }
+      responses:
+        &quot;200&quot;:
+          description: &quot;註冊成功，簽發 session&quot;
+          content:
+            application/json:
+              schema: { $ref: &quot;#/components/schemas/AuthResponse&quot; }
+        &quot;400&quot;: { $ref: &quot;#/components/responses/ValidationError&quot; }
+        &quot;409&quot;: { $ref: &quot;#/components/responses/Conflict&quot; }
+        &quot;429&quot;: { $ref: &quot;#/components/responses/TooManyRequests&quot; }
+
+  /auth/login:
+    post:
+      summary: &quot;登入&quot;
+      operationId: &quot;login&quot;
+      tags: [&quot;member&quot;]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: &quot;#/components/schemas/LoginRequest&quot; }
+      responses:
+        &quot;200&quot;:
+          description: &quot;登入成功&quot;
+          content:
+            application/json:
+              schema: { $ref: &quot;#/components/schemas/AuthResponse&quot; }
+        &quot;401&quot;: { $ref: &quot;#/components/responses/Unauthorized&quot; }
+        &quot;429&quot;: { $ref: &quot;#/components/responses/TooManyRequests&quot; }
+
+  /wallet/spend:
+    post:
+      summary: &quot;花費（行鎖扣款）&quot;
+      operationId: &quot;spend&quot;
+      tags: [&quot;wallet&quot;]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: &quot;#/components/schemas/SpendRequest&quot; }
+      responses:
+        &quot;200&quot;:
+          description: &quot;扣款成功&quot;
+          content:
+            application/json:
+              schema: { $ref: &quot;#/components/schemas/WalletOpResponse&quot; }
+        &quot;400&quot;: { $ref: &quot;#/components/responses/ValidationError&quot; }
+        &quot;401&quot;: { $ref: &quot;#/components/responses/Unauthorized&quot; }
+        &quot;402&quot;:
+          description: &quot;餘額不足&quot;
+          content:
+            application/json:
+              schema: { $ref: &quot;#/components/schemas/PaymentRequiredResponse&quot; }
+        &quot;429&quot;: { $ref: &quot;#/components/responses/TooManyRequests&quot; }
+
+  /leaderboard:
+    get:
+      summary: &quot;公開排行 Top N&quot;
+      operationId: &quot;leaderboardTop&quot;
+      tags: [&quot;leaderboard&quot;]
+      security: []
+      parameters:
+        - name: mode
+          in: query
+          schema: { type: string, default: &quot;&quot; }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        &quot;200&quot;:
+          description: &quot;Top N&quot;
+          content:
+            application/json:
+              schema: { $ref: &quot;#/components/schemas/LeaderboardResponse&quot; }
+        &quot;429&quot;: { $ref: &quot;#/components/responses/TooManyRequests&quot; }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: &quot;opaque session token（32B hex，TTL 30 天）&quot;
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, displayName, password]
+      properties:
+        email: { type: string, format: email, example: &quot;boss@yocat.example&quot; }
+        displayName: { type: string, minLength: 1, maxLength: 24, example: &quot;喵喵科技&quot; }
+        password: { type: string, minLength: 6, example: &quot;s3cret!&quot; }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    AccountView:
+      type: object
+      required: [id, email, display_name]
+      properties:
+        id: { type: string, example: &quot;1024&quot; }
+        email: { type: string, format: email }
+        display_name: { type: string }
+    WalletView:
+      type: object
+      required: [cash, gems]
+      properties:
+        cash: { type: integer, format: int64, example: 18750 }
+        gems: { type: integer, format: int64, example: 330 }
+    AuthResponse:
+      type: object
+      required: [token, account, wallet]
+      properties:
+        token: { type: string, example: &quot;3f8c1d2ae9b7...&quot; }
+        account: { $ref: &quot;#/components/schemas/AccountView&quot; }
+        wallet: { $ref: &quot;#/components/schemas/WalletView&quot; }
+    SpendRequest:
+      type: object
+      required: [currency, amount]
+      properties:
+        currency: { type: string, enum: [cash, gems] }
+        amount: { type: integer, format: int64, minimum: 1, example: 1250 }
+        reason: { type: string, maxLength: 40, nullable: true }
+    WalletOpResponse:
+      type: object
+      required: [ok, currency, balance, wallet]
+      properties:
+        ok: { type: boolean, example: true }
+        currency: { type: string, enum: [cash, gems] }
+        balance: { type: integer, format: int64 }
+        wallet: { $ref: &quot;#/components/schemas/WalletView&quot; }
+    PaymentRequiredResponse:
+      type: object
+      required: [error, wallet]
+      properties:
+        error: { type: string, example: &quot;餘額不足&quot; }
+        wallet: { $ref: &quot;#/components/schemas/WalletView&quot; }
+    LeaderboardEntry:
+      type: object
+      required: [runId, name, mode, score, updatedAt]
+      properties:
+        runId: { type: string }
+        name: { type: string }
+        mode: { type: string }
+        score: { type: integer, format: int64 }
+        grade: { type: string, nullable: true }
+        updatedAt: { type: string, format: date-time }
+    LeaderboardResponse:
+      type: object
+      required: [leaderboard]
+      properties:
+        leaderboard:
+          type: array
+          items: { $ref: &quot;#/components/schemas/LeaderboardEntry&quot; }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+  responses:
+    Unauthorized:
+      description: &quot;未認證或 token 無效&quot;
+      content:
+        application/json:
+          schema: { $ref: &quot;#/components/schemas/ErrorResponse&quot; }
+          example: { error: &quot;請先登入&quot; }
+    ValidationError:
+      description: &quot;請求參數驗證失敗&quot;
+      content:
+        application/json:
+          schema: { $ref: &quot;#/components/schemas/ErrorResponse&quot; }
+          example: { error: &quot;金額不正確&quot; }
+    NotFound:
+      description: &quot;找不到路由&quot;
+      content:
+        application/json:
+          schema: { $ref: &quot;#/components/schemas/ErrorResponse&quot; }
+          example: { error: &quot;api not found&quot; }
+    Conflict:
+      description: &quot;資源衝突（已存在/已擁有）&quot;
+      content:
+        application/json:
+          schema: { $ref: &quot;#/components/schemas/ErrorResponse&quot; }
+          example: { error: &quot;已經擁有這個項目&quot; }
+    TooManyRequests:
+      description: &quot;超過速率限制&quot;
+      headers:
+        Retry-After: { schema: { type: integer } }
+        X-RateLimit-Limit: { schema: { type: integer } }
+        X-RateLimit-Remaining: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: &quot;#/components/schemas/ErrorResponse&quot; }
+          example: { error: &quot;請求過於頻繁&quot; }</code></pre>
+<hr>
+<h2 id="13-api-changelog">13. API Changelog</h2>
+<table>
+<tr><th>版本</th><th>日期</th><th>Breaking Changes</th><th>新功能</th><th>棄用（Deprecated）</th></tr>
+<tr><td>v1.0</td><td>2026-10-30</td><td>—</td><td>初始版本：16 業務端點（+2 健康檢查），7 有界上下文；opaque session 認證；<code>GET /deposit/packs</code>、<code>POST /deposit/checkout</code>（deposit BC）新增</td><td>—</td></tr>
+<tr><td>v1.1</td><td>—</td><td>—</td><td>（Phase B 預留：真金流 Webhook、批次、S3 存檔）</td><td>—</td></tr>
+</table>
+<blockquote><p>Breaking Change 定義：移除欄位、更改欄位類型、更改 HTTP method、更改端點路徑、更改認證機制。</p></blockquote>
+<hr>
+<h2 id="14-api-review-checklist">14. API Review Checklist</h2>
+<h3 id="命名與結構">命名與結構</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> URL 使用名詞資源（<code>/entitlements</code>、<code>/records</code>、<code>/leaderboard</code>）</li><li style="list-style:none"><input type="checkbox" checked disabled> Request/Response 欄位命名一致（原型 wire 格式，camelCase for itemId/runId/updatedAt）</li><li style="list-style:none"><input type="checkbox" checked disabled> 時間欄位統一 ISO 8601 UTC（<code>*At</code> 後綴）</li></ul>
+<h3 id="response-一致性">Response 一致性</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> 錯誤回應統一 <code>{ &quot;error&quot;: &quot;...&quot; }</code>（402 附 wallet）</li><li style="list-style:none"><input type="checkbox" checked disabled> 列表端點（<code>/records</code>、<code>/leaderboard</code>）有排序 + limit 夾擠策略</li><li style="list-style:none"><input type="checkbox" checked disabled> 所有端點回應碼完整（成功 2XX + 500）</li></ul>
+<h3 id="安全性">安全性</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> 所有非公開端點要求 Bearer session token</li><li style="list-style:none"><input type="checkbox" checked disabled> <code>account_id</code> 一律取自 session，不信任 client 傳入（防越權）</li><li style="list-style:none"><input type="checkbox" checked disabled> 認證端點有嚴格 Rate Limiting（login 10/min、register 5/min）</li><li style="list-style:none"><input type="checkbox" checked disabled> 密碼 scrypt + timingSafeEqual；回應不洩露 stack trace / SQL</li><li style="list-style:none"><input type="checkbox" checked disabled> 狀態變更端點冪等標注完整（§7）</li></ul>
+<h3 id="版本與相容性">版本與相容性</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> Breaking change 有版本升號計畫（§15）</li><li style="list-style:none"><input type="checkbox" checked disabled> OpenAPI spec（§12 / <code>docs/openapi.yaml</code>）已同步</li></ul>
+<h3 id="文件完整性">文件完整性</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> 每個端點有完整 Request/Response 範例 + Java DTO</li><li style="list-style:none"><input type="checkbox" checked disabled> 所有錯誤碼收錄於 §5.2 Registry</li><li style="list-style:none"><input type="checkbox" checked disabled> Rate Limiting 規則於 §6 明確</li><li style="list-style:none"><input type="checkbox" checked disabled> 跨 BC 通訊（Domain Event）於 §1.3 / §8 說明</li></ul>
+<h3 id="ha--resilience必查所有端點">HA / Resilience（必查，所有端點）</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> <strong>Timeout</strong>：API 請求逾時 3s（DB 查詢逾時 2s）；§2.2 / §6 定義，非無限</li><li style="list-style:none"><input type="checkbox" checked disabled> <strong>Retry</strong>：client 對 429/503 採指數退避 + jitter（最大 3 次）；Outbox 事件最大 5 次重試（§1.3.4）</li><li style="list-style:none"><input type="checkbox" checked disabled> <strong>冪等</strong>：重試端點冪等性已標注（§7；POST /deposit/checkout 需 Idempotency-Key）</li><li style="list-style:none"><input type="checkbox" checked disabled> <strong>Rate Limit CB</strong>：429/503 含 Retry-After，client 不盲目 retry（§6.3）</li><li style="list-style:none"><input type="checkbox" checked disabled> <strong>Circuit Breaker</strong>：DB/Redis 關鍵呼叫有 CB，open 時回 503 降級（§1.3.2、EDD §3.6）</li><li style="list-style:none"><input type="checkbox" checked disabled> <strong>Graceful Shutdown</strong>：pod 終止前 in-flight request ≤ 30s 完成才終止（§2.8.4、EDD §3.6.5）</li><li style="list-style:none"><input type="checkbox" checked disabled> <strong>Event Consumer 冪等性</strong>：Domain Event（<code>MemberRegistered</code>/<code>DepositConfirmed</code>/<code>WalletBalanceChanged</code>/<code>EntitlementGranted</code>）消費前先查 <code>event_id</code>（<code>event_publication</code> 完成標記 + <code>SELECT FOR UPDATE SKIP LOCKED</code>），已處理則直接 ACK 不重複執行業務（At-least-once 投遞下不重複入帳，EDD §3.6.2 / §4.6）</li></ul>
+<h3 id="bounded-context-封裝spring-modulith-hc-2必查">Bounded Context 封裝（Spring Modulith HC-2，必查）</h3>
+<ul><li style="list-style:none"><input type="checkbox" checked disabled> Document Control「Owning BC / Service」= yocat-office-backend（具體服務名，非 placeholder）</li><li style="list-style:none"><input type="checkbox" checked disabled> §1.1 Service Encapsulation 原則已確認</li><li style="list-style:none"><input type="checkbox" checked disabled> API Response 經 DTO/View Model 層，與 DB 欄位解耦</li><li style="list-style:none"><input type="checkbox" checked disabled> 無端點依賴其他 BC 的 DB Table（跨 BC 走 Public API <code>WalletService.debit()</code> 或 Domain Event）</li><li style="list-style:none"><input type="checkbox" checked disabled> 冷啟動測試：其他 BC 以 stub 取代時本 API 端點仍可返回 2XX</li></ul>
+<hr>
+<h2 id="15-api-versioning--deprecation-policy">15. API Versioning &amp; Deprecation Policy</h2>
+<h3 id="151-版本策略">15.1 版本策略</h3>
+<table>
+<tr><th>策略</th><th>說明</th></tr>
+<tr><td>版本格式</td><td>目前 v1 隱含於路徑（<code>/auth/*</code> 等，與原型一致）；破壞性變更時引入 <code>/v2/</code> 前綴</td></tr>
+<tr><td>並行版本數</td><td>最多同時維護 2 個主版本（Current + Previous）</td></tr>
+<tr><td>Breaking Change 定義</td><td>移除欄位、改變型別、移除 Endpoint、改變 HTTP Method、更改認證機制</td></tr>
+<tr><td>Non-Breaking Change</td><td>新增可選欄位、新增 Endpoint、新增 HTTP Status Code</td></tr>
+<tr><td>向下相容保證</td><td>主版號升級後舊版維護期 ≥ 180 天（棄用通知 ≥ 90 天）</td></tr>
+</table>
+<h3 id="152-deprecation-流程">15.2 Deprecation 流程</h3>
+<div class="diagram-container"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Active : 發佈版本
+    Active --&gt; Deprecated : 宣告廢棄（Deprecation Notice）
+    Deprecated --&gt; Sunset : 寬限期結束（≥ 6 個月）
+    Sunset --&gt; Removed : 正式移除
+    Removed --&gt; [*]</pre></div>
+<p><strong>Deprecation 通知機制（Response Header）：</strong></p>
+<pre><code class="language-http">Deprecation: true
+Sunset: Sat, 01 Jan 2028 00:00:00 GMT
+Link: &lt;https://api.yocat.sayyogames.com/v2/wallet/spend&gt;; rel=&quot;successor-version&quot;
+Warning: 299 - &quot;This endpoint is deprecated. Please migrate to /v2/&quot;</code></pre>
+<h3 id="153-版本遷移指南格式">15.3 版本遷移指南格式</h3>
+<pre><code class="language-markdown">## Migration Guide: v1 → v2
+### Breaking Changes
+| v1 Endpoint | v2 Endpoint | 變更說明 |
+|-------------|-------------|---------|
+| `POST /wallet/topup`（Phase A 假付費） | `POST /deposit/checkout`（真金流） | 儲值統一走 deposit BC 冪等訂單 |
+### Timeline
+- 2027-xx：v2 發佈，v1 進入廢棄期
+- +90 天：v1 回應加入 Deprecation headers
+- +180 天：v1 正式 Sunset</code></pre>
+<h3 id="154-語義化版本">15.4 語義化版本</h3>
+<p><code>MAJOR.MINOR.PATCH</code>：MAJOR=破壞性變更（新版本路徑）；MINOR=向下相容新功能；PATCH=修補不影響行為。</p>
+<hr>
+<h2 id="16-client-sdk--code-generation">16. Client SDK &amp; Code Generation</h2>
+<h3 id="161-sdk-生成策略">16.1 SDK 生成策略</h3>
+<table>
+<tr><th>語言</th><th>工具</th><th>輸出路徑</th><th>用途</th></tr>
+<tr><td>TypeScript</td><td><code>openapi-generator-cli</code>（typescript-fetch）</td><td><code>sdk/typescript/</code></td><td>遊戲前端客戶端（主要消費者）</td></tr>
+<tr><td>Java</td><td><code>openapi-generator-cli</code>（java，RestClient）</td><td><code>sdk/java/</code></td><td>服務間 / 測試</td></tr>
+</table>
+<h3 id="162-sdk-生成指令">16.2 SDK 生成指令</h3>
+<pre><code class="language-bash"># 生成 TypeScript SDK（遊戲前端）
+npx @openapitools/openapi-generator-cli generate \
+  -i docs/openapi.yaml \
+  -g typescript-fetch \
+  -o sdk/typescript \
+  --additional-properties=supportsES6=true,modelPropertyNaming=original
+
+# 生成 Java SDK
+npx @openapitools/openapi-generator-cli generate \
+  -i docs/openapi.yaml \
+  -g java \
+  -o sdk/java \
+  --additional-properties=library=restclient,useJakartaEe=true
+
+# 驗證 OpenAPI 規格
+npx @stoplight/spectral-cli lint docs/openapi.yaml</code></pre>
+<h3 id="163-sdk-使用範例typescript">16.3 SDK 使用範例（TypeScript）</h3>
+<pre><code class="language-typescript">import { Configuration, MemberApi, WalletApi } from &quot;@yocat/office-sdk&quot;;
+
+const config = new Configuration({ basePath: &quot;https://api.yocat.sayyogames.com&quot; });
+const member = new MemberApi(config);
+
+// 登入
+const auth = await member.login({ loginRequest: { email: &quot;boss@yocat.example&quot;, password: &quot;s3cret!&quot; } });
+localStorage.setItem(&quot;token&quot;, auth.token);
+
+// 帶 token 花費
+const wallet = new WalletApi(new Configuration({ basePath: config.basePath, accessToken: auth.token }));
+const res = await wallet.spend({ spendRequest: { currency: &quot;cash&quot;, amount: 1250, reason: &quot;salary_day_42&quot; } });</code></pre>
+<hr>
+<h2 id="17-api-observability--slo">17. API Observability &amp; SLO</h2>
+<h3 id="171-標準-observability-headers">17.1 標準 Observability Headers</h3>
+<table>
+<tr><th>Header</th><th>方向</th><th>說明</th></tr>
+<tr><td><code>X-Request-Id</code></td><td>Req/Res</td><td>請求唯一 ID（traceparent 傳播），貫穿 log/trace</td></tr>
+<tr><td><code>X-Response-Time</code></td><td>Res</td><td>伺服器處理時間（ms）</td></tr>
+<tr><td><code>X-RateLimit-*</code></td><td>Res</td><td>速率限制狀態（§6）</td></tr>
+</table>
+<h3 id="172-slo-定義constants-4">17.2 SLO 定義（CONSTANTS §4）</h3>
+<table>
+<tr><th>SLO 指標</th><th>目標值</th><th>測量窗口</th><th>警報閾值</th></tr>
+<tr><td>可用性（Availability）</td><td>≥ 99.9%（&lt; 8.7h/year）</td><td>30 天滾動</td><td>&lt; 99.5%</td></tr>
+<tr><td>P50 延遲</td><td>&lt; 200ms @ 500 PCU</td><td>5 分鐘</td><td>&gt; 300ms</td></tr>
+<tr><td>P99 延遲</td><td>&lt; 1000ms @ 500 PCU（成長期 3000 PCU &lt; 1500ms）</td><td>5 分鐘</td><td>&gt; 1500ms</td></tr>
+<tr><td>排行 Top N 查詢 P99</td><td>&lt; 300ms（limit ≤ 100）</td><td>5 分鐘</td><td>&gt; 500ms</td></tr>
+<tr><td>錯誤率（5xx）</td><td>&lt; 1%</td><td>5 分鐘</td><td>&gt; 1%（持續 5 分 → P1）</td></tr>
+<tr><td>HA 滾動更新錯誤率</td><td>&lt; 0.1%</td><td>滾動更新期間</td><td>&gt; 0.1%</td></tr>
+<tr><td>寫入交易吞吐量</td><td>≥ 200 txn/sec</td><td>壓測</td><td>&lt; 200</td></tr>
+<tr><td>錢包對帳一致性</td><td>0 筆不一致（ledger 100% 相符）</td><td>併發壓測</td><td>任一不一致 → P0</td></tr>
+</table>
+<h3 id="173-error-budget-計算">17.3 Error Budget 計算</h3>
+<pre><code class="">月度錯誤預算 = (1 - SLO可用性) × 月度總請求數
+範例（99.9% 可用性，月度 10M 請求）：
+  錯誤預算 = 0.001 × 10,000,000 = 10,000 次允許失敗
+  每日預算 = 10,000 / 30 ≈ 333 次/天
+告警：錯誤預算消耗 &gt; 50%（月中）→ 凍結非必要發佈</code></pre>
+<h3 id="174-監測工具">17.4 監測工具</h3>
+<ul><li><strong>Metrics</strong>：Micrometer + Prometheus（<code>/actuator/prometheus</code>）。</li><li><strong>Trace</strong>：OpenTelemetry（採樣 Prod 10% / Staging 100%，錯誤 100%，CONSTANTS §11）。</li><li><strong>Log</strong>：結構化 JSON log（熱 90 天 / 冷 365 天，CONSTANTS §8）。</li><li><strong>可用性 / RTO-RPO</strong>：RTO 30 min / RPO 5 min（CONSTANTS §4）。</li></ul>
+<hr>
+<h2 id="18-admin-api條件章節">18. Admin API（條件章節）</h2>
+<p>本專案 <code>has_admin_backend=false</code>（api-only，C 端信任層），<strong>略過 §18</strong>。營運/客服（OPS 角色）的對帳稽核與強制登出屬 Phase B Admin 後台，將於後台專案獨立設計，不在本 C 端 API 契約範圍。</p>
+<hr>
+<p><em>文件維護者：Backend Core（聖祐遊戲）| 上游：EDD §5.2 / CONSTANTS（SSOT）| 最後更新：2026-10-30</em></p></main>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({startOnLoad:true,theme:'default',
+      flowchart:{curve:'basis',nodeSpacing:60,rankSpacing:80},
+      er:{layoutDirection:'TD',minEntityWidth:100,fontSize:12},
+      sequence:{actorMargin:60,messageMargin:30}});
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-go.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-typescript.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-json.min.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

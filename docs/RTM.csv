@@ -1,0 +1,80 @@
+req_id,user_story,ac_id,test_case_id,test_type,priority,bdd_scenario,status
+RQ-001,US-MEM-001,,TC-UNIT-MEM-003-B01,Unit,P0,"格式或長度不合法的註冊欄位被拒絕（回 400）",TODO
+RQ-001,US-MEM-001,,TC-UNIT-SCRYPTENC-E01,Unit,P0,"錯誤密碼比對失敗且以 timingSafeEqual 防時序攻擊",TODO
+RQ-001,US-MEM-001,,TC-UNIT-REGMEMBER-S01,Unit,P0,"合法資料建帳成功並發布 MemberRegistered 事件",TODO
+RQ-001,US-MEM-001,,TC-UNIT-SESSION-B01,Unit,P0,"session TTL 到期邊界（expires_at <= now）判定為過期",TODO
+RQ-002,US-WAL-001,,TC-UNIT-WALLET-S01,Unit,P0,"餘額足夠時扣款成功並產生負 delta 異動",TODO
+RQ-002,US-WAL-001,,TC-UNIT-WALLET-E01,Unit,P0,"餘額不足時拒絕扣款（不產生異動）",TODO
+RQ-002,US-WAL-001,,TC-UNIT-WAL-004-B01,Unit,P0,"超出合法範圍（<=0）的金額被拒絕（回 400）",TODO
+RQ-002,US-WAL-001,,TC-UNIT-WAL-004-B02,Unit,P0,"合法邊界金額（1 與 10,000,000）的儲值被接受",TODO
+RQ-002,US-WAL-001,,TC-UNIT-MONEY-B01,Unit,P0,"金額 0 與上限邊界運算正確且不產生負值",TODO
+RQ-003,US-ENT-001,,TC-UNIT-BUYENT-S01,Unit,P0,"未擁有且餘額足時原子扣款並授予權益",TODO
+RQ-003,US-ENT-001,,TC-UNIT-ENT-004-B01,Unit,P0,"類別非法或缺項目 ID 的購買被拒絕（回 400）",TODO
+RQ-004,US-SAVE-001,,TC-UNIT-SAVE-004-B01,Unit,P0,"上傳存檔缺少 data 欄位時被拒絕（回 400）",TODO
+RQ-005,US-PLAT-001,,TC-UNIT-ARCH-005-S01,Unit,P0,"模組依賴關係構成有向無環圖（0 循環依賴）",TODO
+RQ-005,US-PLAT-001,,TC-UNIT-BEARERFILTER-E01,Unit,P0,"過期或無效 token 被攔截拒絕",TODO
+RQ-005,US-PLAT-001,,TC-SMOKE-PLAT-LIVE-S01,Integration,P0,"存活探針回應程序存活",TODO
+RQ-005,US-PLAT-001,,TC-SMOKE-PLAT-READY-S01,Integration,P0,"就緒探針檢查 DB / Redis 依賴可用",TODO
+RQ-001,US-MEM-001,,TC-E2E-MEM-001-S01,Integration,P0,"以合法資料註冊新帳號並同時開立錢包",TODO
+RQ-001,US-MEM-001,,TC-INT-MEM-002-E01,Integration,P0,"以已註冊的 email 再次註冊時回應衝突",TODO
+RQ-001,US-MEM-001,,TC-INT-MEM-009-E01,Integration,P0,"同一來源短時間大量註冊時觸發速率限制",TODO
+RQ-001,US-MEM-001,,TC-E2E-MEM-004-S01,Integration,P0,"以正確帳密登入並簽發新 session（TTL 30 天）",TODO
+RQ-001,US-MEM-001,,TC-INT-MEM-005-E01,Integration,P0,"以錯誤密碼登入時回應認證失敗且不洩露帳號是否存在",TODO
+RQ-001,US-MEM-001,,TC-INT-MEM-005-E02,Integration,P0,"以未註冊 email 登入時回應與帳密錯誤相同的訊息",TODO
+RQ-001,US-MEM-001,,TC-INT-MEM-008-S01,Integration,P0,"登出刪除當前 session 且為冪等操作",TODO
+RQ-001,US-MEM-001,,TC-INT-MEM-008-E01,Integration,P0,"以無效或已失效 token 登出仍回應成功（冪等）",TODO
+RQ-001,US-MEM-001,,TC-E2E-MEM-007-S01,Integration,P0,"已登入者查詢我的資料彙整帳號 / 錢包 / 權益",TODO
+RQ-001,US-MEM-001,,TC-INT-MEM-006-E01,Integration,P0,"無有效 token 查詢我的資料時拒絕存取",TODO
+RQ-002,US-WAL-001,,TC-E2E-WAL-001-S01,Integration,P0,"以預定義儲值包儲值並寫入 topup 帳本",TODO
+RQ-002,US-WAL-001,,TC-E2E-WAL-001-S02,Integration,P0,"以自訂現金金額儲值使餘額增加",TODO
+RQ-002,US-WAL-001,,TC-E2E-WAL-002-S01,Integration,P0,"餘額足夠時以行鎖序列化扣款並寫入負異動帳本",TODO
+RQ-002,US-WAL-001,,TC-INT-WAL-003-E01,Integration,P0,"餘額不足時拒絕扣款並回傳現有錢包",TODO
+RQ-002,US-WAL-001,,TC-INT-WAL-006-E01,Integration,P0,"無有效 token 嘗試花費時拒絕存取",TODO
+RQ-002,US-WAL-001,,TC-INT-WAL-005-S01,Integration,P0,"同帳號併發多筆花費時行鎖序列化且帳本與餘額零不一致",TODO
+RQ-002,US-WAL-001,,TC-INT-WAL-007-E01,Integration,P0,"同一帳號短時間大量花費時觸發速率限制",TODO
+RQ-008,US-DEP-001,,TC-E2E-DEP-001-S01,Integration,P1,"未登入也能查詢儲值包目錄",TODO
+RQ-008,US-DEP-001,,TC-E2E-DEP-002-S01,Integration,P1,"以有效儲值包與冪等鍵建立已確認的儲值訂單",TODO
+RQ-008,US-DEP-001,,TC-INT-DEP-003-S01,Integration,P1,"以相同冪等鍵重放時回放原訂單且只入帳一次",TODO
+RQ-008,US-DEP-001,,TC-INT-DEP-004-E01,Integration,P1,"相同冪等鍵但請求內容不同時回應衝突",TODO
+RQ-008,US-DEP-001,,TC-INT-DEP-005-E01,Integration,P1,"以不存在的儲值包建立訂單時被拒絕",TODO
+RQ-008,US-DEP-001,,TC-INT-DEP-006-E01,Integration,P1,"未提供冪等鍵時拒絕建立儲值訂單",TODO
+RQ-008,US-DEP-001,,TC-INT-DEP-007-E01,Integration,P1,"無有效 token 建立儲值訂單時拒絕存取",TODO
+RQ-003,US-ENT-001,,TC-INT-ENT-008-E01,Integration,P0,"無有效 token 查詢權益時拒絕存取",TODO
+RQ-003,US-ENT-001,,TC-E2E-ENT-001-S01,Integration,P0,"餘額足夠且未擁有時原子扣款並授予權益",TODO
+RQ-003,US-ENT-001,,TC-INT-ENT-006-S01,Integration,P0,"以零金額免費授予活動權益時僅插入權益不寫帳本",TODO
+RQ-003,US-ENT-001,,TC-INT-ENT-002-E01,Integration,P0,"重複購買已擁有的項目時回應衝突且不重複扣款",TODO
+RQ-003,US-ENT-001,,TC-INT-ENT-003-E01,Integration,P0,"餘額不足時交易回滾不扣款也不授予",TODO
+RQ-003,US-ENT-001,,TC-INT-ENT-007-E01,Integration,P0,"無有效 token 購買權益時拒絕存取",TODO
+RQ-006,US-REC-001,,TC-INT-REC-001-S01,Integration,P1,"以合法類型新增一筆破產經營史",TODO
+RQ-006,US-REC-001,,TC-INT-REC-002-B01,Integration,P1,"類型非法的經營史記錄被拒絕",TODO
+RQ-006,US-REC-001,,TC-INT-REC-003-E01,Integration,P1,"無有效 token 寫入經營史時拒絕存取",TODO
+RQ-006,US-REC-001,,TC-INT-REC-004-S01,Integration,P1,"查詢經營史時依建立時間由新到舊回傳",TODO
+RQ-006,US-REC-001,,TC-INT-REC-005-S01,Integration,P1,"依類型篩選經營史時只回傳符合的記錄",TODO
+RQ-007,US-LB-001,,TC-INT-LB-001-S01,Integration,P1,"未登入也能依分數由高到低查詢排行榜",TODO
+RQ-007,US-LB-001,,TC-INT-LB-002-B01,Integration,P1,"查詢筆數被夾擠於合法範圍內",TODO
+RQ-007,US-LB-001,,TC-INT-LB-003-S01,Integration,P1,"已登入者上榜時以帳號顯示名稱歸戶寫入",TODO
+RQ-007,US-LB-001,,TC-INT-LB-004-S01,Integration,P1,"以相同場次 ID 再次提交時只更新同一筆排行記錄",TODO
+RQ-007,US-LB-001,,TC-INT-LB-005-E01,Integration,P1,"未提供場次 ID 上榜時被拒絕",TODO
+RQ-007,US-LB-001,,TC-INT-LB-006-E01,Integration,P1,"無有效 token 提交分數時拒絕存取",TODO
+RQ-004,US-SAVE-001,,TC-E2E-SAVE-002-S01,Integration,P0,"查詢已存在的存檔時回傳最新內容",TODO
+RQ-004,US-SAVE-001,,TC-INT-SAVE-003-E01,Integration,P0,"查詢尚無存檔的存檔槽時回傳空存檔而非找不到",TODO
+RQ-004,US-SAVE-001,,TC-E2E-SAVE-001-S01,Integration,P0,"上傳存檔時以帳號與存檔槽 upsert 寫入",TODO
+RQ-004,US-SAVE-001,,TC-INT-SAVE-006-B01,Integration,P0,"上傳空物件存檔時仍視為合法寫入",TODO
+RQ-004,US-SAVE-001,,TC-INT-SAVE-007-E01,Integration,P0,"無有效 token 上傳存檔時拒絕存取",TODO
+RQ-005,US-PLAT-001,,TC-INT-ARCH-001-S01,Integration,P0,"每個有界上下文只存取自己擁有的資料庫 schema",TODO
+RQ-005,US-PLAT-001,,TC-INT-ARCH-002-S01,Integration,P0,"有界上下文之間僅透過公開介面或領域事件互動",TODO
+RQ-005,US-PLAT-001,,TC-INT-ARCH-003-S01,Integration,P0,"跨模組通訊透過具版本相容性的領域事件",TODO
+RQ-005,US-PLAT-001,,TC-INT-ARCH-004-S01,Integration,P0,"各有界上下文使用隔離的 Redis 命名空間",TODO
+RQ-005,US-PLAT-001,,TC-INT-ARCH-006-S01,Integration,P0,"單一有界上下文可在其他模組不可用時獨立冷啟動",TODO
+RQ-001,US-MEM-001,,TC-INT-EVT-001-S01,Integration,P0,"註冊完成時 member 發布合規的會員註冊事件",TODO
+RQ-002,US-WAL-001,,TC-INT-EVT-002-S01,Integration,P0,"wallet 消費會員註冊事件後建立初始錢包與開帳帳本",TODO
+RQ-008,US-DEP-001,,TC-INT-EVT-003-S01,Integration,P1,"儲值確認後 deposit 發布合規的儲值確認事件",TODO
+RQ-002,US-WAL-001,,TC-INT-EVT-004-S01,Integration,P0,"wallet 消費儲值確認事件後入帳且重複投遞只入帳一次",TODO
+RQ-003,US-ENT-001,,TC-INT-EVT-005-S01,Integration,P0,"授予權益後 entitlement 發布合規的權益授予事件",TODO
+RQ-007,US-LB-001,,TC-INT-EVT-006-S01,Integration,P1,"上榜後 leaderboard 發布合規的分數提交事件",TODO
+RQ-002,US-WAL-001,,TC-E2E-JOURNEY-001-S01,E2E,P0,"登入後 topup 假付費、entitlements/buy 原子扣款授予、PUT /save，端到端驗證伺服器權威狀態",TODO
+RQ-004,US-SAVE-001,,TC-E2E-SAVE-005-S01,E2E,P0,"在一台裝置上傳存檔後於另一台裝置登入可還原同一存檔（成功率 >= 99%）",TODO
+RQ-003,US-ENT-001,,TC-E2E-ENT-005-S01,E2E,P0,"帳號破產 recycle 後已購權益與夢想員工仍完整不消失",TODO
+RQ-005,US-PLAT-001,,TC-E2E-PLAT-001-S01,E2E,P0,"殺 1 個 pod 服務持續可用錯誤率 < 0.1%",TODO
+RQ-005,US-PLAT-001,,TC-E2E-PLAT-002-S01,E2E,P0,"滾動更新無停機 HTTP 5xx 比率 < 0.1%（PodDisruptionBudget 保證最小可用數）",TODO
+RQ-005,US-PLAT-001,,TC-E2E-PLAT-005-S01,E2E,P0,"於 Rancher Desktop k8s 一鍵部署 + 測試全流程本機跑完且全綠",TODO
